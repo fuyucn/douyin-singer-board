@@ -222,6 +222,17 @@ export default function App() {
             onChange={(e) => setConfig({ fans_level: Number(e.target.value) || 0 })}
           />
         </label>
+        <label>
+          <span>点歌冷却 (秒)</span>
+          <input
+            type="number"
+            min={0}
+            value={config.sing_cd}
+            disabled={running}
+            onChange={(e) => setConfig({ sing_cd: Math.max(0, Number(e.target.value) || 0) })}
+            title="同一用户两次点歌的最短间隔。0 = 关闭冷却。"
+          />
+        </label>
         {!running ? (
           <button className="primary" onClick={onStart}>开始</button>
         ) : (
