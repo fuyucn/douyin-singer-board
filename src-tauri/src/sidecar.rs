@@ -1,9 +1,9 @@
 // Node sidecar process management.
 //
-// Modes:
-// - dev: locate ../sidecar/build/index.cjs and run with the system `node`
-// - release: use tauri-plugin-shell's sidecar API to run the bundled binary
-//   (binaries built by sidecar/scripts/build-bin.mjs, externalBin in tauri.conf.json)
+// The sidecar binary (built by `pnpm sidecar:build:bin`) is embedded into this
+// crate at compile time via `include_bytes!`. At first run we extract it to
+// the system temp dir, mark it executable, and spawn it. Each version of the
+// app extracts to its own filename so old binaries can be cleaned up.
 //
 // IPC:
 // - Tauri → sidecar: write JSON lines on stdin (cmd: start | stop | reload_config)
@@ -17,6 +17,11 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::Mutex;
 
+/// Sidecar binary embedded at compile time. build.rs places the platform-specific
+/// binary at OUT_DIR/sidecar.bin (or an empty placeholder if pnpm sidecar:build:bin
+/// has not been run yet — in which case spawn() will fail with a clear error).
+const SIDECAR_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sidecar.bin"));
+
 pub struct SidecarHandle {
     child: Mutex<Option<CommandChild>>,
 }
@@ -28,13 +33,32 @@ impl SidecarHandle {
         }
     }
 
-    fn locate_dev_script() -> Option<PathBuf> {
-        let cwd = std::env::current_dir().ok()?;
-        let candidates = [
-            cwd.join("../sidecar/build/index.cjs"),
-            cwd.join("sidecar/build/index.cjs"),
-        ];
-        candidates.into_iter().find(|p| p.exists())
+    /// Extract the embedded sidecar binary to the system temp dir and return its path.
+    /// Per-version filename so upgrades don't clash with stale extracts.
+    fn extract_to_temp() -> Result<PathBuf, String> {
+        if SIDECAR_BIN.len() < 1024 {
+            return Err(
+                "embedded sidecar is empty/too small. Build was made without a sidecar binary; \
+                 run `pnpm sidecar:build:bin` and rebuild."
+                    .to_string(),
+            );
+        }
+        let version = env!("CARGO_PKG_VERSION");
+        let ext = if cfg!(windows) { ".exe" } else { "" };
+        let dir = std::env::temp_dir().join("sususingerboard");
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp: {}", e))?;
+        let path = dir.join(format!("sidecar-{}{}", version, ext));
+
+        if !path.exists() || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) != SIDECAR_BIN.len() as u64 {
+            std::fs::write(&path, SIDECAR_BIN).map_err(|e| format!("write sidecar: {}", e))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let perm = std::fs::Permissions::from_mode(0o755);
+                std::fs::set_permissions(&path, perm).map_err(|e| format!("chmod: {}", e))?;
+            }
+        }
+        Ok(path)
     }
 
     pub async fn spawn(&self, app: AppHandle) -> Result<(), String> {
@@ -43,19 +67,8 @@ impl SidecarHandle {
             return Ok(());
         }
 
-        // Prefer the bundled sidecar binary (release); fall back to `node ../sidecar/build/index.cjs` (dev)
-        let cmd = if let Ok(c) = app.shell().sidecar("sidecar") {
-            c
-        } else if let Some(script) = Self::locate_dev_script() {
-            app.shell()
-                .command("node")
-                .args([script.to_string_lossy().as_ref()])
-        } else {
-            return Err(
-                "no sidecar binary or dev script found. dev: `pnpm sidecar:build`; release: `pnpm sidecar:build:bin`"
-                    .to_string(),
-            );
-        };
+        let path = Self::extract_to_temp()?;
+        let cmd = app.shell().command(path.to_string_lossy().to_string());
 
         let (mut rx, child) = cmd.spawn().map_err(|e| format!("spawn: {}", e))?;
         *child_lock = Some(child);

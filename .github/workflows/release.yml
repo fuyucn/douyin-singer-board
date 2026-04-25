@@ -95,11 +95,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $bundle = "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+          $target = "src-tauri/target/${{ matrix.rust_target }}/release"
           $out = "release-out"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          if (Test-Path "$bundle/msi") { Copy-Item "$bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
-          if (Test-Path "$bundle/nsis") { Copy-Item "$bundle/nsis/*-setup.exe" $out -ErrorAction SilentlyContinue }
+          # Portable single .exe (sidecar is embedded, no installer needed).
+          $portable = "$out/SUSUSingBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
+          Copy-Item "$target/sususingerboard.exe" $portable
+          # Also keep MSI / NSIS installers if the bundler produced them, for users who prefer them.
+          if (Test-Path "$target/bundle/msi") { Copy-Item "$target/bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
+          if (Test-Path "$target/bundle/nsis") { Copy-Item "$target/bundle/nsis/*-setup.exe" $out -ErrorAction SilentlyContinue }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
