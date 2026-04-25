@@ -237,21 +237,28 @@ export default function App() {
         </button>
       </section>
 
-      <ul className="list">
-        {display.length === 0 && <li className="empty">{running ? '等待点歌...' : '点击 "开始" 连接直播间'}</li>}
-        {display.map((s) => (
-          <li key={s.msg_id} className="item">
-            <div className="item-main">
-              <div className="uname">{s.uname}</div>
-              <div className="song">{s.song_name}</div>
+      <div className="list">
+        <div className="list-header">
+          <div className="col-uname">用户</div>
+          <div className="col-song">点歌</div>
+          <div className="col-actions">操作</div>
+        </div>
+        <div className="list-body">
+          {display.length === 0 && (
+            <div className="empty">{running ? '等待点歌...' : '点击 "开始" 连接直播间'}</div>
+          )}
+          {display.map((s) => (
+            <div key={s.msg_id} className="item">
+              <div className="col-uname uname">{s.uname}</div>
+              <div className="col-song song">{s.song_name}</div>
+              <div className="col-actions item-actions">
+                <button onClick={() => onCopy(s.song_name)}>复制</button>
+                <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
+              </div>
             </div>
-            <div className="item-actions">
-              <button onClick={() => onCopy(s.song_name)}>复制</button>
-              <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
-            </div>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
+      </div>
 
       <details className="logs">
         <summary>日志 ({logs.length})</summary>
