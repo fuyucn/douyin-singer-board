@@ -47,6 +47,27 @@ sudo xattr -cr "/Applications/SUSUSingBoard.app"
 This strips the quarantine xattr that Gatekeeper added on download. One-time
 fix per install.
 
+## Install (Windows)
+
+The portable single .exe (`SUSUSingBoard-Windows-x64-X.Y.Z.exe`) is the easiest:
+just double-click. No installer, no admin rights needed.
+
+**SmartScreen warning** ("Windows protected your PC, unknown publisher"): the
+build is unsigned. Click **More info → Run anyway** once.
+
+**If the .exe does nothing when you double-click it**: the machine likely lacks
+the WebView2 runtime. It ships with Win10 1803+ and Win11 by default, so this
+is rare. To install:
+
+[Microsoft WebView2 Runtime download](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+
+Pick the "Evergreen Standalone Installer (x64)". Free, one-time, ~120MB
+download. After it's installed, every WebView2-based app (including this one)
+runs without the prompt.
+
+Alternatives if you don't want the portable: the same Release page also has an
+MSI and an NSIS installer — those auto-handle the WebView2 dependency.
+
 ## Configuration (in the app's UI)
 
 - **Douyin room ID** — the number in `https://live.douyin.com/{this}`
