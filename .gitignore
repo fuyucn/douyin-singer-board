@@ -1,0 +1,32 @@
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+sidecar/build/
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/schemas/
+
+# Rust
+**/*.rs.bk
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# TypeScript incremental
+*.tsbuildinfo
+
+# Local config
+config.json

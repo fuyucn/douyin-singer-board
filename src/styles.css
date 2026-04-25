@@ -1,0 +1,62 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+.header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #eee; }
+.header h1 { font-size: 18px; margin: 0; }
+
+.status.on { color: #2e7d32; }
+.status.off { color: #999; }
+
+.banner.error { background: #fdecea; color: #b71c1c; padding: 8px 20px; }
+
+.config { display: flex; gap: 12px; align-items: flex-end; padding: 12px 20px; border-bottom: 1px solid #eee; flex-wrap: wrap; }
+.config label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 140px; }
+.config label > span { font-size: 12px; color: #666; }
+.config input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; }
+.config input:disabled { background: #f5f5f5; color: #999; }
+.config button.primary { background: #2e7d32; color: #fff; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.config button.primary:hover { background: #1b5e20; }
+.config button.danger { background: #c62828; color: #fff; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; font-weight: 500; }
+.config button.danger:hover { background: #8e0000; }
+
+.toolbar { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid #eee; }
+.toolbar input { flex: 1; padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; }
+.toolbar button { padding: 6px 14px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; }
+.toolbar button:hover:not(:disabled) { background: #f5f5f5; }
+.toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.list { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; }
+.list .empty { padding: 40px; text-align: center; color: #999; }
+
+.item { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid #f0f0f0; }
+.item:hover { background: #fafafa; }
+.item-main { flex: 1; display: flex; align-items: baseline; gap: 12px; }
+.item .uname { color: #666; font-size: 13px; min-width: 100px; }
+.item .song { font-size: 15px; font-weight: 500; }
+.item-actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
+.item:hover .item-actions { opacity: 1; }
+.item-actions button { padding: 4px 10px; font-size: 12px; border: 1px solid #ddd; border-radius: 3px; background: #fff; cursor: pointer; }
+
+.logs { border-top: 1px solid #eee; padding: 4px 20px; max-height: 180px; overflow-y: auto; font-size: 12px; color: #666; }
+.logs pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  padding: 10px 20px; border-radius: 6px; color: #fff; font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); pointer-events: none;
+  animation: toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards;
+  z-index: 1000;
+}
+.toast.success { background: #2e7d32; }
+.toast.error { background: #c62828; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, 12px); }
+}

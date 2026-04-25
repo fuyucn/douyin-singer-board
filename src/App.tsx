@@ -1,0 +1,238 @@
+import { useEffect, useMemo, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { useAppStore, dedupedSongs } from './store';
+import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessionHistory } from './db';
+import type { SidecarEvent } from './types';
+
+export default function App() {
+  const config = useAppStore((s) => s.config);
+  const setConfig = useAppStore((s) => s.setConfig);
+  const hydrateConfig = useAppStore((s) => s.hydrateConfig);
+  const running = useAppStore((s) => s.running);
+  const setRunning = useAppStore((s) => s.setRunning);
+  const sessionId = useAppStore((s) => s.sessionId);
+  const newSession = useAppStore((s) => s.newSession);
+  const status = useAppStore((s) => s.status);
+  const setStatus = useAppStore((s) => s.setStatus);
+  const songs = useAppStore((s) => s.songs);
+  const addSong = useAppStore((s) => s.addSong);
+  const cancelByUid = useAppStore((s) => s.cancelByUid);
+  const removeByMsgId = useAppStore((s) => s.removeByMsgId);
+  const clearSongs = useAppStore((s) => s.clearSongs);
+  const manualAdd = useAppStore((s) => s.manualAdd);
+  const logs = useAppStore((s) => s.logs);
+  const pushLog = useAppStore((s) => s.pushLog);
+
+  const [manualText, setManualText] = useState('');
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
+
+  // 显示一个 toast, 1.6s 自动消失
+  const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
+    setToast({ msg, kind });
+    window.setTimeout(() => setToast(null), 1600);
+  };
+
+  const display = useMemo(() => dedupedSongs(songs), [songs]);
+
+  // 启动时加载配置
+  useEffect(() => {
+    (async () => {
+      try {
+        const cfg = await loadConfig();
+        hydrateConfig(cfg);
+      } catch (e) {
+        setBootError(`加载配置失败: ${e}`);
+      }
+    })();
+  }, [hydrateConfig]);
+
+  // 订阅 sidecar 事件
+  useEffect(() => {
+    const unlisten = listen<SidecarEvent>('sidecar-event', (e) => {
+      const ev = e.payload;
+      switch (ev.event) {
+        case 'danmu':
+          addSong(ev.data);
+          if (sessionId) {
+            insertHistory(ev.data, sessionId).catch((err) => pushLog(`db: ${err}`));
+          }
+          break;
+        case 'cancel':
+          cancelByUid(ev.uid);
+          break;
+        case 'status':
+          setStatus({ connected: ev.connected, message: ev.message });
+          break;
+        case 'log':
+          pushLog(`[${ev.level}] ${ev.msg}`);
+          break;
+        case 'error':
+          pushLog(`[error] ${ev.msg}`);
+          break;
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [addSong, cancelByUid, setStatus, pushLog, sessionId]);
+
+  const onStart = async () => {
+    if (!config.room_id.trim()) {
+      setBootError('请填写抖音直播间 ID');
+      return;
+    }
+    setBootError(null);
+    try {
+      await saveConfig(config);
+      const sid = newSession();
+      clearSongs();
+      await clearSessionHistory(sid).catch(() => {}); // 防御: 万一同 id 残留
+      await invoke('sidecar_send', { cmd: { cmd: 'start', config } });
+      setRunning(true);
+    } catch (e) {
+      setBootError(`启动失败: ${e}`);
+    }
+  };
+
+  const onStop = async () => {
+    try {
+      await invoke('sidecar_send', { cmd: { cmd: 'stop' } });
+    } catch (e) {
+      pushLog(`stop error: ${e}`);
+    } finally {
+      setRunning(false);
+      setStatus({ connected: false, message: '已停止' });
+    }
+  };
+
+  const onCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(`已复制: ${text}`);
+    } catch (e) {
+      showToast(`复制失败: ${e}`, 'error');
+    }
+  };
+  const onCopyAll = async () => {
+    if (display.length === 0) return;
+    try {
+      await navigator.clipboard.writeText(display.map((s) => s.song_name).join('\n'));
+      showToast(`已复制 ${display.length} 条到剪贴板`);
+    } catch (e) {
+      showToast(`复制失败: ${e}`, 'error');
+    }
+  };
+  const onManualAdd = () => {
+    const t = manualText.trim();
+    if (!t) return;
+    const item = manualAdd(t);
+    if (sessionId) insertHistory(item, sessionId).catch(() => {});
+    setManualText('');
+    showToast(`已添加: ${t}`);
+  };
+  const onRemoveOne = async (msgId: string, name: string) => {
+    removeByMsgId(msgId);
+    await deleteHistoryByMsgId(msgId).catch(() => {});
+    showToast(`已删除: ${name}`);
+  };
+  const onClearList = async () => {
+    const n = display.length;
+    clearSongs();
+    if (sessionId) await clearSessionHistory(sessionId).catch(() => {});
+    showToast(`已清空 ${n} 条`);
+  };
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1>SUSUSingBoard</h1>
+        <span className={`status ${status.connected ? 'on' : 'off'}`}>
+          {status.connected ? '●' : '○'} {status.message}
+        </span>
+      </header>
+
+      {bootError && <div className="banner error">{bootError}</div>}
+
+      <section className="config">
+        <label>
+          <span>抖音直播间 ID</span>
+          <input
+            type="text"
+            value={config.room_id}
+            disabled={running}
+            onChange={(e) => setConfig({ room_id: e.target.value })}
+            placeholder="例如 221321076494"
+          />
+        </label>
+        <label>
+          <span>点歌指令(正则)</span>
+          <input
+            type="text"
+            value={config.sing_prefix}
+            disabled={running}
+            onChange={(e) => setConfig({ sing_prefix: e.target.value })}
+          />
+        </label>
+        <label>
+          <span>最低粉丝团等级</span>
+          <input
+            type="number"
+            min={0}
+            value={config.fans_level}
+            disabled={running}
+            onChange={(e) => setConfig({ fans_level: Number(e.target.value) || 0 })}
+          />
+        </label>
+        {!running ? (
+          <button className="primary" onClick={onStart}>开始</button>
+        ) : (
+          <button className="danger" onClick={onStop}>停止</button>
+        )}
+      </section>
+
+      <section className="toolbar">
+        <input
+          type="text"
+          placeholder="手动点歌"
+          value={manualText}
+          onChange={(e) => setManualText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onManualAdd()}
+        />
+        <button onClick={onManualAdd}>添加</button>
+        <button onClick={onCopyAll} disabled={display.length === 0}>
+          复制列表 ({display.length})
+        </button>
+        <button onClick={onClearList} disabled={display.length === 0}>
+          清空
+        </button>
+      </section>
+
+      <ul className="list">
+        {display.length === 0 && <li className="empty">{running ? '等待点歌...' : '点击 "开始" 连接直播间'}</li>}
+        {display.map((s) => (
+          <li key={s.msg_id} className="item">
+            <div className="item-main">
+              <div className="uname">{s.uname}</div>
+              <div className="song">{s.song_name}</div>
+            </div>
+            <div className="item-actions">
+              <button onClick={() => onCopy(s.song_name)}>复制</button>
+              <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <details className="logs">
+        <summary>日志 ({logs.length})</summary>
+        <pre>{logs.join('\n')}</pre>
+      </details>
+
+      {toast && (
+        <div className={`toast ${toast.kind}`}>{toast.msg}</div>
+      )}
+    </div>
+  );
+}

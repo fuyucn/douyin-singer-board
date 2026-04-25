@@ -1,0 +1,85 @@
+import type { Config, DanmuInfo } from './types.js';
+import { DEFAULT_SING_PREFIX } from './types.js';
+
+interface RawDanmu {
+  uid: string;
+  uname: string;
+  content: string;
+  medal_level: number;
+  medal_name: string;
+}
+
+export type MatchResult =
+  | { kind: 'song'; danmu: DanmuInfo }
+  | { kind: 'cancel'; uid: string }
+  | { kind: 'skip'; reason: string };
+
+const CANCEL_PREFIX = '取消点歌';
+
+export class Matcher {
+  private config: Config;
+  private lastByUid = new Map<string, number>();
+  private compiled: RegExp;
+
+  constructor(config: Config) {
+    this.config = config;
+    this.compiled = this.compilePattern(config.sing_prefix);
+  }
+
+  reload(config: Config): void {
+    this.config = config;
+    this.compiled = this.compilePattern(config.sing_prefix);
+  }
+
+  private compilePattern(pattern: string): RegExp {
+    const p = pattern && pattern.trim() ? pattern : DEFAULT_SING_PREFIX;
+    try {
+      return new RegExp(p);
+    } catch {
+      return new RegExp(DEFAULT_SING_PREFIX);
+    }
+  }
+
+  match(raw: RawDanmu): MatchResult {
+    const { uid, uname, content, medal_level, medal_name } = raw;
+
+    if (content.startsWith(CANCEL_PREFIX)) {
+      this.lastByUid.delete(uid);
+      return { kind: 'cancel', uid };
+    }
+
+    const m = this.compiled.exec(content);
+    if (!m) return { kind: 'skip', reason: 'prefix mismatch' };
+
+    let song: string;
+    if (m.length > 1 && m[1] !== undefined) {
+      song = m[1].trim();
+    } else {
+      song = content.slice(m.index + m[0].length).trim();
+    }
+    if (!song) return { kind: 'skip', reason: 'empty song name' };
+
+    if (this.config.fans_level > 0 && medal_level < this.config.fans_level) {
+      return { kind: 'skip', reason: `fans level too low: ${medal_level}<${this.config.fans_level}` };
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const last = this.lastByUid.get(uid);
+    if (this.config.sing_cd > 0 && last !== undefined && now - last < this.config.sing_cd) {
+      return { kind: 'skip', reason: 'cooldown active' };
+    }
+    this.lastByUid.set(uid, now);
+
+    const danmu: DanmuInfo = {
+      msg_id: `${now}_${uid}`,
+      uid,
+      uname,
+      song_name: song,
+      raw_msg: content,
+      medal_level,
+      medal_name,
+      send_time: now,
+    };
+    return { kind: 'song', danmu };
+  }
+}
