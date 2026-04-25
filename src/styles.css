@@ -10,6 +10,21 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
 .status.off { color: #999; }
 
 .banner.error { background: #fdecea; color: #b71c1c; padding: 8px 20px; }
+.banner.update {
+  display: flex; align-items: center; gap: 12px;
+  background: #e3f2fd; color: #0d47a1; padding: 8px 20px;
+  border-bottom: 1px solid #bbdefb;
+}
+.banner.update button {
+  padding: 4px 12px; border: 1px solid #1976d2; border-radius: 4px;
+  background: #1976d2; color: #fff; cursor: pointer; font-size: 13px;
+}
+.banner.update button:hover { background: #1565c0; }
+.banner.update button.dismiss {
+  background: transparent; color: #0d47a1; border: none;
+  margin-left: auto; font-size: 18px; padding: 0 8px;
+}
+.banner.update button.dismiss:hover { background: rgba(13, 71, 161, 0.1); }
 
 .config { display: flex; gap: 12px; align-items: flex-end; padding: 12px 20px; border-bottom: 1px solid #eee; flex-wrap: wrap; }
 .config label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 140px; }
@@ -45,10 +60,11 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
 .toast {
   position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
   padding: 10px 20px; border-radius: 6px; color: #fff; font-size: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); cursor: pointer;
   animation: toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards;
   z-index: 1000;
 }
+.toast:hover { opacity: 0.85; }
 .toast.success { background: #2e7d32; }
 .toast.error { background: #c62828; }
 

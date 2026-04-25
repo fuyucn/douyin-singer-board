@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useAppStore, dedupedSongs } from './store';
 import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessionHistory } from './db';
 import type { SidecarEvent } from './types';
+import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -27,6 +28,7 @@ export default function App() {
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
 
   // 显示一个 toast, 1.6s 自动消失
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
@@ -47,6 +49,13 @@ export default function App() {
       }
     })();
   }, [hydrateConfig]);
+
+  // Check GitHub Releases for a newer version on startup. Failure is silent.
+  useEffect(() => {
+    checkForUpdate().then((info) => {
+      if (info) setUpdate(info);
+    });
+  }, []);
 
   // 订阅 sidecar 事件
   useEffect(() => {
@@ -155,6 +164,23 @@ export default function App() {
 
       {bootError && <div className="banner error">{bootError}</div>}
 
+      {update && (
+        <div className="banner update">
+          <span>新版本 {update.tag} 可用</span>
+          <button onClick={() => openInBrowser(update.htmlUrl)}>前往下载</button>
+          <button
+            className="dismiss"
+            title="跳过此版本，下次启动不再提示（更新版本发布后会重新提示）"
+            onClick={() => {
+              skipVersion(update.tag);
+              setUpdate(null);
+            }}
+          >
+            跳过
+          </button>
+        </div>
+      )}
+
       <section className="config">
         <label>
           <span>抖音直播间 ID</span>
@@ -233,7 +259,13 @@ export default function App() {
       </details>
 
       {toast && (
-        <div className={`toast ${toast.kind}`}>{toast.msg}</div>
+        <div
+          className={`toast ${toast.kind}`}
+          onClick={() => setToast(null)}
+          title="Click to dismiss"
+        >
+          {toast.msg}
+        </div>
       )}
     </div>
   );
