@@ -57,6 +57,20 @@ impl SidecarHandle {
                 let perm = std::fs::Permissions::from_mode(0o755);
                 std::fs::set_permissions(&path, perm).map_err(|e| format!("chmod: {}", e))?;
             }
+            #[cfg(target_os = "macos")]
+            {
+                // macOS Gatekeeper kills unsigned binaries spawned by an unsigned parent.
+                // 1) Strip any quarantine xattr.
+                let _ = std::process::Command::new("xattr")
+                    .args(["-cr"])
+                    .arg(&path)
+                    .output();
+                // 2) Ad-hoc sign so the kernel will accept it (no certificate needed).
+                let _ = std::process::Command::new("codesign")
+                    .args(["--force", "--sign", "-"])
+                    .arg(&path)
+                    .output();
+            }
         }
         Ok(path)
     }
