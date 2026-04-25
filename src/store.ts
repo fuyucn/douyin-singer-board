@@ -89,13 +89,13 @@ export const useAppStore = create<AppStore>((set) => ({
   pushLog: (line) => set((s) => ({ logs: [...s.logs.slice(-99), line] })),
 }));
 
-// Dedup display by song name: keep the earliest entry (smallest send_time) per name,
-// returned in send_time-descending order.
+// Dedup by song name (keep earliest request per song), returned earliest-first.
+// First-come-first-served: the user who requested it first sits at the top.
 export function dedupedSongs(songs: DanmuInfo[]): DanmuInfo[] {
   const seen = new Map<string, DanmuInfo>();
   const sorted = [...songs].sort((a, b) => a.send_time - b.send_time);
   for (const s of sorted) {
     if (!seen.has(s.song_name)) seen.set(s.song_name, s);
   }
-  return Array.from(seen.values()).sort((a, b) => b.send_time - a.send_time);
+  return Array.from(seen.values()).sort((a, b) => a.send_time - b.send_time);
 }

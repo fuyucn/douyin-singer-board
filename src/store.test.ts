@@ -40,16 +40,16 @@ describe('dedupedSongs', () => {
     expect(out).toHaveLength(2);
   });
 
-  it('returns newest first', () => {
-    const old = song({ msg_id: '1', song_name: 'A', send_time: 1 });
-    const fresh = song({ msg_id: '2', song_name: 'B', send_time: 100 });
-    const out = dedupedSongs([old, fresh]);
-    expect(out[0].msg_id).toBe('2');
-    expect(out[1].msg_id).toBe('1');
+  it('returns earliest first (FCFS)', () => {
+    const earlier = song({ msg_id: '1', song_name: 'A', send_time: 1 });
+    const later = song({ msg_id: '2', song_name: 'B', send_time: 100 });
+    const out = dedupedSongs([earlier, later]);
+    expect(out[0].msg_id).toBe('1');
+    expect(out[1].msg_id).toBe('2');
   });
 
   it('combines dedup + ordering', () => {
-    // 三条按时间: 1=A, 2=B, 3=A(dup, drop), 4=C
+    // Three rows by time: 1=A, 2=B, 3=A (dup, drop), 4=C
     const inputs = [
       song({ msg_id: '1', song_name: 'A', send_time: 1 }),
       song({ msg_id: '2', song_name: 'B', send_time: 2 }),
@@ -57,6 +57,6 @@ describe('dedupedSongs', () => {
       song({ msg_id: '4', song_name: 'C', send_time: 4 }),
     ];
     const out = dedupedSongs(inputs);
-    expect(out.map((x) => x.msg_id)).toEqual(['4', '2', '1']);
+    expect(out.map((x) => x.msg_id)).toEqual(['1', '2', '4']);
   });
 });
