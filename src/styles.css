@@ -110,8 +110,11 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
 .modal-close:hover { color: #333; }
 .modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 .modal-body .row { display: flex; gap: 12px; align-items: baseline; font-size: 14px; }
-.modal-body .row .label { flex: 0 0 80px; color: #666; font-size: 13px; }
-.modal-body .row .value { flex: 1; }
+.modal-body .row .label {
+  flex: 0 0 90px; text-align: right;
+  color: #666; font-size: 13px;
+}
+.modal-body .row .value { flex: 1; min-width: 0; word-break: break-all; }
 .modal-body .link {
   background: transparent; border: none; color: #1976d2; cursor: pointer;
   padding: 0; font-size: 14px; text-decoration: none;
