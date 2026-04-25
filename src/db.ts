@@ -5,7 +5,7 @@ let _db: Database | null = null;
 
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
-  _db = await Database.load('sqlite:sususingerboard.db');
+  _db = await Database.load('sqlite:sususongboard.db');
   return _db;
 }
 

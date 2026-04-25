@@ -4067,8 +4067,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "sususingerboard"
-version = "0.0.17"
+name = "sususongboard"
+version = "0.0.18"
 dependencies = [
  "dirs 5.0.1",
  "serde",

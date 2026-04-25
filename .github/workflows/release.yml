@@ -106,7 +106,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           # Portable single .exe (sidecar is embedded, no installer needed).
           $portable = "$out/SUSUSongBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
-          Copy-Item "$target/sususingerboard.exe" $portable
+          Copy-Item "$target/sususongboard.exe" $portable
           # Also keep MSI / NSIS installers if the bundler produced them, for users who prefer them.
           if (Test-Path "$target/bundle/msi") { Copy-Item "$target/bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
           if (Test-Path "$target/bundle/nsis") { Copy-Item "$target/bundle/nsis/*-setup.exe" $out -ErrorAction SilentlyContinue }

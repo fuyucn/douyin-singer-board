@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
-const DB_NAME: &str = "sqlite:sususingerboard.db";
+const DB_NAME: &str = "sqlite:sususongboard.db";
 
 fn migrations() -> Vec<Migration> {
     vec![

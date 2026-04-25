@@ -12,7 +12,7 @@ import { open } from '@tauri-apps/plugin-shell';
 declare const __APP_VERSION__: string;
 
 const REPO = 'fuyucn/douyin-singer-board';
-const SKIP_KEY = 'sususingerboard.skipped-update-tag';
+const SKIP_KEY = 'sususongboard.skipped-update-tag';
 
 export interface UpdateInfo {
   tag: string;       // e.g. "v0.0.8"

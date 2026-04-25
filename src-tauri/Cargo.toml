@@ -1,11 +1,11 @@
 [package]
-name = "sususingerboard"
-version = "0.0.18"
+name = "sususongboard"
+version = "0.0.19"
 description = "SUSUSongBoard - 抖音直播点歌助手"
 edition = "2021"
 
 [lib]
-name = "sususingerboard_lib"
+name = "sususongboard_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

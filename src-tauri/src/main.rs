@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    sususingerboard_lib::run()
+    sususongboard_lib::run()
 }

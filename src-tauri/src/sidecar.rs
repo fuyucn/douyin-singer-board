@@ -45,7 +45,7 @@ impl SidecarHandle {
         }
         let version = env!("CARGO_PKG_VERSION");
         let ext = if cfg!(windows) { ".exe" } else { "" };
-        let dir = std::env::temp_dir().join("sususingerboard");
+        let dir = std::env::temp_dir().join("sususongboard");
         std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp: {}", e))?;
         let path = dir.join(format!("sidecar-{}{}", version, ext));
 

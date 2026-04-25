@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SUSUSongBoard",
-  "version": "0.0.18",
-  "identifier": "com.fuyucn.sususingerboard",
+  "version": "0.0.19",
+  "identifier": "com.fuyucn.sususongboard",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:5173",

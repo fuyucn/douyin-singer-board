@@ -14,7 +14,7 @@
     "sql:allow-select",
     {
       "identifier": "sql:allow-load",
-      "allow": [{ "name": "sqlite:sususingerboard.db" }]
+      "allow": [{ "name": "sqlite:sususongboard.db" }]
     }
   ]
 }
