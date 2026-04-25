@@ -7,6 +7,7 @@ import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
+import { openKuGouSearch } from './kugou';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -293,6 +294,12 @@ export default function App() {
               <div className="col-uname uname">{s.uname}</div>
               <div className="col-song song">{s.song_name}</div>
               <div className="col-actions item-actions">
+                <button
+                  onClick={() => openKuGouSearch(s.song_name)}
+                  title="在酷狗中搜索 (优先打开 PC 客户端，缺则用网页)"
+                >
+                  🎵酷狗
+                </button>
                 <button onClick={() => onCopy(s.song_name)}>复制</button>
                 <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
               </div>

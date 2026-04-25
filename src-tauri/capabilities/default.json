@@ -7,7 +7,13 @@
     "core:default",
     "core:event:default",
     "shell:allow-execute",
-    "shell:allow-open",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "^https?://" },
+        { "url": "^kugou://" }
+      ]
+    },
     "sql:default",
     "sql:allow-load",
     "sql:allow-execute",

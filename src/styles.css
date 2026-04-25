@@ -197,7 +197,7 @@ body {
 
 .col-uname { flex: 0 0 140px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-song { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-actions { flex: 0 0 130px; display: flex; justify-content: flex-end; gap: 6px; }
+.col-actions { flex: 0 0 200px; display: flex; justify-content: flex-end; gap: 6px; }
 
 .item .uname { color: var(--fg-muted); font-size: 13px; }
 .item .song { font-size: 15px; font-weight: 500; }

@@ -16,12 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - id: v
         run: |
           VER=$(node -p "require('./package.json').version")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          # Anything with a pre-release tag (e.g. 0.0.30-rc.1, 1.0.0-beta) is marked as pre-release.
+          if [[ "$VER" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "version: $VER"
 
   build:
@@ -143,6 +150,6 @@ jobs:
           name: v${{ needs.read-version.outputs.version }}
           files: release/*
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.read-version.outputs.prerelease == 'true' }}
           generate_release_notes: true
           fail_on_unmatched_files: true
