@@ -59,4 +59,24 @@ describe('dedupedSongs', () => {
     const out = dedupedSongs(inputs);
     expect(out.map((x) => x.msg_id)).toEqual(['1', '2', '4']);
   });
+
+  it('places manual entries on top (newest-manual first), auto below (FCFS)', () => {
+    const inputs = [
+      song({ msg_id: 'a1', uid: 'u1', song_name: 'A', send_time: 1 }),
+      song({ msg_id: 'm1', uid: 'manual', song_name: 'M1', send_time: 50 }),
+      song({ msg_id: 'a2', uid: 'u2', song_name: 'B', send_time: 2 }),
+      song({ msg_id: 'm2', uid: 'manual', song_name: 'M2', send_time: 60 }),
+    ];
+    const out = dedupedSongs(inputs);
+    // M2 (newer manual) before M1 (older manual); A (earlier auto) before B
+    expect(out.map((x) => x.msg_id)).toEqual(['m2', 'm1', 'a1', 'a2']);
+  });
+
+  it('manual entry wins over auto entry of the same song name', () => {
+    const auto = song({ msg_id: 'a', uid: 'u1', song_name: '稻香', send_time: 1 });
+    const manual = song({ msg_id: 'm', uid: 'manual', song_name: '稻香', send_time: 100 });
+    const out = dedupedSongs([auto, manual]);
+    expect(out).toHaveLength(1);
+    expect(out[0].msg_id).toBe('m');
+  });
 });
