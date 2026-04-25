@@ -32,6 +32,21 @@ Outputs:
 
 Cross-compile is not supported (pkg builds the sidecar for the host triple, cargo also can't cross). To build for Windows, run on Windows, etc.
 
+## Install (macOS)
+
+The build is **unsigned**, so macOS Gatekeeper will quarantine the `.app` after
+you copy it out of the DMG and refuse to open it ("the app is damaged" or
+"can't be opened because Apple cannot check it for malicious software").
+
+After dragging `SUSUSingBoard.app` into `/Applications`, run:
+
+```bash
+sudo xattr -cr "/Applications/SUSUSingBoard.app"
+```
+
+This strips the quarantine xattr that Gatekeeper added on download. One-time
+fix per install.
+
 ## Configuration (in the app's UI)
 
 - **Douyin room ID** — the number in `https://live.douyin.com/{this}`
