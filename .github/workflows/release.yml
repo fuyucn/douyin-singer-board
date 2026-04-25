@@ -74,6 +74,12 @@ jobs:
       - name: Build sidecar binary
         run: pnpm sidecar:build:bin
 
+      - name: Clean stale bundle artifacts
+        # The cached target dir would otherwise carry forward .dmg/.msi/.exe
+        # files from previous version builds; we'd then accidentally upload them.
+        shell: bash
+        run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
+
       - name: Build Tauri app
         run: pnpm exec tauri build --target ${{ matrix.rust_target }}
 
