@@ -15,9 +15,9 @@ export async function loadConfig(): Promise<Config> {
     'SELECT room_id, sing_prefix, fans_level, sing_cd FROM config WHERE id = 1',
   );
   if (rows.length === 0) {
-    // migration 已经 INSERT 过, 兜底再插一次
+    // The migration already inserts a row; this is a defensive fallback.
     await db.execute('INSERT OR IGNORE INTO config (id) VALUES (1)');
-    return { room_id: '', sing_prefix: '^点歌\\s+(.+)', fans_level: 0, sing_cd: 60 };
+    return { room_id: '', sing_prefix: '点歌[space][song]', fans_level: 0, sing_cd: 60 };
   }
   return rows[0];
 }

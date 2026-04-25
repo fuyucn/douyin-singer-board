@@ -31,12 +31,47 @@ export class Matcher {
     this.compiled = this.compilePattern(config.sing_prefix);
   }
 
+  // Convert a human-friendly template into a RegExp.
+  //   [space]  -> \s+ (one or more whitespace; consecutive [space] collapse)
+  //   [song]   -> (.+?) capture group 1 = song name (matcher.match() trims)
+  //   anything else -> literal (regex meta-chars auto-escaped)
+  // Examples:
+  //   "点歌[space][song]"  -> /^点歌\s+(.+?)$/
+  //   "点歌:[song]"        -> /^点歌:(.+?)$/
+  //   "点歌[space][space][song]" -> /^点歌\s+(.+?)$/  (collapsed)
+  // Legacy Chinese placeholders [空格] / [歌曲] / [歌名] are also accepted
+  // so existing configs keep working.
+  static templateToRegex(template: string): RegExp {
+    const tokens = template.split(/(\[space\]|\[song\]|\[空格\]|\[歌曲\]|\[歌名\])/i);
+    let pattern = '';
+    let lastWasSep = false;
+    for (const tok of tokens) {
+      if (!tok) continue;
+      const lower = tok.toLowerCase();
+      if (lower === '[space]' || tok === '[空格]') {
+        if (!lastWasSep) {
+          pattern += '\\s+';
+          lastWasSep = true;
+        }
+      } else if (lower === '[song]' || tok === '[歌曲]' || tok === '[歌名]') {
+        pattern += '(.+?)';
+        lastWasSep = false;
+      } else {
+        pattern += tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        lastWasSep = false;
+      }
+    }
+    if (!pattern.startsWith('^')) pattern = '^' + pattern;
+    if (!pattern.endsWith('$')) pattern = pattern + '$';
+    return new RegExp(pattern);
+  }
+
   private compilePattern(pattern: string): RegExp {
     const p = pattern && pattern.trim() ? pattern : DEFAULT_SING_PREFIX;
     try {
-      return new RegExp(p);
+      return Matcher.templateToRegex(p);
     } catch {
-      return new RegExp(DEFAULT_SING_PREFIX);
+      return Matcher.templateToRegex(DEFAULT_SING_PREFIX);
     }
   }
 

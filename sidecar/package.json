@@ -1,7 +1,7 @@
 {
   "name": "sidecar",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.4",
   "type": "module",
   "main": "build/index.cjs",
   "scripts": {
@@ -20,7 +20,11 @@
     "typescript": "^5.6.2"
   },
   "pkg": {
-    "scripts": ["build/index.cjs"],
-    "targets": ["node20"]
+    "scripts": [
+      "build/index.cjs"
+    ],
+    "targets": [
+      "node20"
+    ]
   }
 }

@@ -1,11 +1,12 @@
-// 把 sidecar 编成各平台 binary, 命名按 Tauri externalBin 约定:
+// Compile the sidecar into a per-platform native binary, named per Tauri's externalBin convention:
 //   src-tauri/binaries/sidecar-{rustTriple}{ext}
 //
-// 当前 host triple 通过 rustc -vV 获取. 想出全量平台的话单独跑 CI 矩阵.
+// Host triple is obtained via `rustc -vV`. To produce binaries for other platforms,
+// run this on each target platform (e.g. via a CI matrix).
 //
-// 用法:
-//   pnpm sidecar:build       (先编 .cjs)
-//   pnpm sidecar:build:bin   (再用 pkg 编出 native binary 给 Tauri 打包用)
+// Usage:
+//   pnpm sidecar:build       (first, produces build/index.cjs)
+//   pnpm sidecar:build:bin   (this script: pkg the .cjs into a native binary)
 
 import { execSync } from 'node:child_process';
 import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
@@ -25,7 +26,7 @@ function rustTriple() {
 }
 
 function pkgTarget(triple) {
-  // node20 + 平台映射
+  // map host triple to pkg target slug (always node20)
   if (triple.includes('apple-darwin')) {
     if (triple.startsWith('aarch64')) return 'node20-macos-arm64';
     return 'node20-macos-x64';
@@ -50,7 +51,7 @@ const outPath = join(binariesDir, outName);
 mkdirSync(binariesDir, { recursive: true });
 mkdirSync(join(sidecarDir, 'build'), { recursive: true });
 
-// 1) esbuild bundle (与 build 脚本一致, 显式调一遍保证最新)
+// 1) esbuild bundle (mirror of the `build` script; re-run to ensure freshness)
 console.log('[bundle] esbuild');
 execSync(
   'npx esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs',

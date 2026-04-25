@@ -3,22 +3,22 @@ import type { Config, DanmuInfo } from './types';
 import { DEFAULT_SING_PREFIX } from './types';
 
 interface AppStore {
-  // 配置
+  // Config
   config: Config;
   setConfig: (patch: Partial<Config>) => void;
   hydrateConfig: (cfg: Config) => void;
 
-  // 运行状态
+  // Run state
   running: boolean;
   setRunning: (r: boolean) => void;
   sessionId: string;
   newSession: () => string;
 
-  // 连接状态
+  // Connection status
   status: { connected: boolean; message: string };
   setStatus: (s: { connected: boolean; message?: string }) => void;
 
-  // 当前 session 的歌单
+  // Songs in the current session
   songs: DanmuInfo[];
   addSong: (s: DanmuInfo) => void;
   cancelByUid: (uid: string) => void;
@@ -27,7 +27,7 @@ interface AppStore {
   manualAdd: (name: string) => DanmuInfo;
   setSongs: (list: DanmuInfo[]) => void;
 
-  // 简易日志
+  // Simple log buffer
   logs: string[];
   pushLog: (line: string) => void;
 }
@@ -46,9 +46,14 @@ export const useAppStore = create<AppStore>((set) => ({
     return id;
   },
 
-  status: { connected: false, message: '未连接' },
+  status: { connected: false, message: 'Disconnected' },
   setStatus: (s) =>
-    set({ status: { connected: s.connected, message: s.message ?? (s.connected ? '已连接' : '未连接') } }),
+    set({
+      status: {
+        connected: s.connected,
+        message: s.message ?? (s.connected ? 'Connected' : 'Disconnected'),
+      },
+    }),
 
   songs: [],
   addSong: (s) => set((state) => ({ songs: [s, ...state.songs] })),
@@ -68,7 +73,7 @@ export const useAppStore = create<AppStore>((set) => ({
     const item: DanmuInfo = {
       msg_id: `manual_${now}_${Math.random().toString(36).slice(2, 6)}`,
       uid: 'manual',
-      uname: '主播',
+      uname: 'Host',
       song_name: name,
       raw_msg: name,
       medal_level: 0,
@@ -84,7 +89,8 @@ export const useAppStore = create<AppStore>((set) => ({
   pushLog: (line) => set((s) => ({ logs: [...s.logs.slice(-99), line] })),
 }));
 
-// 同名去重: 相同 song_name 只保留最早 (send_time 最小) 那条, 显示按 send_time 倒序
+// Dedup display by song name: keep the earliest entry (smallest send_time) per name,
+// returned in send_time-descending order.
 export function dedupedSongs(songs: DanmuInfo[]): DanmuInfo[] {
   const seen = new Map<string, DanmuInfo>();
   const sorted = [...songs].sort((a, b) => a.send_time - b.send_time);

@@ -15,7 +15,7 @@ fn migrations() -> Vec<Migration> {
                 CREATE TABLE config (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     room_id TEXT NOT NULL DEFAULT '',
-                    sing_prefix TEXT NOT NULL DEFAULT '^点歌\\s+(.+)',
+                    sing_prefix TEXT NOT NULL DEFAULT '点歌[space][song]',
                     fans_level INTEGER NOT NULL DEFAULT 0,
                     sing_cd INTEGER NOT NULL DEFAULT 60
                 );

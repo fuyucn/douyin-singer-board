@@ -23,4 +23,6 @@ export type SidecarEvent =
   | { event: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; msg: string }
   | { event: 'error'; msg: string };
 
-export const DEFAULT_SING_PREFIX = '^点歌\\s+(.+)';
+// Human-friendly template, not a regex.
+// Placeholders: [space] = whitespace, [song] = song-name capture.
+export const DEFAULT_SING_PREFIX = '点歌[space][song]';

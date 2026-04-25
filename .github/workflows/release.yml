@@ -1,22 +1,31 @@
-# 手动打包 SUSUSingBoard.
-# 触发: GitHub -> Actions -> "Release" -> Run workflow.
-# 矩阵: macOS arm64 / macOS x64 / Windows x64. 不签名.
+# Manually-triggered build for SUSUSingBoard.
+# Trigger: GitHub -> Actions -> "Release" -> Run workflow.
+# Matrix: macOS arm64 + Windows x64. Unsigned.
+# The artifact filename version is read from package.json automatically.
 
 name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Artifact 文件名版本号 (e.g. 0.1.0)'
-        required: false
-        default: 'dev'
 
 permissions:
   contents: read
 
 jobs:
+  read-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "version: $VER"
+
   build:
+    needs: read-version
     name: Build (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -26,9 +35,6 @@ jobs:
           - os: macos-15
             arch: arm64
             rust_target: aarch64-apple-darwin
-          - os: macos-15-intel
-            arch: x64
-            rust_target: x86_64-apple-darwin
           - os: windows-latest
             arch: x64
             rust_target: x86_64-pc-windows-msvc
@@ -45,7 +51,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -83,7 +88,7 @@ jobs:
           if compgen -G "$BUNDLE_DIR/macos/*.app" > /dev/null; then
             APP_PATH=$(ls -d "$BUNDLE_DIR"/macos/*.app | head -n1)
             ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" \
-              "$OUT_DIR/SUSUSingBoard-macOS-${{ matrix.arch }}-${{ github.event.inputs.version }}.zip"
+              "$OUT_DIR/SUSUSingBoard-macOS-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.zip"
           fi
 
       - name: Collect artifact (Windows)
@@ -99,7 +104,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SUSUSingBoard-${{ runner.os }}-${{ matrix.arch }}-${{ github.event.inputs.version }}
+          name: SUSUSingBoard-${{ runner.os }}-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}
           path: release-out/*
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

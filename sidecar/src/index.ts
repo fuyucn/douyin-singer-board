@@ -1,13 +1,13 @@
-// Tauri ↔ Node sidecar 桥接
+// Tauri ↔ Node sidecar bridge.
 //
-// stdin: 一行一个 JSON 命令 (SidecarCmd)
-// stdout: 一行一个 JSON 事件 (SidecarEvent)
+// stdin: one JSON command per line (SidecarCmd)
+// stdout: one JSON event per line (SidecarEvent)
 //
 // douyin-danma-listener API (lib/index.js + types/types.d.ts):
 //   class DouYinDanmaClient extends TypedEmitter
 //   constructor(roomId, options?)
-//   连接: connect() / 断开: close()
-//   事件: 'open' | 'close' | 'error' | 'reconnect' | 'init' | 'chat' | 'message' | ...
+//   connect: connect() / disconnect: close()
+//   events: 'open' | 'close' | 'error' | 'reconnect' | 'init' | 'chat' | 'message' | ...
 //   ChatMessage: { user: { id, nickName, BadgeImageList }, content, eventTime }
 
 import readline from 'node:readline';
@@ -26,10 +26,10 @@ function log(level: 'debug' | 'info' | 'warn' | 'error', msg: string): void {
   emit({ event: 'log', level, msg });
 }
 
-// URL 短码 (web_rid) → 真正的 id_str
-// 抖音直播间链接 https://live.douyin.com/{web_rid} 里那串数字是 web_rid,
-// douyin-danma-listener 要的是 id_str (~20 位长 ID).
-// 抓直播间 HTML, 正则匹 `roomId":"..."` 拿到 id_str.
+// URL short code (web_rid) → real id_str.
+// The number in the live URL https://live.douyin.com/{web_rid} is the web_rid,
+// but douyin-danma-listener expects the id_str (~20-digit long ID).
+// We fetch the live-room HTML and extract id_str via the `roomId":"..."` pattern.
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
@@ -45,7 +45,7 @@ async function getTtwid(): Promise<string> {
 }
 
 async function resolveIdStr(input: string): Promise<string> {
-  // 已经像 id_str (>= 18 位) 就直接用
+  // If it already looks like an id_str (>= 18 digits) use it directly.
   if (/^\d{18,}$/.test(input)) return input;
 
   log('info', `resolving web_rid ${input} -> id_str ...`);
@@ -79,30 +79,30 @@ async function start(config: Config): Promise<void> {
   matcher = new Matcher(config);
 
   const idStr = await resolveIdStr(config.room_id.trim());
-  // 注意: 第一参数是 roomId 字符串 (id_str, 不是 web_rid)
+  // Note: first arg is the roomId string (id_str, not web_rid)
   listener = new DouYinDanmaClient(idStr);
 
   listener.on('open', () => {
-    emit({ event: 'status', connected: true, message: '已连接抖音' });
+    emit({ event: 'status', connected: true, message: 'Connected' });
     log('info', '✅ ws open');
   });
   listener.on('close', () => {
-    emit({ event: 'status', connected: false, message: '抖音连接关闭' });
+    emit({ event: 'status', connected: false, message: 'Disconnected' });
     log('warn', 'ws close');
   });
   listener.on('error', (e: Error) => emit({ event: 'error', msg: String(e?.message ?? e) }));
   listener.on('reconnect', (count: number) => log('info', `reconnecting attempt ${count}`));
   listener.on('init', (url: string) => log('info', `ws url: ${url.slice(0, 80)}...`));
-  // 低频事件 (gift/social) 还是值得 log; member/like/roomStats/roomRank 太刷屏不留
+  // Low-frequency events (gift/social) are worth logging; member/like/roomStats/roomRank are too noisy.
   listener.on('gift', (m: any) =>
-    log('info', `🎁 ${m?.user?.nickName ?? '?'} 送礼 (${m?.common?.describe ?? m?.common?.method ?? ''})`),
+    log('info', `🎁 ${m?.user?.nickName ?? '?'} sent a gift (${m?.common?.describe ?? m?.common?.method ?? ''})`),
   );
   listener.on('social', (m: any) =>
-    log('info', `👥 ${m?.user?.nickName ?? '?'} ${m?.common?.describe ?? '关注'}`),
+    log('info', `👥 ${m?.user?.nickName ?? '?'} ${m?.common?.describe ?? 'followed'}`),
   );
 
-  // 诊断: 把所有进入 decode 的消息 method 名打出来 (含 lib 不处理的那些).
-  // 帮我们看到比如 WebcastBatchGiftMessage / WebcastInRoomBannerMessage 这类 lib 直接 drop 的类型.
+  // Diagnostic: log every decoded message's `method` name, including ones the lib drops silently
+  // (e.g. WebcastBatchGiftMessage, WebcastInRoomBannerMessage), so we can identify them.
   try {
     const protoMod: any = await import('douyin-danma-listener/lib/proto.js');
     const proto = protoMod.default ?? protoMod;
@@ -125,7 +125,7 @@ async function start(config: Config): Promise<void> {
           if (methods.length) log('debug', `[methods] ${methods.join(', ')}`);
         }
       } catch {
-        /* 不打印, 失败就让 origDecode 走 */
+        /* swallow; let origDecode handle */
       }
       return origDecode(data);
     };
@@ -147,7 +147,7 @@ async function start(config: Config): Promise<void> {
     }
 
     const r = matcher!.match({ uid, uname, content, medal_level, medal_name });
-    // 每条弹幕一行 debug 日志: "user: content ✅/❌/↩️ reason"
+    // One debug line per chat message: "user: content ✅/❌/↩️ reason"
     const medalTag = medal_level > 0 ? `[${medal_name} ${medal_level}] ` : '';
     let summary: string;
     if (r.kind === 'song') {

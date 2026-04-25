@@ -1,4 +1,4 @@
-// 阻止 Windows release 构建弹出额外控制台
+// Suppress the extra console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {

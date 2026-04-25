@@ -28,4 +28,8 @@ export type SidecarEvent =
   | { event: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; msg: string }
   | { event: 'error'; msg: string };
 
-export const DEFAULT_SING_PREFIX = '^点歌\\s+(.+)';
+// Human-friendly template, not a regex.
+// Placeholders: [space] = one or more whitespace, [song] = song-name capture.
+// Legacy [空格]/[歌曲]/[歌名] still accepted for backward compatibility.
+// matcher.templateToRegex turns this into /^点歌\s+(.+?)$/
+export const DEFAULT_SING_PREFIX = '点歌[space][song]';

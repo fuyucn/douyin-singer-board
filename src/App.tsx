@@ -167,12 +167,14 @@ export default function App() {
           />
         </label>
         <label>
-          <span>点歌指令(正则)</span>
+          <span>点歌指令模板</span>
           <input
             type="text"
             value={config.sing_prefix}
             disabled={running}
             onChange={(e) => setConfig({ sing_prefix: e.target.value })}
+            placeholder="点歌[space][song]"
+            title="Placeholders: [space]=whitespace, [song]=song name. Examples: 点歌:[song] / 点歌[space][song]"
           />
         </label>
         <label>

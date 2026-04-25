@@ -1,13 +1,13 @@
-// Node sidecar 进程管理
+// Node sidecar process management.
 //
-// 启动模式:
-// - dev: 找 ../sidecar/build/index.cjs 用系统 node 跑
-// - release: 用 tauri-plugin-shell 的 sidecar API 跑随包 binary
-//   (binaries 由 sidecar/scripts/build-bin 编译, externalBin 配置在 tauri.conf.json)
+// Modes:
+// - dev: locate ../sidecar/build/index.cjs and run with the system `node`
+// - release: use tauri-plugin-shell's sidecar API to run the bundled binary
+//   (binaries built by sidecar/scripts/build-bin.mjs, externalBin in tauri.conf.json)
 //
-// 通信:
-// - Tauri → sidecar: 通过 stdin 写 JSON lines (cmd: start/stop/reload_config)
-// - sidecar → Tauri: 通过 stdout 读 JSON lines, emit 到前端 'sidecar-event'
+// IPC:
+// - Tauri → sidecar: write JSON lines on stdin (cmd: start | stop | reload_config)
+// - sidecar → Tauri: read JSON lines on stdout, emit as 'sidecar-event' to the frontend
 
 use serde_json::Value;
 use std::path::PathBuf;
@@ -43,7 +43,7 @@ impl SidecarHandle {
             return Ok(());
         }
 
-        // 优先用 release 模式的 sidecar binary; 没有就退回 dev 模式 node 跑 .cjs
+        // Prefer the bundled sidecar binary (release); fall back to `node ../sidecar/build/index.cjs` (dev)
         let cmd = if let Ok(c) = app.shell().sidecar("sidecar") {
             c
         } else if let Some(script) = Self::locate_dev_script() {
@@ -52,7 +52,7 @@ impl SidecarHandle {
                 .args([script.to_string_lossy().as_ref()])
         } else {
             return Err(
-                "sidecar binary 或 dev script 都找不到. dev: pnpm sidecar:build; release: pnpm sidecar:build:bin"
+                "no sidecar binary or dev script found. dev: `pnpm sidecar:build`; release: `pnpm sidecar:build:bin`"
                     .to_string(),
             );
         };
