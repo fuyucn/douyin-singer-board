@@ -4,6 +4,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
 .app { display: flex; flex-direction: column; height: 100vh; }
 
 .header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #eee; }
+.header-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
 .header h1 { font-size: 18px; margin: 0; }
 
 .status.on { color: #2e7d32; }
