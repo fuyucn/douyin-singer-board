@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # required to create releases
 
 jobs:
   read-version:
@@ -112,3 +112,31 @@ jobs:
           path: release-out/*
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    needs: [read-version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.read-version.outputs.version }}
+          name: v${{ needs.read-version.outputs.version }}
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
