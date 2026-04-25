@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write   # required to create releases
 
+env:
+  # Run JS-based GitHub Actions (checkout, setup-node, etc.) on Node 24 to
+  # silence the Node-20 deprecation warnings.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   read-version:
     runs-on: ubuntu-latest
@@ -57,7 +62,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
