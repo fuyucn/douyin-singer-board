@@ -101,7 +101,8 @@ export class Matcher {
     const now = Math.floor(Date.now() / 1000);
     const last = this.lastByUid.get(uid);
     if (this.config.sing_cd > 0 && last !== undefined && now - last < this.config.sing_cd) {
-      return { kind: 'skip', reason: 'cooldown active' };
+      const remaining = this.config.sing_cd - (now - last);
+      return { kind: 'skip', reason: `cooldown active, ${remaining}s left` };
     }
     this.lastByUid.set(uid, now);
 
