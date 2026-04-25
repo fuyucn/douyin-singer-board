@@ -55,6 +55,20 @@ export function skipVersion(tag: string): void {
   localStorage.setItem(SKIP_KEY, tag);
 }
 
+export function clearSkippedVersion(): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(SKIP_KEY);
+}
+
+export function getSkippedVersion(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(SKIP_KEY);
+}
+
+export const REPO_URL = `https://github.com/${REPO}`;
+export const RELEASES_URL = `${REPO_URL}/releases`;
+export const ISSUES_URL = `${REPO_URL}/issues`;
+
 export async function openInBrowser(url: string): Promise<void> {
   if (!url) return;
   await open(url);

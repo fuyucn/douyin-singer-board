@@ -5,6 +5,7 @@ import { useAppStore, dedupedSongs } from './store';
 import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessionHistory } from './db';
 import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
+import { AboutModal } from './AboutModal';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -29,6 +30,7 @@ export default function App() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
 
   // 显示一个 toast, 1.6s 自动消失
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
@@ -160,6 +162,13 @@ export default function App() {
         <span className={`status ${status.connected ? 'on' : 'off'}`}>
           {status.connected ? '●' : '○'} {status.message}
         </span>
+        <button
+          className="header-about"
+          onClick={() => setShowAbout(true)}
+          title="关于 / 检查更新"
+        >
+          ⓘ
+        </button>
       </header>
 
       {bootError && <div className="banner error">{bootError}</div>}
@@ -273,6 +282,13 @@ export default function App() {
         >
           {toast.msg}
         </div>
+      )}
+
+      {showAbout && (
+        <AboutModal
+          onClose={() => setShowAbout(false)}
+          onShowToast={showToast}
+        />
       )}
     </div>
   );
