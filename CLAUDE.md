@@ -1,4 +1,4 @@
-# SUSUSingBoard - AI Collaboration Rules
+# SUSUSongBoard - AI Collaboration Rules
 
 ## Versioning (important)
 

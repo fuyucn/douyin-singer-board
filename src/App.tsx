@@ -158,7 +158,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>SUSUSingBoard</h1>
+        <h1>SUSUSongBoard</h1>
         <span className={`status ${status.connected ? 'on' : 'off'}`}>
           {status.connected ? '●' : '○'} {status.message}
         </span>

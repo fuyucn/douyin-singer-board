@@ -1,7 +1,7 @@
 [package]
 name = "sususingerboard"
-version = "0.0.17"
-description = "SUSUSingBoard - 抖音直播点歌助手"
+version = "0.0.18"
+description = "SUSUSongBoard - 抖音直播点歌助手"
 edition = "2021"
 
 [lib]

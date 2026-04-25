@@ -1,4 +1,4 @@
-# Manually-triggered build for SUSUSingBoard.
+# Manually-triggered build for SUSUSongBoard.
 # Trigger: GitHub -> Actions -> "Release" -> Run workflow.
 # Matrix: macOS arm64 + Windows x64. Unsigned.
 # The artifact filename version is read from package.json automatically.
@@ -94,7 +94,7 @@ jobs:
           if compgen -G "$BUNDLE_DIR/macos/*.app" > /dev/null; then
             APP_PATH=$(ls -d "$BUNDLE_DIR"/macos/*.app | head -n1)
             ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" \
-              "$OUT_DIR/SUSUSingBoard-macOS-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.zip"
+              "$OUT_DIR/SUSUSongBoard-macOS-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.zip"
           fi
 
       - name: Collect artifact (Windows)
@@ -105,7 +105,7 @@ jobs:
           $out = "release-out"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           # Portable single .exe (sidecar is embedded, no installer needed).
-          $portable = "$out/SUSUSingBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
+          $portable = "$out/SUSUSongBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
           Copy-Item "$target/sususingerboard.exe" $portable
           # Also keep MSI / NSIS installers if the bundler produced them, for users who prefer them.
           if (Test-Path "$target/bundle/msi") { Copy-Item "$target/bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
@@ -114,7 +114,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SUSUSingBoard-${{ runner.os }}-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}
+          name: SUSUSongBoard-${{ runner.os }}-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}
           path: release-out/*
           if-no-files-found: error
           retention-days: 30

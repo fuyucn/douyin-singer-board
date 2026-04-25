@@ -1,4 +1,4 @@
-# SUSUSingBoard
+# SUSUSongBoard
 
 A small desktop tool that watches a Douyin live room's chat, matches song-request danmu, and shows them in a real-time list. Personal-use project.
 
@@ -38,10 +38,10 @@ The build is **unsigned**, so macOS Gatekeeper will quarantine the `.app` after
 you copy it out of the DMG and refuse to open it ("the app is damaged" or
 "can't be opened because Apple cannot check it for malicious software").
 
-After dragging `SUSUSingBoard.app` into `/Applications`, run:
+After dragging `SUSUSongBoard.app` into `/Applications`, run:
 
 ```bash
-sudo xattr -cr "/Applications/SUSUSingBoard.app"
+sudo xattr -cr "/Applications/SUSUSongBoard.app"
 ```
 
 This strips the quarantine xattr that Gatekeeper added on download. One-time
@@ -49,7 +49,7 @@ fix per install.
 
 ## Install (Windows)
 
-The portable single .exe (`SUSUSingBoard-Windows-x64-X.Y.Z.exe`) is the easiest:
+The portable single .exe (`SUSUSongBoard-Windows-x64-X.Y.Z.exe`) is the easiest:
 just double-click. No installer, no admin rights needed.
 
 **SmartScreen warning** ("Windows protected your PC, unknown publisher"): the
