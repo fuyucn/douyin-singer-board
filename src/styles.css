@@ -38,8 +38,44 @@
   --overlay: rgba(0, 0, 0, 0.4);
 }
 
+/* Dark token block, applied either explicitly via data-theme="dark"
+   or implicitly when no data-theme attribute is set AND the OS is dark. */
+:root[data-theme="dark"] {
+  --bg-base: #1a1a1a;
+  --bg-elev: #242424;
+  --bg-soft: #1f1f1f;
+  --bg-softer: #1d1d1d;
+  --bg-disabled: #2a2a2a;
+
+  --fg-base: #e8e8e8;
+  --fg-muted: #a0a0a0;
+  --fg-faint: #6a6a6a;
+
+  --border-strong: #3a3a3a;
+  --border-medium: #333;
+  --border-soft: #2a2a2a;
+  --border-softer: #262626;
+
+  --success: #4caf50;
+  --success-hover: #66bb6a;
+  --danger: #ef5350;
+  --danger-hover: #f06b67;
+  --danger-soft-bg: #3a1f1f;
+  --danger-soft-fg: #ef9a9a;
+
+  --accent: #4f9eea;
+  --accent-hover: #7ab6f0;
+  --accent-soft-bg: #1f2d3d;
+  --accent-soft-fg: #90c8f5;
+  --accent-soft-border: #2a3f55;
+
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg-base: #1a1a1a;
     --bg-elev: #242424;
     --bg-soft: #1f1f1f;
@@ -55,7 +91,6 @@
     --border-soft: #2a2a2a;
     --border-softer: #262626;
 
-    /* Brighter green/red/blue read better on dark */
     --success: #4caf50;
     --success-hover: #66bb6a;
     --danger: #ef5350;
@@ -92,12 +127,14 @@ body {
 .status.on { color: var(--success); }
 .status.off { color: var(--fg-faint); }
 
-.header-about {
-  margin-left: auto; padding: 4px 10px; font-size: 16px; line-height: 1;
+.header-action {
+  padding: 4px 10px; font-size: 16px; line-height: 1;
   background: transparent; border: 1px solid transparent; border-radius: 50%;
   cursor: pointer; color: var(--fg-muted);
 }
-.header-about:hover { background: var(--bg-soft); border-color: var(--border-strong); color: var(--fg-base); }
+.header-action:hover { background: var(--bg-soft); border-color: var(--border-strong); color: var(--fg-base); }
+.header-action.first-tail { margin-left: auto; }
+.header-theme { font-size: 14px; }
 
 .banner.error { background: var(--danger-soft-bg); color: var(--danger-soft-fg); padding: 8px 20px; }
 .banner.update {

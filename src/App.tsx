@@ -6,6 +6,7 @@ import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessi
 import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
+import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -31,6 +32,18 @@ export default function App() {
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [theme, setTheme] = useState<Theme>(loadTheme());
+
+  // Apply current theme on mount (in case it was saved before)
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+
+  const onCycleTheme = () => {
+    const t = nextTheme(theme);
+    saveTheme(t);
+    setTheme(t);
+  };
 
   // 显示一个 toast, 1.6s 自动消失
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
@@ -164,7 +177,14 @@ export default function App() {
           {status.connected ? '●' : '○'} {status.message}
         </span>
         <button
-          className="header-about"
+          className="header-action header-theme first-tail"
+          onClick={onCycleTheme}
+          title={`主题: ${themeLabel(theme)} (点击切换)`}
+        >
+          {themeIcon(theme)}
+        </button>
+        <button
+          className="header-action"
           onClick={() => setShowAbout(true)}
           title="关于 / 检查更新"
         >
