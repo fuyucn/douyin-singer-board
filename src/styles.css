@@ -128,9 +128,12 @@ body {
 .status.off { color: var(--fg-faint); }
 
 .header-action {
-  padding: 4px 10px; font-size: 16px; line-height: 1;
+  width: 32px; height: 32px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1;
   background: transparent; border: 1px solid transparent; border-radius: 50%;
   cursor: pointer; color: var(--fg-muted);
+  flex-shrink: 0;
 }
 .header-action:hover { background: var(--bg-soft); border-color: var(--border-strong); color: var(--fg-base); }
 .header-action.first-tail { margin-left: auto; }
