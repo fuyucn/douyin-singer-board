@@ -76,7 +76,10 @@ impl SidecarHandle {
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true);
+            .kill_on_drop(true)
+            // Silence Node's DeprecationWarnings/process warnings from transitive deps
+            // (e.g. legacy Buffer() usage in protobufjs). Keeps the UI log clean.
+            .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
         // Windows: pkg-compiled Node binaries are console-subsystem .exe files.
         // Without CREATE_NO_WINDOW the OS opens a cmd window for them, which the
