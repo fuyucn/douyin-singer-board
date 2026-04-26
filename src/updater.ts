@@ -1,11 +1,9 @@
-// Lightweight update checker.
-// Hits GitHub Releases API once at startup, compares the latest tag with the
-// current app version. No auth required (public repo). No signature checking
-// — we just open the release page in the browser if a newer version exists.
+// Lightweight update checker. Hits GitHub Releases API on startup, compares
+// the latest tag with the current app version. Public repo, no auth.
 //
-// Tauri's full auto-updater (tauri-plugin-updater) is the heavier alternative;
-// it requires a signing keypair and applies updates in-place. We don't need that
-// for self-use.
+// The repo location is hardcoded here for the update fetch. We deliberately
+// don't surface it as a UI link — the About modal shows only the version,
+// and the "前往下载" button opens whatever release URL the API hands back.
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -15,9 +13,9 @@ const REPO = 'fuyucn/douyin-singer-board';
 const SKIP_KEY = 'sususongboard.skipped-update-tag';
 
 export interface UpdateInfo {
-  tag: string;       // e.g. "v0.0.8"
-  htmlUrl: string;   // release page in the browser
-  body: string;      // release notes (markdown)
+  tag: string;
+  htmlUrl: string;
+  body: string;
   publishedAt: string;
 }
 
@@ -34,7 +32,6 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     const latest = tag.replace(/^v/, '');
     if (!latest) return null;
     if (compareSemver(latest, CURRENT_VERSION) <= 0) return null;
-    // Honor an earlier "skip this version" dismissal.
     if (typeof localStorage !== 'undefined' && localStorage.getItem(SKIP_KEY) === tag) {
       return null;
     }
@@ -49,7 +46,6 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   }
 }
 
-/** Skip this specific version: future checkForUpdate calls return null until a newer version is published. */
 export function skipVersion(tag: string): void {
   if (typeof localStorage === 'undefined' || !tag) return;
   localStorage.setItem(SKIP_KEY, tag);
@@ -65,17 +61,12 @@ export function getSkippedVersion(): string | null {
   return localStorage.getItem(SKIP_KEY);
 }
 
-export const REPO_URL = `https://github.com/${REPO}`;
-export const RELEASES_URL = `${REPO_URL}/releases`;
-export const ISSUES_URL = `${REPO_URL}/issues`;
-
 export async function openInBrowser(url: string): Promise<void> {
   if (!url) return;
   await open(url);
 }
 
-// Returns >0 if a is greater than b, <0 if smaller, 0 if equal.
-// Handles plain "x.y.z" versions; ignores pre-release suffixes.
+// >0 if a > b, <0 if smaller, 0 if equal. Strips pre-release suffixes.
 export function compareSemver(a: string, b: string): number {
   const pa = a.split('-')[0].split('.').map((n) => parseInt(n, 10) || 0);
   const pb = b.split('-')[0].split('.').map((n) => parseInt(n, 10) || 0);
