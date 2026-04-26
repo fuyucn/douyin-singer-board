@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   CURRENT_VERSION,
-  REPO_URL,
-  RELEASES_URL,
-  ISSUES_URL,
   openInBrowser,
   checkForUpdate,
   clearSkippedVersion,
@@ -19,7 +16,6 @@ export function AboutModal({ onClose, onShowToast }: Props) {
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
 
-  // Close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -64,24 +60,6 @@ export function AboutModal({ onClose, onShowToast }: Props) {
           <div className="row">
             <span className="label">版本</span>
             <span className="value">v{CURRENT_VERSION}</span>
-          </div>
-          <div className="row">
-            <span className="label">仓库</span>
-            <button className="link" onClick={() => openInBrowser(REPO_URL)}>
-              {REPO_URL.replace('https://', '')}
-            </button>
-          </div>
-          <div className="row">
-            <span className="label">所有版本</span>
-            <button className="link" onClick={() => openInBrowser(RELEASES_URL)}>
-              GitHub Releases
-            </button>
-          </div>
-          <div className="row">
-            <span className="label">反馈 / Bug</span>
-            <button className="link" onClick={() => openInBrowser(ISSUES_URL)}>
-              提交 Issue
-            </button>
           </div>
           {skipped && (
             <div className="row">

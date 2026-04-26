@@ -65,7 +65,7 @@ export default function App() {
     })();
   }, [hydrateConfig]);
 
-  // Check GitHub Releases for a newer version on startup. Failure is silent.
+  // Check Releases for a newer version on startup. Failure is silent.
   useEffect(() => {
     checkForUpdate().then((info) => {
       if (info) setUpdate(info);
