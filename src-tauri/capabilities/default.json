@@ -11,7 +11,8 @@
       "identifier": "shell:allow-open",
       "allow": [
         { "url": "^https?://" },
-        { "url": "^kugou://" }
+        { "url": "^kugou://" },
+        { "url": "^mackugou://" }
       ]
     },
     "sql:default",

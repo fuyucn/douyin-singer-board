@@ -1,3 +1,4 @@
+mod kugou;
 mod sidecar;
 
 use std::sync::Arc;
@@ -63,7 +64,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![sidecar::sidecar_send])
+        .invoke_handler(tauri::generate_handler![sidecar::sidecar_send, kugou::kugou_search])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

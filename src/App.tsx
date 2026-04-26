@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useAppStore, dedupedSongs } from './store';
@@ -7,7 +7,13 @@ import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
-import { openKuGouSearch } from './kugou';
+import { searchKuGou, playKuGouSong, type KuGouSong } from './kugou';
+
+type KuGouEntry =
+  | { status: 'pending' }
+  | { status: 'found'; song: KuGouSong }
+  | { status: 'not_found' }
+  | { status: 'error'; msg: string };
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -35,6 +41,12 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
 
+  // KuGou search results, keyed by trimmed song_name. Each entry is fetched at
+  // most once per session — pending while in flight, then frozen as found /
+  // not_found / error. The button next to a row reads its status from here.
+  const [kugouCache, setKugouCache] = useState<Record<string, KuGouEntry>>({});
+  const kugouStartedRef = useRef<Set<string>>(new Set());
+
   // Apply current theme on mount (in case it was saved before)
   useEffect(() => {
     applyTheme(theme);
@@ -53,6 +65,41 @@ export default function App() {
   };
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
+
+  // Pre-fetch KuGou search for each song in the display list. We fire one
+  // request per unique song_name and never repeat — the ref tracks which
+  // names we've already kicked off, separately from the React state cache
+  // (which lags behind by one render).
+  useEffect(() => {
+    for (const s of display) {
+      const name = s.song_name.trim();
+      if (!name) continue;
+      if (kugouStartedRef.current.has(name)) continue;
+      kugouStartedRef.current.add(name);
+      setKugouCache((prev) => ({ ...prev, [name]: { status: 'pending' } }));
+      searchKuGou(name)
+        .then((song) => {
+          setKugouCache((prev) => ({
+            ...prev,
+            [name]: song ? { status: 'found', song } : { status: 'not_found' },
+          }));
+        })
+        .catch((err) => {
+          setKugouCache((prev) => ({
+            ...prev,
+            [name]: { status: 'error', msg: String(err) },
+          }));
+        });
+    }
+  }, [display]);
+
+  const onPlayKuGou = async (song: KuGouSong) => {
+    try {
+      await playKuGouSong(song);
+    } catch (e) {
+      showToast(`KuGou 播放失败: ${e}`, 'error');
+    }
+  };
 
   // 启动时加载配置
   useEffect(() => {
@@ -289,22 +336,43 @@ export default function App() {
           {display.length === 0 && (
             <div className="empty">{running ? '等待点歌...' : '点击 "开始" 连接直播间'}</div>
           )}
-          {display.map((s) => (
-            <div key={s.msg_id} className="item">
-              <div className="col-uname uname">{s.uname}</div>
-              <div className="col-song song">{s.song_name}</div>
-              <div className="col-actions item-actions">
-                <button
-                  onClick={() => openKuGouSearch(s.song_name)}
-                  title="在酷狗中搜索 (优先打开 PC 客户端，缺则用网页)"
-                >
-                  🎵酷狗
-                </button>
-                <button onClick={() => onCopy(s.song_name)}>复制</button>
-                <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
+          {display.map((s) => {
+            const entry: KuGouEntry = kugouCache[s.song_name.trim()] ?? { status: 'pending' };
+            let kugouLabel = '🎵酷狗';
+            let kugouTitle = '';
+            switch (entry.status) {
+              case 'pending':
+                kugouLabel = '🎵⋯';
+                kugouTitle = '正在 KuGou 查找…';
+                break;
+              case 'found':
+                kugouTitle = `在 KuGou 客户端播放: ${entry.song.filename}`;
+                break;
+              case 'not_found':
+                kugouTitle = 'KuGou 未找到这首歌';
+                break;
+              case 'error':
+                kugouTitle = `KuGou 搜索失败: ${entry.msg}`;
+                break;
+            }
+            return (
+              <div key={s.msg_id} className="item">
+                <div className="col-uname uname">{s.uname}</div>
+                <div className="col-song song">{s.song_name}</div>
+                <div className="col-actions item-actions">
+                  <button
+                    disabled={entry.status !== 'found'}
+                    onClick={() => entry.status === 'found' && onPlayKuGou(entry.song)}
+                    title={kugouTitle}
+                  >
+                    {kugouLabel}
+                  </button>
+                  <button onClick={() => onCopy(s.song_name)}>复制</button>
+                  <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
