@@ -11,13 +11,22 @@ export async function getDb(): Promise<Database> {
 
 export async function loadConfig(): Promise<Config> {
   const db = await getDb();
-  const rows = await db.select<Array<Config & { id: number; sing_cd: number }>>(
-    'SELECT room_id, sing_prefix, fans_level, sing_cd FROM config WHERE id = 1',
+  const rows = await db.select<Config[]>(
+    `SELECT room_id, sing_prefix, fans_level, sing_cd,
+            target_playlist_name, target_playlist_id
+     FROM config WHERE id = 1`,
   );
   if (rows.length === 0) {
     // The migration already inserts a row; this is a defensive fallback.
     await db.execute('INSERT OR IGNORE INTO config (id) VALUES (1)');
-    return { room_id: '', sing_prefix: '点歌[space][song]', fans_level: 0, sing_cd: 60 };
+    return {
+      room_id: '',
+      sing_prefix: '点歌[space][song]',
+      fans_level: 0,
+      sing_cd: 60,
+      target_playlist_name: '',
+      target_playlist_id: 0,
+    };
   }
   return rows[0];
 }
@@ -25,8 +34,17 @@ export async function loadConfig(): Promise<Config> {
 export async function saveConfig(cfg: Config): Promise<void> {
   const db = await getDb();
   await db.execute(
-    `UPDATE config SET room_id = $1, sing_prefix = $2, fans_level = $3, sing_cd = $4 WHERE id = 1`,
-    [cfg.room_id, cfg.sing_prefix, cfg.fans_level, cfg.sing_cd ?? 60],
+    `UPDATE config SET room_id = $1, sing_prefix = $2, fans_level = $3, sing_cd = $4,
+                       target_playlist_name = $5, target_playlist_id = $6
+     WHERE id = 1`,
+    [
+      cfg.room_id,
+      cfg.sing_prefix,
+      cfg.fans_level,
+      cfg.sing_cd ?? 60,
+      cfg.target_playlist_name ?? '',
+      cfg.target_playlist_id ?? 0,
+    ],
   );
 }
 
@@ -57,4 +75,61 @@ export async function deleteHistoryByMsgId(msgId: string): Promise<void> {
 export async function clearSessionHistory(sessionId: string): Promise<void> {
   const db = await getDb();
   await db.execute('DELETE FROM history WHERE session_id = $1', [sessionId]);
+}
+
+// KuGou login session — single-row table keyed at id=1, persists across app
+// restarts so we don't re-register the device or re-scan QR every launch.
+export interface KugouSession {
+  token: string;
+  userid: string;
+  dfid: string;
+  refreshed_at: number; // unix seconds
+}
+
+export async function loadKugouSession(): Promise<KugouSession> {
+  const db = await getDb();
+  const rows = await db.select<KugouSession[]>(
+    'SELECT token, userid, dfid, refreshed_at FROM kugou_session WHERE id = 1',
+  );
+  if (rows.length === 0) {
+    await db.execute('INSERT OR IGNORE INTO kugou_session (id) VALUES (1)');
+    return { token: '', userid: '', dfid: '', refreshed_at: 0 };
+  }
+  return rows[0];
+}
+
+export async function saveKugouSession(s: Partial<KugouSession>): Promise<void> {
+  const db = await getDb();
+  // Patch only the provided fields so callers can update token+refreshed_at
+  // without clobbering dfid (etc).
+  const fields: string[] = [];
+  const args: unknown[] = [];
+  let i = 1;
+  for (const k of ['token', 'userid', 'dfid', 'refreshed_at'] as const) {
+    if (s[k] !== undefined) {
+      fields.push(`${k} = $${i++}`);
+      args.push(s[k]);
+    }
+  }
+  if (fields.length === 0) return;
+  await db.execute(
+    `UPDATE kugou_session SET ${fields.join(', ')} WHERE id = 1`,
+    args,
+  );
+}
+
+export async function clearKugouSession(): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE kugou_session SET token = '', userid = '', dfid = '', refreshed_at = 0 WHERE id = 1`,
+  );
+}
+
+/** Build the cookie string for kugou_api_request from a session row. */
+export function sessionToCookie(s: KugouSession): string {
+  const parts: string[] = [];
+  if (s.token) parts.push(`token=${s.token}`);
+  if (s.userid) parts.push(`userid=${s.userid}`);
+  if (s.dfid) parts.push(`dfid=${s.dfid}`);
+  return parts.join(';');
 }

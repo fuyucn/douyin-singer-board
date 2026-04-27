@@ -40,6 +40,30 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 2,
+            description: "kugou session (token / userid / dfid + refresh marker)",
+            sql: "
+                CREATE TABLE kugou_session (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    token TEXT NOT NULL DEFAULT '',
+                    userid TEXT NOT NULL DEFAULT '',
+                    dfid TEXT NOT NULL DEFAULT '',
+                    refreshed_at INTEGER NOT NULL DEFAULT 0
+                );
+                INSERT OR IGNORE INTO kugou_session (id) VALUES (1);
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "config: target_playlist_name + target_playlist_id (auto-add destination)",
+            sql: "
+                ALTER TABLE config ADD COLUMN target_playlist_name TEXT NOT NULL DEFAULT '';
+                ALTER TABLE config ADD COLUMN target_playlist_id INTEGER NOT NULL DEFAULT 0;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

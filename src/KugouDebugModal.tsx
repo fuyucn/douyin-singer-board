@@ -4,6 +4,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import {
+  loadKugouSession,
+  saveKugouSession,
+  clearKugouSession,
+  sessionToCookie,
+} from './db';
+import { ensureDeviceRegistered, refreshToken, saveLogin } from './kugouSession';
+import { useAppStore } from './store';
 
 interface Props {
   onClose: () => void;
@@ -14,31 +22,39 @@ interface ApiResult {
   body: any;
 }
 
-const COOKIE_KEY = 'sususongboard.kugou-cookie';
-
+// KuGouMusicApi has a 2-minute apicache middleware on 200 responses, which
+// makes /login/qr/check polling lock onto the first "status=1" forever.
+// Per the docs ("调用务必带上时间戳,防止缓存") we append a unique `_t` param
+// to every call so the cache key is always fresh.
 async function call(
   method: string,
   path: string,
   cookie: string,
   body?: unknown,
 ): Promise<ApiResult> {
-  return invoke<ApiResult>('kugou_api_request', { method, path, cookie, body });
+  const sep = path.includes('?') ? '&' : '?';
+  const pathWithTs = `${path}${sep}_t=${Date.now()}`;
+  return invoke<ApiResult>('kugou_api_request', { method, path: pathWithTs, cookie, body });
 }
 
 type QrState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'waiting'; key: string; image: string; statusLabel: string }
+  | {
+      kind: 'waiting';
+      key: string;
+      image: string;
+      qrUrl: string;
+      statusLabel: string;
+      pollCount: number;
+      lastResp: ApiResult | null;
+    }
   | { kind: 'error'; msg: string };
 
 export function KugouDebugModal({ onClose }: Props) {
-  const [cookie, setCookie] = useState<string>(() => {
-    try {
-      return localStorage.getItem(COOKIE_KEY) ?? '';
-    } catch {
-      return '';
-    }
-  });
+  const pushLog = useAppStore((s) => s.pushLog);
+  const [cookie, setCookie] = useState<string>('');
+  const [refreshedAt, setRefreshedAt] = useState<number>(0);
   const [keyword, setKeyword] = useState('海阔天空');
   const [listid, setListid] = useState('');
   const [songData, setSongData] = useState(''); // name|hash|album_id|mixsongid
@@ -48,34 +64,99 @@ export function KugouDebugModal({ onClose }: Props) {
   const [qr, setQr] = useState<QrState>({ kind: 'idle' });
   const pollRef = useRef<number | null>(null);
 
+  // Hydrate cookie from SQLite on mount so previous logins survive restarts.
+  useEffect(() => {
+    loadKugouSession()
+      .then((s) => {
+        setCookie(sessionToCookie(s));
+        setRefreshedAt(s.refreshed_at);
+      })
+      .catch((e) => setError(`load session: ${e}`));
+  }, []);
+
+  // Keydown listener — re-binds when onClose changes. Must NOT touch
+  // pollRef in cleanup, otherwise every parent re-render kills our
+  // setInterval (parent passes a fresh arrow each render).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      if (pollRef.current !== null) window.clearInterval(pollRef.current);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const persistCookie = (value: string) => {
-    try {
-      localStorage.setItem(COOKIE_KEY, value);
-    } catch {}
+  // Mount-only cleanup so we don't strand the QR poll interval when the
+  // modal actually unmounts.
+  useEffect(() => {
+    return () => {
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    };
+  }, []);
+
+  const refreshFromDb = async () => {
+    const s = await loadKugouSession();
+    setCookie(sessionToCookie(s));
+    setRefreshedAt(s.refreshed_at);
   };
 
   const run = async (label: string, fn: () => Promise<ApiResult>) => {
     setBusy(label);
     setError(null);
+    pushLog(`[kg-dev] ${label} →`);
     try {
       const data = await fn();
+      pushLog(`[kg-dev] ${label} ← status=${data.status}`);
       setResult({ label, data });
     } catch (e) {
+      pushLog(`[kg-dev] ${label} ERR: ${e}`);
       setError(`${label} failed: ${e}`);
     } finally {
       setBusy(null);
     }
+  };
+
+  const onRegisterDev = async () => {
+    setBusy('register/dev');
+    setError(null);
+    try {
+      // Force re-register: clear stored dfid first so ensureDeviceRegistered
+      // actually hits the upstream call again, then refresh from DB.
+      await saveKugouSession({ dfid: '' });
+      const dfid = await ensureDeviceRegistered();
+      await refreshFromDb();
+      setResult({
+        label: 'register/dev',
+        data: { status: dfid ? 200 : 0, body: { dfid } },
+      });
+    } catch (e) {
+      setError(`register/dev failed: ${e}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onRefreshToken = async () => {
+    setBusy('login/token');
+    setError(null);
+    try {
+      const newToken = await refreshToken();
+      await refreshFromDb();
+      setResult({
+        label: 'login/token (refreshed)',
+        data: { status: 200, body: { token: newToken } },
+      });
+    } catch (e) {
+      setError(`token refresh failed: ${e}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onLogout = async () => {
+    await clearKugouSession();
+    await refreshFromDb();
+    setResult(null);
+    setError(null);
   };
 
   const onUserDetail = () =>
@@ -134,48 +215,88 @@ export function KugouDebugModal({ onClose }: Props) {
         '',
       );
       const image = String(createResp.body?.data?.base64 ?? '');
+      const qrUrl = String(createResp.body?.data?.url ?? '');
       if (!image) {
         setQr({ kind: 'error', msg: '/login/qr/create 没返回 base64 图片' });
         return;
       }
-      setQr({ kind: 'waiting', key, image, statusLabel: '等待手机扫码' });
+      setQr({
+        kind: 'waiting',
+        key,
+        image,
+        qrUrl,
+        statusLabel: '等待手机扫码',
+        pollCount: 0,
+        lastResp: null,
+      });
 
       pollRef.current = window.setInterval(async () => {
         try {
           const r = await call('GET', `/login/qr/check?key=${encodeURIComponent(key)}`, '');
+          // Always surface the latest response so we can see what KuGou is
+          // saying even when our parser doesn't find what it expects.
+          setResult({ label: `/login/qr/check`, data: r });
+
           const data = r.body?.data ?? {};
-          const code = Number(data.status ?? -1);
+          const rawStatus = data.status;
+          const code =
+            typeof rawStatus === 'number' ? rawStatus : Number(rawStatus ?? -1);
+
           if (code === 4) {
             stopPoll();
-            const token = String(data.token ?? '');
-            const userid = String(data.userid ?? '');
+            const token = String(data.token ?? r.body?.token ?? '');
+            const userid = String(data.userid ?? r.body?.userid ?? '');
             if (!token || !userid) {
-              setQr({ kind: 'error', msg: '登录返回未含 token/userid，原始响应见下方结果' });
-              setResult({ label: '扫码登录响应', data: r });
+              setQr({
+                kind: 'error',
+                msg: 'status=4 but no token/userid (see 结果 panel below)',
+              });
               return;
             }
-            const cookieStr = `token=${token};userid=${userid}`;
-            setCookie(cookieStr);
-            persistCookie(cookieStr);
+
+            // Persist the new login + register the device on first login. The
+            // dfid is sticky across restarts so we won't hit /register/dev
+            // again after this — even on a fresh launch.
+            await saveLogin(token, userid);
+            try {
+              const dfid = await ensureDeviceRegistered();
+              setResult({
+                label: 'login complete (dfid acquired)',
+                data: { status: 200, body: { dfid } },
+              });
+            } catch (e) {
+              setError(`register/dev 失败: ${e}`);
+            }
+            await refreshFromDb();
             setQr({ kind: 'idle' });
-            setResult({ label: '扫码登录成功 (token/userid 已写入)', data: r });
-          } else if (code === 0) {
+            return;
+          }
+          if (code === 0) {
             stopPoll();
             setQr({ kind: 'error', msg: '二维码已过期，请重新扫码' });
-          } else {
-            const labels: Record<number, string> = {
-              1: '等待手机扫码',
-              2: '已扫码，等待手机确认',
-            };
-            setQr((prev) =>
-              prev.kind === 'waiting'
-                ? { ...prev, statusLabel: labels[code] ?? `status=${code}` }
-                : prev,
-            );
+            return;
           }
+
+          const labels: Record<number, string> = {
+            1: '等待手机扫码',
+            2: '已扫码，等待手机确认',
+          };
+          setQr((prev) =>
+            prev.kind === 'waiting'
+              ? {
+                  ...prev,
+                  statusLabel:
+                    labels[code] ?? `status=${code} raw=${JSON.stringify(rawStatus)}`,
+                  pollCount: prev.pollCount + 1,
+                  lastResp: r,
+                }
+              : prev,
+          );
         } catch (e) {
-          // transient — keep polling
-          console.warn('qr check err', e);
+          setError(`qr check err: ${e}`);
+          setQr((prev) =>
+            prev.kind === 'waiting' ? { ...prev, pollCount: prev.pollCount + 1 } : prev,
+          );
         }
       }, 2500);
     } catch (e) {
@@ -208,7 +329,24 @@ export function KugouDebugModal({ onClose }: Props) {
           {qr.kind === 'waiting' && (
             <div className="kg-qr">
               <img src={qr.image} alt="KuGou QR" />
-              <div className="kg-qr-status">{qr.statusLabel}</div>
+              <div className="kg-qr-status">
+                {qr.statusLabel}（已轮询 {qr.pollCount} 次）
+              </div>
+              {qr.qrUrl && (
+                <div className="kg-qr-url">
+                  <code title={qr.qrUrl}>{qr.qrUrl}</code>
+                  <button
+                    className="link inline"
+                    onClick={() => navigator.clipboard.writeText(qr.qrUrl)}
+                  >
+                    复制
+                  </button>
+                </div>
+              )}
+              <div className="kg-qr-help">
+                提示：用 <b>酷狗音乐 App</b>（不是概念版/微信小程序）扫码；如果不响应，
+                试试用手机浏览器直接打开上面 URL 看 H5 页面是否正常。
+              </div>
             </div>
           )}
           {qr.kind === 'error' && <div className="kg-status error">QR: {qr.msg}</div>}
@@ -218,12 +356,44 @@ export function KugouDebugModal({ onClose }: Props) {
             <textarea
               className="kg-cookie"
               rows={3}
-              placeholder="扫码登录后会自动填好；或者手动粘贴 token=xxx;userid=yyy 格式"
+              placeholder="扫码登录后自动持久化到 SQLite。手动编辑可改 token / userid / dfid"
               value={cookie}
               onChange={(e) => setCookie(e.target.value)}
-              onBlur={() => persistCookie(cookie)}
+              onBlur={async () => {
+                // Parse the textarea back into KugouSession fields and persist.
+                const parsed: Record<string, string> = {};
+                cookie.split(';').forEach((p) => {
+                  const idx = p.indexOf('=');
+                  if (idx > 0) {
+                    parsed[p.slice(0, idx).trim()] = p.slice(idx + 1).trim();
+                  }
+                });
+                await saveKugouSession({
+                  token: parsed.token ?? '',
+                  userid: parsed.userid ?? '',
+                  dfid: parsed.dfid ?? '',
+                });
+              }}
             />
           </label>
+
+          <div className="kg-status">
+            {refreshedAt > 0
+              ? `登录态已持久化 — token 上次刷新: ${new Date(refreshedAt * 1000).toLocaleString()}`
+              : '未登录'}
+          </div>
+
+          <div className="kg-actions">
+            <button onClick={onRefreshToken} disabled={!cookie || busy !== null}>
+              刷新 Token (/login/token)
+            </button>
+            <button onClick={onRegisterDev} disabled={!cookie || busy !== null}>
+              重新注册设备 (/register/dev)
+            </button>
+            <button onClick={onLogout} disabled={!cookie || busy !== null}>
+              清空 session
+            </button>
+          </div>
 
           <div className="kg-actions">
             <button onClick={onUserDetail} disabled={!cookie || busy !== null}>

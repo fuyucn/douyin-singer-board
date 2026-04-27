@@ -220,7 +220,38 @@ pub async fn kugou_api_request(
     cookie: Option<String>,
     body: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
-    let url = kugou_api_url(&path)?;
+    // KuGouMusicApi's documented way to pass cookies for non-browser clients
+    // is the `?cookie=token=X;userid=Y;dfid=Z` query string. Its HTTP Cookie
+    // header parser in server.js requires `;\s+` to split entries (i.e. a
+    // space after each semicolon) and silently merges everything into one
+    // pair otherwise — which sends the WHOLE remaining cookie string into
+    // `req.cookies.token`, blowing past the 128-byte RSA limit in
+    // user_detail's cryptoRSAEncrypt. The query-string path uses a simple
+    // `split(';')` so the no-space format works.
+    let cookie_clean = cookie
+        .as_ref()
+        .map(|s| sanitize_cookie(s))
+        .filter(|s| !s.is_empty());
+    let path_with_cookie = match cookie_clean.as_ref() {
+        Some(c) => {
+            let sep = if path.contains('?') { '&' } else { '?' };
+            // urlencode the cookie value so `=` and `;` survive the URL parser
+            let encoded: String = c
+                .bytes()
+                .flat_map(|b| {
+                    if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                        vec![b as char]
+                    } else {
+                        format!("%{b:02X}").chars().collect()
+                    }
+                })
+                .collect();
+            format!("{path}{sep}cookie={encoded}")
+        }
+        None => path.clone(),
+    };
+
+    let url = kugou_api_url(&path_with_cookie)?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()
@@ -234,9 +265,6 @@ pub async fn kugou_api_request(
         m => return Err(format!("unsupported method {m}")),
     };
 
-    if let Some(c) = cookie.as_ref().map(|s| sanitize_cookie(s)).filter(|s| !s.is_empty()) {
-        req = req.header(reqwest::header::COOKIE, &c);
-    }
     if let Some(b) = body {
         req = req.json(&b);
     }

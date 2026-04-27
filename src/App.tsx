@@ -2,17 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useAppStore, dedupedSongs } from './store';
-import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessionHistory } from './db';
+import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessionHistory, loadKugouSession } from './db';
 import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
-import { searchKuGou, playKuGouSong, type KuGouSong } from './kugou';
+import {
+  refreshTokenIfStale,
+  resolvePlaylistByName,
+  searchKuGouTopHit,
+  addTrackToPlaylist,
+  type KuGouTrack,
+} from './kugouSession';
 
 type KuGouEntry =
   | { status: 'pending' }
-  | { status: 'found'; song: KuGouSong }
+  | { status: 'found'; track: KuGouTrack }
   | { status: 'not_found' }
   | { status: 'error'; msg: string };
 
@@ -42,6 +48,16 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
+  // KuGou login state — drives whether playlist target row + per-row 酷狗
+  // buttons are visible. We re-check whenever the dev modal closes so it
+  // updates immediately after a fresh QR scan.
+  const [kugouLoggedIn, setKugouLoggedIn] = useState(false);
+
+  useEffect(() => {
+    loadKugouSession()
+      .then((s) => setKugouLoggedIn(Boolean(s.token && s.userid && s.dfid)))
+      .catch(() => setKugouLoggedIn(false));
+  }, [showKgDebug]);
 
   // KuGou search results, keyed by trimmed song_name. Each entry is fetched at
   // most once per session — pending while in flight, then frozen as found /
@@ -68,22 +84,24 @@ export default function App() {
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
 
-  // Pre-fetch KuGou search for each song in the display list. We fire one
-  // request per unique song_name and never repeat — the ref tracks which
-  // names we've already kicked off, separately from the React state cache
-  // (which lags behind by one render).
+  // Pre-fetch KuGou search for each song in the display list (only after
+  // login — pre-login the cache stays empty and the row buttons are hidden
+  // by the kugouLoggedIn gate). We hit the embedded KuGouMusicApi /search
+  // with the user's cookie and cache the top-1 result so a click can
+  // immediately add it to the saved target playlist.
   useEffect(() => {
+    if (!kugouLoggedIn) return;
     for (const s of display) {
       const name = s.song_name.trim();
       if (!name) continue;
       if (kugouStartedRef.current.has(name)) continue;
       kugouStartedRef.current.add(name);
       setKugouCache((prev) => ({ ...prev, [name]: { status: 'pending' } }));
-      searchKuGou(name)
-        .then((song) => {
+      searchKuGouTopHit(name)
+        .then((track) => {
           setKugouCache((prev) => ({
             ...prev,
-            [name]: song ? { status: 'found', song } : { status: 'not_found' },
+            [name]: track ? { status: 'found', track } : { status: 'not_found' },
           }));
         })
         .catch((err) => {
@@ -93,13 +111,23 @@ export default function App() {
           }));
         });
     }
-  }, [display]);
+  }, [display, kugouLoggedIn]);
 
-  const onPlayKuGou = async (song: KuGouSong) => {
+  const onAddToPlaylist = async (track: KuGouTrack) => {
+    const listid = config.target_playlist_id;
+    if (!listid) {
+      pushLog('[kugou] add aborted: no target playlist saved');
+      showToast('请先在"目标歌单"里保存一个歌单', 'error');
+      return;
+    }
+    pushLog(`[kugou] add → listid=${listid}: ${track.filename}`);
     try {
-      await playKuGouSong(song);
+      await addTrackToPlaylist(track, listid);
+      pushLog(`[kugou] added: ${track.filename}`);
+      showToast(`已加入歌单: ${track.filename}`);
     } catch (e) {
-      showToast(`KuGou 播放失败: ${e}`, 'error');
+      pushLog(`[kugou] add failed: ${e}`);
+      showToast(`加入歌单失败: ${e}`, 'error');
     }
   };
 
@@ -120,6 +148,16 @@ export default function App() {
     checkForUpdate().then((info) => {
       if (info) setUpdate(info);
     });
+  }, []);
+
+  // KuGou token has a long but finite life. Refresh proactively on startup if
+  // it's >1 day old so streamers don't bump into auth errors mid-stream.
+  // Wait a few seconds first so the kugou-api sidecar has time to come up.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      refreshTokenIfStale().catch(() => {});
+    }, 4000);
+    return () => window.clearTimeout(t);
   }, []);
 
   // 订阅 sidecar 事件
@@ -153,8 +191,11 @@ export default function App() {
   }, [addSong, cancelByUid, setStatus, pushLog, sessionId]);
 
   const onStart = async () => {
+    pushLog('[app] start clicked');
     if (!config.room_id.trim()) {
-      setBootError('请填写抖音直播间 ID');
+      const msg = '请填写抖音直播间 ID';
+      pushLog(`[app] start aborted: ${msg}`);
+      setBootError(msg);
       return;
     }
     setBootError(null);
@@ -162,19 +203,23 @@ export default function App() {
       await saveConfig(config);
       const sid = newSession();
       clearSongs();
-      await clearSessionHistory(sid).catch(() => {}); // 防御: 万一同 id 残留
+      await clearSessionHistory(sid).catch(() => {});
       await invoke('sidecar_send', { cmd: { cmd: 'start', config } });
       setRunning(true);
+      pushLog(`[app] sidecar started, session=${sid}`);
     } catch (e) {
+      pushLog(`[app] start failed: ${e}`);
       setBootError(`启动失败: ${e}`);
     }
   };
 
   const onStop = async () => {
+    pushLog('[app] stop clicked');
     try {
       await invoke('sidecar_send', { cmd: { cmd: 'stop' } });
+      pushLog('[app] sidecar stop ack');
     } catch (e) {
-      pushLog(`stop error: ${e}`);
+      pushLog(`[app] stop error: ${e}`);
     } finally {
       setRunning(false);
       setStatus({ connected: false, message: '已停止' });
@@ -184,8 +229,10 @@ export default function App() {
   const onCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      pushLog(`[app] copy: ${text}`);
       showToast(`已复制: ${text}`);
     } catch (e) {
+      pushLog(`[app] copy failed: ${e}`);
       showToast(`复制失败: ${e}`, 'error');
     }
   };
@@ -193,8 +240,10 @@ export default function App() {
     if (display.length === 0) return;
     try {
       await navigator.clipboard.writeText(display.map((s) => s.song_name).join('\n'));
+      pushLog(`[app] copy all: ${display.length} items`);
       showToast(`已复制 ${display.length} 条到剪贴板`);
     } catch (e) {
+      pushLog(`[app] copy all failed: ${e}`);
       showToast(`复制失败: ${e}`, 'error');
     }
   };
@@ -204,17 +253,20 @@ export default function App() {
     const item = manualAdd(t);
     if (sessionId) insertHistory(item, sessionId).catch(() => {});
     setManualText('');
+    pushLog(`[app] manual add: ${t}`);
     showToast(`已添加: ${t}`);
   };
   const onRemoveOne = async (msgId: string, name: string) => {
     removeByMsgId(msgId);
     await deleteHistoryByMsgId(msgId).catch(() => {});
+    pushLog(`[app] remove: ${name} (${msgId})`);
     showToast(`已删除: ${name}`);
   };
   const onClearList = async () => {
     const n = display.length;
     clearSongs();
     if (sessionId) await clearSessionHistory(sessionId).catch(() => {});
+    pushLog(`[app] cleared ${n} items`);
     showToast(`已清空 ${n} 条`);
   };
 
@@ -311,6 +363,55 @@ export default function App() {
             title="同一用户两次点歌的最短间隔。0 = 关闭冷却。"
           />
         </label>
+        {kugouLoggedIn && (
+        <label className="playlist-target">
+          <span>目标歌单</span>
+          <div className="playlist-row">
+            <input
+              type="text"
+              value={config.target_playlist_name}
+              onChange={(e) => setConfig({ target_playlist_name: e.target.value })}
+              placeholder="自动加入歌单的名字"
+            />
+            <span className="listid-display">
+              {config.target_playlist_id
+                ? `id: ${config.target_playlist_id}`
+                : 'id: —'}
+            </span>
+            <button
+              type="button"
+              onClick={async () => {
+                const name = config.target_playlist_name.trim();
+                if (!name) {
+                  showToast('请先填歌单名', 'error');
+                  return;
+                }
+                pushLog(`[playlist] resolving "${name}"`);
+                try {
+                  const { listid, created } = await resolvePlaylistByName(name);
+                  setConfig({ target_playlist_id: listid });
+                  await saveConfig({ ...config, target_playlist_name: name, target_playlist_id: listid });
+                  const msg = created
+                    ? `已新建歌单 (id: ${listid})`
+                    : `已绑定歌单 (id: ${listid})`;
+                  pushLog(`[playlist] ${msg}`);
+                  showToast(msg);
+                } catch (e) {
+                  const detail = String(e);
+                  pushLog(`[playlist] failed: ${detail}`);
+                  if (detail.includes('not logged in')) {
+                    showToast('请先点 🛠 扫码登录', 'error');
+                  } else {
+                    showToast(`解析失败: ${detail}`, 'error');
+                  }
+                }
+              }}
+            >
+              保存
+            </button>
+          </div>
+        </label>
+        )}
         {!running ? (
           <button className="primary" onClick={onStart}>开始</button>
         ) : (
@@ -347,15 +448,19 @@ export default function App() {
           )}
           {display.map((s) => {
             const entry: KuGouEntry = kugouCache[s.song_name.trim()] ?? { status: 'pending' };
-            let kugouLabel = '🎵酷狗';
+            const hasTarget = config.target_playlist_id > 0;
+            let kugouLabel = '🎵 加入歌单';
             let kugouTitle = '';
+            let kugouEnabled = entry.status === 'found' && hasTarget;
             switch (entry.status) {
               case 'pending':
-                kugouLabel = '🎵⋯';
+                kugouLabel = '🎵 ⋯';
                 kugouTitle = '正在 KuGou 查找…';
                 break;
               case 'found':
-                kugouTitle = `在 KuGou 客户端播放: ${entry.song.filename}`;
+                kugouTitle = hasTarget
+                  ? `加入歌单 (id ${config.target_playlist_id}): ${entry.track.filename}`
+                  : '请先在"目标歌单"里保存一个歌单';
                 break;
               case 'not_found':
                 kugouTitle = 'KuGou 未找到这首歌';
@@ -369,13 +474,15 @@ export default function App() {
                 <div className="col-uname uname">{s.uname}</div>
                 <div className="col-song song">{s.song_name}</div>
                 <div className="col-actions item-actions">
-                  <button
-                    disabled={entry.status !== 'found'}
-                    onClick={() => entry.status === 'found' && onPlayKuGou(entry.song)}
-                    title={kugouTitle}
-                  >
-                    {kugouLabel}
-                  </button>
+                  {kugouLoggedIn && (
+                    <button
+                      disabled={!kugouEnabled}
+                      onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track)}
+                      title={kugouTitle}
+                    >
+                      {kugouLabel}
+                    </button>
+                  )}
                   <button onClick={() => onCopy(s.song_name)}>复制</button>
                   <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
                 </div>

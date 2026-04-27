@@ -14,6 +14,8 @@ export interface Config {
   sing_prefix: string;
   sing_cd: number;
   fans_level: number;
+  target_playlist_name: string;
+  target_playlist_id: number;
 }
 
 export type SidecarEvent =
