@@ -188,6 +188,31 @@ pub type KugouApiState = Arc<KugouApiHandle>;
 /// `path` should already include the query string (e.g. `/search?keywords=foo`).
 /// `cookie` is sent both as a Cookie header and as a `cookie=` query param —
 /// belt-and-suspenders, since KuGouMusicApi accepts either.
+/// Sanitize a copy-pasted cookie string into a single header line.
+/// HTTP header values can't contain CR/LF/NUL — pasted cookies often have
+/// soft-wraps or stray newlines, which produce reqwest "builder error".
+/// Also collapse interior whitespace runs and trim ends.
+fn sanitize_cookie(raw: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .map(|c| if c == '\r' || c == '\n' || c == '\t' || c == '\0' { ' ' } else { c })
+        .collect();
+    let mut out = String::with_capacity(cleaned.len());
+    let mut prev_space = false;
+    for c in cleaned.chars() {
+        if c == ' ' {
+            if !prev_space && !out.is_empty() {
+                out.push(' ');
+            }
+            prev_space = true;
+        } else {
+            out.push(c);
+            prev_space = false;
+        }
+    }
+    out.trim().trim_end_matches(';').trim().to_string()
+}
+
 #[tauri::command]
 pub async fn kugou_api_request(
     method: String,
@@ -209,14 +234,24 @@ pub async fn kugou_api_request(
         m => return Err(format!("unsupported method {m}")),
     };
 
-    if let Some(c) = cookie.as_ref().filter(|s| !s.is_empty()) {
-        req = req.header("Cookie", c.clone());
+    if let Some(c) = cookie.as_ref().map(|s| sanitize_cookie(s)).filter(|s| !s.is_empty()) {
+        req = req.header(reqwest::header::COOKIE, &c);
     }
     if let Some(b) = body {
         req = req.json(&b);
     }
 
-    let resp = req.send().await.map_err(|e| format!("send: {e}"))?;
+    // Materialize the request first so a builder error (bad URL / header /
+    // serialization) surfaces with a real reason instead of opaque "builder
+    // error" from send().
+    let request = req
+        .build()
+        .map_err(|e| format!("build {url}: {e}"))?;
+
+    let resp = client
+        .execute(request)
+        .await
+        .map_err(|e| format!("send {url}: {e}"))?;
     let status = resp.status().as_u16();
     let text = resp.text().await.map_err(|e| format!("body: {e}"))?;
 
