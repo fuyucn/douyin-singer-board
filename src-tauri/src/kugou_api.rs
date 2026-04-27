@@ -164,8 +164,6 @@ impl KugouApiHandle {
 
 /// Returns the base URL of the running kugou-api server, or an error if it's
 /// not yet ready. Other Rust modules build their request URLs from this.
-/// Phase 1 only spawns the server; the first caller will land in Phase 2.
-#[allow(dead_code)]
 pub fn kugou_api_url(path: &str) -> Result<String, String> {
     let port = PORT.get().ok_or("kugou-api not ready yet".to_string())?;
     if path.starts_with('/') {
@@ -182,3 +180,53 @@ fn log_to_ui(app: &AppHandle, level: &str, msg: &str) {
 
 #[allow(dead_code)]
 pub type KugouApiState = Arc<KugouApiHandle>;
+
+/// Generic proxy to the embedded KuGouMusicApi server. Used by the dev panel
+/// to exercise raw endpoints (search, user/detail, user/playlist,
+/// playlist/tracks/add) without scattering reqwest calls across modules.
+///
+/// `path` should already include the query string (e.g. `/search?keywords=foo`).
+/// `cookie` is sent both as a Cookie header and as a `cookie=` query param —
+/// belt-and-suspenders, since KuGouMusicApi accepts either.
+#[tauri::command]
+pub async fn kugou_api_request(
+    method: String,
+    path: String,
+    cookie: Option<String>,
+    body: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let url = kugou_api_url(&path)?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("client: {e}"))?;
+
+    let mut req = match method.to_uppercase().as_str() {
+        "GET" => client.get(&url),
+        "POST" => client.post(&url),
+        "PUT" => client.put(&url),
+        "DELETE" => client.delete(&url),
+        m => return Err(format!("unsupported method {m}")),
+    };
+
+    if let Some(c) = cookie.as_ref().filter(|s| !s.is_empty()) {
+        req = req.header("Cookie", c.clone());
+    }
+    if let Some(b) = body {
+        req = req.json(&b);
+    }
+
+    let resp = req.send().await.map_err(|e| format!("send: {e}"))?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.map_err(|e| format!("body: {e}"))?;
+
+    // Best-effort JSON parse. If the response isn't JSON, return it as a
+    // string under `_raw` so the dev panel can still show something.
+    let parsed: serde_json::Value = serde_json::from_str(&text)
+        .unwrap_or_else(|_| serde_json::json!({ "_raw": text }));
+
+    Ok(serde_json::json!({
+        "status": status,
+        "body": parsed,
+    }))
+}

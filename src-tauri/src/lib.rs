@@ -75,7 +75,11 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![sidecar::sidecar_send, kugou::kugou_search])
+        .invoke_handler(tauri::generate_handler![
+            sidecar::sidecar_send,
+            kugou::kugou_search,
+            kugou_api::kugou_api_request,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

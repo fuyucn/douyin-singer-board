@@ -6,6 +6,7 @@ import { loadConfig, saveConfig, insertHistory, deleteHistoryByMsgId, clearSessi
 import type { SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
+import { KugouDebugModal } from './KugouDebugModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
 import { searchKuGou, playKuGouSong, type KuGouSong } from './kugou';
 
@@ -39,6 +40,7 @@ export default function App() {
   const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [showKgDebug, setShowKgDebug] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
 
   // KuGou search results, keyed by trimmed song_name. Each entry is fetched at
@@ -233,6 +235,13 @@ export default function App() {
         </button>
         <button
           className="header-action"
+          onClick={() => setShowKgDebug(true)}
+          title="KuGou API 调试面板"
+        >
+          🛠
+        </button>
+        <button
+          className="header-action"
           onClick={() => setShowAbout(true)}
           title="关于 / 检查更新"
         >
@@ -397,6 +406,8 @@ export default function App() {
           onShowToast={showToast}
         />
       )}
+
+      {showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
     </div>
   );
 }
