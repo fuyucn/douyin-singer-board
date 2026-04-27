@@ -151,19 +151,23 @@ export async function resolvePlaylistByName(
   return { listid: Number(newId), created: true };
 }
 
-/** Minimal song metadata required by /playlist/tracks/add. */
+/**
+ * Minimal song metadata required by /playlist/tracks/add. `plays` is our
+ * own annotation from /user/listen and only meaningful for variants that
+ * appear in the streamer's top-120 cumulative history (0 otherwise).
+ */
 export interface KuGouTrack {
   filename: string;
   hash: string;
   album_id: string;
   mixsongid: string;
+  plays?: number;
 }
 
 /**
- * Authenticated top-1 search via the local kugou-api /search endpoint.
- * Returns null when not logged in or the upstream returned no hits — callers
- * use this to decide whether the row's "add to playlist" button should be
- * enabled.
+ * Authenticated top-1 search — kept as a fallback. Production callers should
+ * prefer `searchKuGouPreferredHit` so we tilt toward versions the streamer
+ * has actually played (KuGou returns many variants per title).
  */
 export async function searchKuGouTopHit(
   keyword: string,
@@ -186,6 +190,130 @@ export async function searchKuGouTopHit(
     hash,
     album_id: String(top.AlbumID ?? ''),
     mixsongid: String(top.MixSongID ?? ''),
+  };
+}
+
+// In-memory cache of /user/listen?type=1 (cumulative top-120) — refreshed
+// every hour. Key = uppercase hash, value = play count. Used by
+// `searchKuGouPreferredHit` to bias version selection toward what the
+// streamer has actually played.
+let listenHistoryCache: { map: Map<string, number>; fetched_at: number } | null = null;
+const LISTEN_TTL_SECONDS = 60 * 60;
+
+function extractListenEntries(body: any): Array<{ hash: string; count: number }> {
+  // /user/listen?type=1 nests the array at data.lists with `hash` (upper)
+  // and `listen_count`. We probe a few alternates for forward compat in
+  // case KuGou ever shuffles the gateway shape.
+  const arr: any[] = []
+    .concat(Array.isArray(body?.data?.lists) ? body.data.lists : [])
+    .concat(Array.isArray(body?.data?.songs) ? body.data.songs : [])
+    .concat(Array.isArray(body?.data?.list) ? body.data.list : [])
+    .concat(Array.isArray(body?.data?.info) ? body.data.info : [])
+    .concat(Array.isArray(body?.data) ? body.data : []);
+  return arr
+    .filter((x: any) => x && (x.hash || x.FileHash))
+    .map((x: any) => ({
+      hash: String(x.hash ?? x.FileHash ?? '').toUpperCase(),
+      count: Number(
+        x.listen_count ?? x.play_count ?? x.playcount ?? x.pc ?? x.count ?? 1,
+      ),
+    }));
+}
+
+export async function listenHistoryMap(force = false): Promise<Map<string, number>> {
+  const now = Math.floor(Date.now() / 1000);
+  if (
+    !force &&
+    listenHistoryCache &&
+    now - listenHistoryCache.fetched_at < LISTEN_TTL_SECONDS
+  ) {
+    return listenHistoryCache.map;
+  }
+  const cookie = await currentCookie();
+  if (!cookie) return new Map();
+  try {
+    const resp = await call('GET', '/user/listen?type=1', cookie);
+    const entries = extractListenEntries(resp.body);
+    const map = new Map<string, number>();
+    for (const e of entries) {
+      if (e.hash) map.set(e.hash, Math.max(e.count, map.get(e.hash) ?? 0));
+    }
+    listenHistoryCache = { map, fetched_at: now };
+    return map;
+  } catch {
+    return listenHistoryCache?.map ?? new Map();
+  }
+}
+
+export function clearListenHistoryCache(): void {
+  listenHistoryCache = null;
+}
+
+/**
+ * Cross-references search results with the streamer's listen history and
+ * returns the variant they've played the most. Falls back to the first hit
+ * when no match. Examines both top-level lists and their Grp[] variants
+ * (KuGou groups remasters / live / different albums of the same song).
+ */
+export async function searchKuGouPreferredHit(
+  keyword: string,
+): Promise<KuGouTrack | null> {
+  const k = keyword.trim();
+  if (!k) return null;
+  const cookie = await currentCookie();
+  if (!cookie) return null;
+
+  const resp = await call(
+    'GET',
+    `/search?keywords=${encodeURIComponent(k)}&pagesize=10`,
+    cookie,
+  );
+  const lists = resp.body?.data?.lists ?? [];
+  if (!Array.isArray(lists) || lists.length === 0) return null;
+
+  type Candidate = KuGouTrack & {
+    plays: number;       // primary: streamer's own play count from /user/listen
+    ownerCount: number;  // secondary: KuGou-wide collectors of this version
+  };
+  const candidates: Candidate[] = [];
+  const playMap = await listenHistoryMap();
+
+  const visit = (item: any) => {
+    const hash = String(item?.FileHash ?? '').toUpperCase();
+    if (!hash) return;
+    candidates.push({
+      filename: String(item.FileName ?? ''),
+      hash,
+      album_id: String(item.AlbumID ?? ''),
+      mixsongid: String(item.MixSongID ?? ''),
+      plays: playMap.get(hash) ?? 0,
+      ownerCount: Number(item.OwnerCount ?? 0),
+    });
+    if (Array.isArray(item.Grp)) {
+      for (const g of item.Grp) visit(g);
+    }
+  };
+  for (const item of lists) visit(item);
+
+  if (candidates.length === 0) return null;
+
+  // Two-stage rank:
+  //   1. play count from listen history (>0 means streamer has played this
+  //      exact version) — strongest signal we have for "preferred version"
+  //   2. OwnerCount (KuGou-wide collectors) — when nothing matches the
+  //      top-120 history, the canonical version usually has orders of
+  //      magnitude more collectors than reissues/live cuts/karaoke
+  // We never break ties on search order alone; OwnerCount handles it.
+  candidates.sort((a, b) => {
+    if (a.plays !== b.plays) return b.plays - a.plays;
+    return b.ownerCount - a.ownerCount;
+  });
+  const best = candidates[0];
+  return {
+    filename: best.filename,
+    hash: best.hash,
+    album_id: best.album_id,
+    mixsongid: best.mixsongid,
   };
 }
 

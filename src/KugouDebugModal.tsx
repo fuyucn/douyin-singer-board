@@ -53,6 +53,8 @@ type QrState =
 
 export function KugouDebugModal({ onClose }: Props) {
   const pushLog = useAppStore((s) => s.pushLog);
+  const preferCumulative = useAppStore((s) => s.preferCumulative);
+  const setPreferCumulative = useAppStore((s) => s.setPreferCumulative);
   const [cookie, setCookie] = useState<string>('');
   const [refreshedAt, setRefreshedAt] = useState<number>(0);
   const [keyword, setKeyword] = useState('海阔天空');
@@ -164,6 +166,14 @@ export function KugouDebugModal({ onClose }: Props) {
 
   const onListPlaylists = () =>
     run('GET /user/playlist', () => call('GET', '/user/playlist?pagesize=100', cookie));
+
+  const onUserListen = () =>
+    run('GET /user/listen?type=1', () =>
+      call('GET', '/user/listen?type=1', cookie),
+    );
+
+  const onUserHistory = () =>
+    run('GET /user/history', () => call('GET', '/user/history', cookie));
 
   const onSearch = () =>
     run('GET /search', () =>
@@ -402,7 +412,27 @@ export function KugouDebugModal({ onClose }: Props) {
             <button onClick={onListPlaylists} disabled={!cookie || busy !== null}>
               列我的歌单 (/user/playlist)
             </button>
+            <button onClick={onUserListen} disabled={!cookie || busy !== null}>
+              累计播放榜 (/user/listen?type=1)
+            </button>
+            <button onClick={onUserHistory} disabled={!cookie || busy !== null}>
+              最近播放流水 (/user/history)
+            </button>
           </div>
+
+          <label className="kg-switch">
+            <input
+              type="checkbox"
+              checked={preferCumulative}
+              onChange={(e) => {
+                setPreferCumulative(e.target.checked);
+                pushLog(
+                  `[kg-dev] 累计播放优先 = ${e.target.checked ? 'on' : 'off'}`,
+                );
+              }}
+            />
+            <span>累计播放优先（每行 🎵 用 /user/listen 历史挑版本，关闭则取搜索首条）</span>
+          </label>
 
           <div className="kg-row inline">
             <span className="label">关键词</span>
@@ -439,6 +469,20 @@ export function KugouDebugModal({ onClose }: Props) {
             <details className="kg-result" open>
               <summary>
                 {result.label} → status {result.data.status}
+                <button
+                  className="kg-copy"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const json = JSON.stringify(result.data.body, null, 2);
+                    navigator.clipboard
+                      .writeText(json)
+                      .then(() => pushLog(`[kg-dev] copied ${json.length} chars`))
+                      .catch((err) => pushLog(`[kg-dev] copy failed: ${err}`));
+                  }}
+                >
+                  复制
+                </button>
               </summary>
               <pre>{JSON.stringify(result.data.body, null, 2)}</pre>
             </details>

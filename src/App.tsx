@@ -11,7 +11,9 @@ import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, typ
 import {
   refreshTokenIfStale,
   resolvePlaylistByName,
+  searchKuGouPreferredHit,
   searchKuGouTopHit,
+  listenHistoryMap,
   addTrackToPlaylist,
   type KuGouTrack,
 } from './kugouSession';
@@ -40,6 +42,7 @@ export default function App() {
   const manualAdd = useAppStore((s) => s.manualAdd);
   const logs = useAppStore((s) => s.logs);
   const pushLog = useAppStore((s) => s.pushLog);
+  const preferCumulative = useAppStore((s) => s.preferCumulative);
 
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
@@ -58,6 +61,16 @@ export default function App() {
       .then((s) => setKugouLoggedIn(Boolean(s.token && s.userid && s.dfid)))
       .catch(() => setKugouLoggedIn(false));
   }, [showKgDebug]);
+
+  // Warm the /user/listen cache once on login so the first per-row
+  // searchKuGouPreferredHit call doesn't pay the round-trip latency.
+  // Failure is silent — preferred-hit gracefully falls back to OwnerCount.
+  useEffect(() => {
+    if (!kugouLoggedIn) return;
+    listenHistoryMap()
+      .then((m) => pushLog(`[kugou] listen history cached: ${m.size} hashes`))
+      .catch((e) => pushLog(`[kugou] listen history failed: ${e}`));
+  }, [kugouLoggedIn, pushLog]);
 
   // KuGou search results, keyed by trimmed song_name. Each entry is fetched at
   // most once per session — pending while in flight, then frozen as found /
@@ -97,7 +110,8 @@ export default function App() {
       if (kugouStartedRef.current.has(name)) continue;
       kugouStartedRef.current.add(name);
       setKugouCache((prev) => ({ ...prev, [name]: { status: 'pending' } }));
-      searchKuGouTopHit(name)
+      const search = preferCumulative ? searchKuGouPreferredHit : searchKuGouTopHit;
+      search(name)
         .then((track) => {
           setKugouCache((prev) => ({
             ...prev,
@@ -111,7 +125,7 @@ export default function App() {
           }));
         });
     }
-  }, [display, kugouLoggedIn]);
+  }, [display, kugouLoggedIn, preferCumulative]);
 
   const onAddToPlaylist = async (track: KuGouTrack) => {
     const listid = config.target_playlist_id;

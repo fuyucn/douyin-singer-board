@@ -30,6 +30,11 @@ interface AppStore {
   // Simple log buffer
   logs: string[];
   pushLog: (line: string) => void;
+
+  // KuGou preference: when true, the per-row 🎵 button uses preferred-hit
+  // (cumulative play count > OwnerCount > search order). Off → plain top-1.
+  preferCumulative: boolean;
+  setPreferCumulative: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -94,6 +99,23 @@ export const useAppStore = create<AppStore>((set) => ({
 
   logs: [],
   pushLog: (line) => set((s) => ({ logs: [...s.logs.slice(-99), line] })),
+
+  preferCumulative: (() => {
+    try {
+      const v = localStorage.getItem('sususongboard.kugou-prefer-cumulative');
+      // Default on for fresh installs; only opt out by explicit '0'.
+      if (v === null) return true;
+      return v === '1';
+    } catch {
+      return true;
+    }
+  })(),
+  setPreferCumulative: (v) => {
+    try {
+      localStorage.setItem('sususongboard.kugou-prefer-cumulative', v ? '1' : '0');
+    } catch {}
+    set({ preferCumulative: v });
+  },
 }));
 
 // Dedup by song name. Display order:
