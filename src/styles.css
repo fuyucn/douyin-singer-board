@@ -316,6 +316,13 @@ body {
   margin: 0; padding: 10px; max-height: 320px; overflow: auto;
   white-space: pre-wrap; word-break: break-all; color: var(--fg-base);
 }
+.modal.kg-debug .kg-qr {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px; border: 1px solid var(--border-soft); border-radius: 4px;
+  background: var(--bg-base);
+}
+.modal.kg-debug .kg-qr img { width: 220px; height: 220px; image-rendering: pixelated; }
+.modal.kg-debug .kg-qr-status { color: var(--fg-muted); font-size: 13px; }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }

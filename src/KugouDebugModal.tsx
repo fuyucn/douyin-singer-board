@@ -2,7 +2,7 @@
 // buttons cover the workflow we need to validate (login → list playlists →
 // search → add) before investing in a real QR-login UX.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
 interface Props {
@@ -25,6 +25,12 @@ async function call(
   return invoke<ApiResult>('kugou_api_request', { method, path, cookie, body });
 }
 
+type QrState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'waiting'; key: string; image: string; statusLabel: string }
+  | { kind: 'error'; msg: string };
+
 export function KugouDebugModal({ onClose }: Props) {
   const [cookie, setCookie] = useState<string>(() => {
     try {
@@ -39,18 +45,23 @@ export function KugouDebugModal({ onClose }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<{ label: string; data: ApiResult } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [qr, setQr] = useState<QrState>({ kind: 'idle' });
+  const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (pollRef.current !== null) window.clearInterval(pollRef.current);
+    };
   }, [onClose]);
 
-  const saveCookie = () => {
+  const persistCookie = (value: string) => {
     try {
-      localStorage.setItem(COOKIE_KEY, cookie);
+      localStorage.setItem(COOKIE_KEY, value);
     } catch {}
   };
 
@@ -96,6 +107,87 @@ export function KugouDebugModal({ onClose }: Props) {
     );
   };
 
+  const stopPoll = () => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  };
+
+  // KuGou QR login: get a key, render the QR image, poll for the user to scan
+  // with the KuGou mobile app and confirm. On status=4 the response carries
+  // the token + userid we need — we wire them into the cookie field so the
+  // four buttons below light up immediately.
+  const startQrLogin = async () => {
+    setError(null);
+    setQr({ kind: 'loading' });
+    try {
+      const keyResp = await call('GET', '/login/qr/key', '');
+      const key = String(keyResp.body?.data?.qrcode ?? '');
+      if (!key) {
+        setQr({ kind: 'error', msg: `/login/qr/key 没返回 qrcode (status ${keyResp.status})` });
+        return;
+      }
+      const createResp = await call(
+        'GET',
+        `/login/qr/create?key=${encodeURIComponent(key)}&qrimg=true`,
+        '',
+      );
+      const image = String(createResp.body?.data?.base64 ?? '');
+      if (!image) {
+        setQr({ kind: 'error', msg: '/login/qr/create 没返回 base64 图片' });
+        return;
+      }
+      setQr({ kind: 'waiting', key, image, statusLabel: '等待手机扫码' });
+
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const r = await call('GET', `/login/qr/check?key=${encodeURIComponent(key)}`, '');
+          const data = r.body?.data ?? {};
+          const code = Number(data.status ?? -1);
+          if (code === 4) {
+            stopPoll();
+            const token = String(data.token ?? '');
+            const userid = String(data.userid ?? '');
+            if (!token || !userid) {
+              setQr({ kind: 'error', msg: '登录返回未含 token/userid，原始响应见下方结果' });
+              setResult({ label: '扫码登录响应', data: r });
+              return;
+            }
+            const cookieStr = `token=${token};userid=${userid}`;
+            setCookie(cookieStr);
+            persistCookie(cookieStr);
+            setQr({ kind: 'idle' });
+            setResult({ label: '扫码登录成功 (token/userid 已写入)', data: r });
+          } else if (code === 0) {
+            stopPoll();
+            setQr({ kind: 'error', msg: '二维码已过期，请重新扫码' });
+          } else {
+            const labels: Record<number, string> = {
+              1: '等待手机扫码',
+              2: '已扫码，等待手机确认',
+            };
+            setQr((prev) =>
+              prev.kind === 'waiting'
+                ? { ...prev, statusLabel: labels[code] ?? `status=${code}` }
+                : prev,
+            );
+          }
+        } catch (e) {
+          // transient — keep polling
+          console.warn('qr check err', e);
+        }
+      }, 2500);
+    } catch (e) {
+      setQr({ kind: 'error', msg: String(e) });
+    }
+  };
+
+  const cancelQr = () => {
+    stopPoll();
+    setQr({ kind: 'idle' });
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal kg-debug" onClick={(e) => e.stopPropagation()}>
@@ -104,15 +196,32 @@ export function KugouDebugModal({ onClose }: Props) {
           <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="modal-body">
+          <div className="kg-actions">
+            <button onClick={startQrLogin} disabled={qr.kind === 'loading' || qr.kind === 'waiting'}>
+              {qr.kind === 'loading' ? '生成二维码中…' : '扫码登录 (KuGou 手机 App)'}
+            </button>
+            {(qr.kind === 'waiting' || qr.kind === 'error') && (
+              <button onClick={cancelQr}>取消</button>
+            )}
+          </div>
+
+          {qr.kind === 'waiting' && (
+            <div className="kg-qr">
+              <img src={qr.image} alt="KuGou QR" />
+              <div className="kg-qr-status">{qr.statusLabel}</div>
+            </div>
+          )}
+          {qr.kind === 'error' && <div className="kg-status error">QR: {qr.msg}</div>}
+
           <label className="kg-row">
             <span className="label">Cookie</span>
             <textarea
               className="kg-cookie"
               rows={3}
-              placeholder="从 www.kugou.com 登录后 DevTools → Application → Cookies 复制全部，或粘贴 token=xxx;userid=yyy;...格式"
+              placeholder="扫码登录后会自动填好；或者手动粘贴 token=xxx;userid=yyy 格式"
               value={cookie}
               onChange={(e) => setCookie(e.target.value)}
-              onBlur={saveCookie}
+              onBlur={() => persistCookie(cookie)}
             />
           </label>
 
