@@ -53,6 +53,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -85,6 +87,9 @@ jobs:
 
       - name: Build sidecar binary
         run: pnpm sidecar:build:bin
+
+      - name: Build kugou-api sidecar binary
+        run: pnpm kugou-api:build:bin
 
       - name: Clean stale bundle artifacts
         # The cached target dir would otherwise carry forward .dmg/.msi/.exe

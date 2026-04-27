@@ -1,4 +1,5 @@
 mod kugou;
+mod kugou_api;
 mod sidecar;
 
 use std::sync::Arc;
@@ -59,6 +60,16 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = handle.spawn(app_handle.clone()).await {
                     eprintln!("[tauri] sidecar spawn failed: {}", e);
+                }
+            });
+
+            let kugou_api_handle = Arc::new(kugou_api::KugouApiHandle::new());
+            app.manage(kugou_api_handle.clone());
+
+            let app_handle_kg = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = kugou_api_handle.spawn(app_handle_kg.clone()).await {
+                    eprintln!("[tauri] kugou-api spawn failed: {}", e);
                 }
             });
 

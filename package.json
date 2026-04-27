@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.30-4",
+  "version": "0.0.30-5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,10 @@
     "sidecar:dev": "pnpm -F sidecar dev",
     "sidecar:build": "pnpm -F sidecar build",
     "sidecar:build:bin": "pnpm -F sidecar build:bin",
+    "kugou-api:build:bin": "node scripts/build-kugou-api-bin.mjs",
     "tauri": "tauri",
     "tauri:dev": "pnpm sidecar:build && tauri dev",
-    "tauri:build": "pnpm sidecar:build:bin && tauri build",
+    "tauri:build": "pnpm sidecar:build:bin && pnpm kugou-api:build:bin && tauri build",
     "bump": "node scripts/bump-patch.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -30,6 +31,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "@yao-pkg/pkg": "^6.3.0",
     "typescript": "^5.6.2",
     "vite": "^6.0.3",
     "vitest": "^2.1.8"
