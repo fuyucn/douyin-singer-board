@@ -242,7 +242,7 @@ export default function App() {
 
   const onAddToPlaylist = async (track: KuGouTrack, song: DanmuInfo) => {
     if (!config.target_playlist_id) {
-      showToast('请先在"目标歌单"里保存一个歌单', 'error');
+      showToast('请先在"Kugou歌单"里保存一个歌单', 'error');
       return;
     }
     try {
@@ -266,7 +266,7 @@ export default function App() {
     let enabled = entry.status === 'found' && hasTarget;
     switch (entry.status) {
       case 'pending': label = '🎵 ⋯'; title = '正在 KuGou 查找…'; break;
-      case 'found': title = hasTarget ? `加入歌单: ${entry.track.filename}` : '请先保存目标歌单'; break;
+      case 'found': title = hasTarget ? `加入歌单: ${entry.track.filename}` : '请先保存Kugou歌单'; break;
       case 'not_found': title = 'KuGou 未找到这首歌'; break;
       case 'error': title = `KuGou 搜索失败: ${entry.msg}`; break;
     }
@@ -352,7 +352,7 @@ export default function App() {
         )}
         {kugouLoggedIn && (
         <label className="playlist-target">
-          <span>目标歌单</span>
+          <span>Kugou歌单</span>
           <div className="playlist-row">
             <input type="text" value={config.target_playlist_name} onChange={(e) => setConfig({ target_playlist_name: e.target.value })} placeholder="自动加入歌单的名字" />
             <span className="listid-display">{config.target_playlist_id ? `id: ${config.target_playlist_id}` : 'id: —'}</span>
