@@ -15,13 +15,15 @@ interface ApiResult {
   body: any;
 }
 
-async function call(
+export async function call(
   method: string,
   path: string,
   cookie: string,
   body?: unknown,
 ): Promise<ApiResult> {
-  return invoke<ApiResult>('kugou_api_request', { method, path, cookie, body });
+  const sep = path.includes('?') ? '&' : '?';
+  const pathWithTs = `${path}${sep}_t=${Date.now()}`;
+  return invoke<ApiResult>('kugou_api_request', { method, path: pathWithTs, cookie, body });
 }
 
 /** Persist (token, userid) coming out of a successful QR check. */

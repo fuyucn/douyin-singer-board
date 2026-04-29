@@ -7,6 +7,7 @@ import type { DanmuInfo, SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
+import { KugouLoginModal } from './KugouLoginModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeIcon, themeLabel, type Theme } from './theme';
 import {
   refreshTokenIfStale,
@@ -61,6 +62,7 @@ export default function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
+  const [showKgLogin, setShowKgLogin] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
   const [kugouLoggedIn, setKugouLoggedIn] = useState(false);
@@ -69,7 +71,7 @@ export default function App() {
     loadKugouSession()
       .then((s) => setKugouLoggedIn(Boolean(s.token && s.userid && s.dfid)))
       .catch(() => setKugouLoggedIn(false));
-  }, [showKgDebug]);
+  }, [showKgDebug, showKgLogin]);
 
   useEffect(() => {
     if (!kugouLoggedIn) return;
@@ -307,7 +309,12 @@ export default function App() {
         <button className="header-action header-theme first-tail" onClick={() => { const t = nextTheme(theme); saveTheme(t); setTheme(t); }} title={`主题: ${themeLabel(theme)}`}>
           {themeIcon(theme)}
         </button>
-        <button className="header-action" onClick={() => setShowKgDebug(true)} title="KuGou API 调试面板">🛠</button>
+        <button className="header-action" onClick={() => setShowKgLogin(true)} title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}>
+          <img src="/kugou.svg" className={`header-kugou-icon ${kugouLoggedIn ? '' : 'kugou-off'}`} alt="" />
+        </button>
+        {import.meta.env.DEV && (
+          <button className="header-action" onClick={() => setShowKgDebug(true)} title="KuGou API 调试面板">🛠</button>
+        )}
         <button className="header-action" onClick={() => setShowAbout(true)} title="关于 / 检查更新">ⓘ</button>
       </header>
 
@@ -456,6 +463,7 @@ export default function App() {
 
       {toast && <div className={`toast ${toast.kind}`} onClick={() => setToast(null)} title="Click to dismiss">{toast.msg}</div>}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} onShowToast={showToast} />}
+      {showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
       {showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
     </div>
   );

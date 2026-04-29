@@ -3,14 +3,18 @@
 // search → add) before investing in a real QR-login UX.
 
 import { useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import {
   loadKugouSession,
   saveKugouSession,
   clearKugouSession,
   sessionToCookie,
 } from './db';
-import { ensureDeviceRegistered, refreshToken, saveLogin } from './kugouSession';
+import {
+  ensureDeviceRegistered,
+  refreshToken,
+  saveLogin,
+  call,
+} from './kugouSession';
 import { useAppStore } from './store';
 
 interface Props {
@@ -20,21 +24,6 @@ interface Props {
 interface ApiResult {
   status: number;
   body: any;
-}
-
-// KuGouMusicApi has a 2-minute apicache middleware on 200 responses, which
-// makes /login/qr/check polling lock onto the first "status=1" forever.
-// Per the docs ("调用务必带上时间戳,防止缓存") we append a unique `_t` param
-// to every call so the cache key is always fresh.
-async function call(
-  method: string,
-  path: string,
-  cookie: string,
-  body?: unknown,
-): Promise<ApiResult> {
-  const sep = path.includes('?') ? '&' : '?';
-  const pathWithTs = `${path}${sep}_t=${Date.now()}`;
-  return invoke<ApiResult>('kugou_api_request', { method, path: pathWithTs, cookie, body });
 }
 
 type QrState =
