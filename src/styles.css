@@ -215,6 +215,10 @@ body {
 
 .item .uname { color: var(--fg-muted); font-size: 13px; }
 .item .song { font-size: 15px; font-weight: 500; }
+.song-cell { line-height: 1.4; }
+.song-original { font-size: 13px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-match { font-size: 14px; font-weight: 500; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-status { font-size: 12px; color: var(--fg-muted); }
 .item-actions { opacity: 0.7; transition: opacity 0.15s; }
 .item:hover .item-actions { opacity: 1; }
 .item-actions button {

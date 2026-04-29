@@ -275,7 +275,7 @@ export default function App() {
             {label}
           </button>
         )}
-        <button onClick={() => onCopy(entry.status === 'found' ? entry.track.filename : s.song_name)}>复制</button>
+        <button onClick={() => onCopy(s.song_name)}>复制</button>
         <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
       </>
     );
@@ -286,10 +286,7 @@ export default function App() {
   );
 
   const ctxActions = ctxMenu ? [
-    { label: '复制歌名', onClick: () => {
-      const entry = kugouCache[ctxMenu.song.song_name.trim()];
-      onCopy(entry?.status === 'found' ? entry.track.filename : ctxMenu.song.song_name);
-    }},
+    { label: '复制歌名', onClick: () => onCopy(ctxMenu.song.song_name) },
     { label: '删除', onClick: () => onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name) },
     { label: '加入黑名单', onClick: () => {
       addBlacklist(ctxMenu.song.song_name, ctxMenu.song.msg_id);
@@ -396,10 +393,22 @@ export default function App() {
           songs={display}
           emptyText={running ? '等待点歌...' : '点击 "开始" 连接直播间'}
           renderActions={renderSongActions}
-          renderSongName={(s) => {
+          renderSong={(s) => {
             const entry = kugouCache[s.song_name.trim()];
-            if (entry?.status === 'found') return entry.track.filename;
-            return s.song_name;
+            return (
+              <div className="song-cell">
+                <div className="song-original">{s.song_name}</div>
+                {entry?.status === 'found' ? (
+                  <div className="song-match">{entry.track.filename}</div>
+                ) : entry?.status === 'pending' ? (
+                  <div className="song-status">⋯ 搜索中</div>
+                ) : entry?.status === 'not_found' ? (
+                  <div className="song-status">未找到</div>
+                ) : (
+                  <div className="song-status">搜索失败</div>
+                )}
+              </div>
+            );
           }}
           onContextMenu={openCtxMenu}
         />
