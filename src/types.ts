@@ -7,6 +7,7 @@ export interface DanmuInfo {
   medal_level: number;
   medal_name: string;
   send_time: number;
+  played_at?: number;
 }
 
 export interface Config {

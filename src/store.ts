@@ -146,7 +146,12 @@ export const useAppStore = create<AppStore>((set) => ({
     }),
 
   played: [],
-  addPlayed: (song) => set((s) => ({ played: [song, ...s.played] })),
+  addPlayed: (song) =>
+    set((s) => {
+      const item = { ...song, played_at: Math.floor(Date.now() / 1000) };
+      const next = [item, ...s.played].sort((a, b) => (b.played_at ?? 0) - (a.played_at ?? 0));
+      return { played: next };
+    }),
   removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
   clearPlayed: () => set({ played: [] }),
 }));

@@ -399,8 +399,14 @@ export default function App() {
         <SongList
           songs={played}
           emptyText="暂无已点歌曲"
-          headerLabels={{ uname: '用户', song: '已点歌曲', actions: '操作' }}
+          headerLabels={{ uname: '添加时间', song: '已点歌曲', actions: '操作' }}
           renderActions={renderPlayedActions}
+          renderUname={(s) => {
+            const ts = s.played_at ?? s.send_time;
+            const d = new Date(ts * 1000);
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          }}
           onContextMenu={openCtxMenu}
         />
       ) : (
