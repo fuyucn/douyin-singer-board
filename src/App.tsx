@@ -71,6 +71,14 @@ export default function App() {
       .catch(() => setKugouLoggedIn(false));
   }, [showKgDebug, showKgLogin]);
 
+  // Turn off auto-sync when logging out (kugouLoggedIn transitions true→false).
+  // Using a ref to distinguish logout from initial false-before-session-loads.
+  const kgRef = useRef(kugouLoggedIn);
+  useEffect(() => {
+    if (!kugouLoggedIn && kgRef.current) setAutoSync(false);
+    kgRef.current = kugouLoggedIn;
+  }, [kugouLoggedIn, setAutoSync]);
+
   useEffect(() => {
     if (!kugouLoggedIn) return;
     listenHistoryMap()

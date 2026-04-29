@@ -134,13 +134,8 @@ export const useAppStore = create<AppStore>((set) => ({
     set({ preferCumulative: v });
   },
 
-  autoSync: (() => {
-    try { return localStorage.getItem('sususongboard.auto-sync') === '1'; } catch { return false; }
-  })(),
-  setAutoSync: (v) => {
-    try { localStorage.setItem('sususongboard.auto-sync', v ? '1' : '0'); } catch {}
-    set({ autoSync: v });
-  },
+  autoSync: false,
+  setAutoSync: (v) => set({ autoSync: v }),
 
   // Blacklist
   blacklist: new Set<string>(),
