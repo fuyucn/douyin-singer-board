@@ -30,6 +30,18 @@ interface AppStore {
   // Simple log buffer
   logs: string[];
   pushLog: (line: string) => void;
+
+  // Blacklist
+  blacklist: Set<string>;
+  hydrateBlacklist: (names: string[]) => void;
+  addToBlacklist: (name: string) => void;
+  removeFromBlacklist: (name: string) => void;
+
+  // Played songs (session-scoped)
+  played: DanmuInfo[];
+  addPlayed: (song: DanmuInfo) => void;
+  removePlayed: (msgId: string) => void;
+  clearPlayed: () => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -87,6 +99,32 @@ export const useAppStore = create<AppStore>((set) => ({
 
   logs: [],
   pushLog: (line) => set((s) => ({ logs: [...s.logs.slice(-99), line] })),
+
+  // Blacklist
+  blacklist: new Set<string>(),
+  hydrateBlacklist: (names) => set({ blacklist: new Set(names) }),
+  addToBlacklist: (name) =>
+    set((state) => {
+      const next = new Set(state.blacklist);
+      next.add(name);
+      return { blacklist: next };
+    }),
+  removeFromBlacklist: (name) =>
+    set((state) => {
+      const next = new Set(state.blacklist);
+      next.delete(name);
+      return { blacklist: next };
+    }),
+
+  played: [],
+  addPlayed: (song) =>
+    set((s) => {
+      const item = { ...song, played_at: Math.floor(Date.now() / 1000) };
+      const next = [item, ...s.played].sort((a, b) => (b.played_at ?? 0) - (a.played_at ?? 0));
+      return { played: next };
+    }),
+  removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
+  clearPlayed: () => set({ played: [] }),
 }));
 
 // Dedup by song name. Display order:
@@ -106,7 +144,6 @@ export function dedupedSongs(songs: DanmuInfo[]): DanmuInfo[] {
     } else if (!isManual(s) && isManual(existing)) {
       // keep existing manual
     } else if (s.send_time < existing.send_time) {
-      // both same kind: keep earliest
       seen.set(s.song_name, s);
     }
   }

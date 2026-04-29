@@ -6,6 +6,9 @@ let _db: Database | null = null;
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   _db = await Database.load('sqlite:sususongboard.db');
+  await _db.execute(
+    'CREATE TABLE IF NOT EXISTS blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, song_name TEXT UNIQUE NOT NULL, created_at INTEGER NOT NULL DEFAULT (strftime(\'%s\',\'now\')))',
+  );
   return _db;
 }
 
@@ -15,7 +18,6 @@ export async function loadConfig(): Promise<Config> {
     'SELECT room_id, sing_prefix, fans_level, sing_cd FROM config WHERE id = 1',
   );
   if (rows.length === 0) {
-    // The migration already inserts a row; this is a defensive fallback.
     await db.execute('INSERT OR IGNORE INTO config (id) VALUES (1)');
     return { room_id: '', sing_prefix: '点歌[space][song]', fans_level: 0, sing_cd: 60 };
   }
@@ -57,4 +59,24 @@ export async function deleteHistoryByMsgId(msgId: string): Promise<void> {
 export async function clearSessionHistory(sessionId: string): Promise<void> {
   const db = await getDb();
   await db.execute('DELETE FROM history WHERE session_id = $1', [sessionId]);
+}
+
+// ─── Blacklist ────────────────────────────────────────────────
+
+export async function loadBlacklist(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<Array<{ song_name: string }>>(
+    'SELECT song_name FROM blacklist ORDER BY id',
+  );
+  return rows.map((r) => r.song_name);
+}
+
+export async function addToBlacklist(songName: string): Promise<void> {
+  const db = await getDb();
+  await db.execute('INSERT OR IGNORE INTO blacklist (song_name) VALUES ($1)', [songName]);
+}
+
+export async function removeFromBlacklist(songName: string): Promise<void> {
+  const db = await getDb();
+  await db.execute('DELETE FROM blacklist WHERE song_name = $1', [songName]);
 }

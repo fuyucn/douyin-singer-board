@@ -93,14 +93,6 @@ async function start(config: Config): Promise<void> {
   listener.on('error', (e: Error) => emit({ event: 'error', msg: String(e?.message ?? e) }));
   listener.on('reconnect', (count: number) => log('info', `reconnecting attempt ${count}`));
   listener.on('init', (url: string) => log('info', `ws url: ${url.slice(0, 80)}...`));
-  // Low-frequency events (gift/social) are worth logging; member/like/roomStats/roomRank are too noisy.
-  listener.on('gift', (m: any) =>
-    log('info', `🎁 ${m?.user?.nickName ?? '?'} sent a gift (${m?.common?.describe ?? m?.common?.method ?? ''})`),
-  );
-  listener.on('social', (m: any) =>
-    log('info', `👥 ${m?.user?.nickName ?? '?'} ${m?.common?.describe ?? 'followed'}`),
-  );
-
   // Diagnostic: log every decoded message's `method` name, including ones the lib drops silently
   // (e.g. WebcastBatchGiftMessage, WebcastInRoomBannerMessage), so we can identify them.
   try {
