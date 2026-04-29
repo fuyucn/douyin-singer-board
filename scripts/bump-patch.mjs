@@ -17,9 +17,10 @@ const targets = [
 ];
 
 function bumpPatch(v) {
-  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
-  if (!m) throw new Error(`bad version ${v}`);
-  return `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
+  // 格式: 0.0.30-24 → 0.0.30-25  (bump -N 后缀)
+  const m = /^(\d+\.\d+\.\d+)-(\d+)$/.exec(v);
+  if (!m) throw new Error(`bad version ${v} (expected x.y.z-N)`);
+  return `${m[1]}-${Number(m[2]) + 1}`;
 }
 
 function readJsonVersion(path, key) {

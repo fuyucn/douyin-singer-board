@@ -20,15 +20,18 @@ export class Matcher {
   private config: Config;
   private lastByUid = new Map<string, number>();
   private compiled: RegExp;
+  private blacklist: Set<string>;
 
   constructor(config: Config) {
     this.config = config;
     this.compiled = this.compilePattern(config.sing_prefix);
+    this.blacklist = new Set(config.blacklist ?? []);
   }
 
   reload(config: Config): void {
     this.config = config;
     this.compiled = this.compilePattern(config.sing_prefix);
+    this.blacklist = new Set(config.blacklist ?? []);
   }
 
   // Convert a human-friendly template into a RegExp.
@@ -93,6 +96,10 @@ export class Matcher {
       song = content.slice(m.index + m[0].length).trim();
     }
     if (!song) return { kind: 'skip', reason: 'empty song name' };
+
+    if (this.blacklist.has(song)) {
+      return { kind: 'skip', reason: 'blacklisted' };
+    }
 
     if (this.config.fans_level > 0 && medal_level < this.config.fans_level) {
       return { kind: 'skip', reason: `fans level too low: ${medal_level}<${this.config.fans_level}` };

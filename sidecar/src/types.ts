@@ -3,6 +3,7 @@ export interface Config {
   sing_prefix: string;
   sing_cd: number;
   fans_level: number;
+  blacklist?: string[];
 }
 
 export interface DanmuInfo {

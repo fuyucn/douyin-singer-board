@@ -6,6 +6,14 @@ let _db: Database | null = null;
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   _db = await Database.load('sqlite:sususongboard.db');
+  // Ensure blacklist table exists (no migration system, so we do it here)
+  await _db.execute(
+    `CREATE TABLE IF NOT EXISTS blacklist (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      song_name  TEXT UNIQUE NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+    )`,
+  );
   return _db;
 }
 
@@ -132,4 +140,27 @@ export function sessionToCookie(s: KugouSession): string {
   if (s.userid) parts.push(`userid=${s.userid}`);
   if (s.dfid) parts.push(`dfid=${s.dfid}`);
   return parts.join(';');
+}
+
+// ─── Blacklist ────────────────────────────────────────────────────────────────
+
+export async function loadBlacklist(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select<{ song_name: string }[]>(
+    'SELECT song_name FROM blacklist ORDER BY created_at ASC',
+  );
+  return rows.map((r) => r.song_name);
+}
+
+export async function addToBlacklist(songName: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    'INSERT OR IGNORE INTO blacklist (song_name) VALUES ($1)',
+    [songName],
+  );
+}
+
+export async function removeFromBlacklist(songName: string): Promise<void> {
+  const db = await getDb();
+  await db.execute('DELETE FROM blacklist WHERE song_name = $1', [songName]);
 }

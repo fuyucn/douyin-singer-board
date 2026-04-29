@@ -35,6 +35,18 @@ interface AppStore {
   // (cumulative play count > OwnerCount > search order). Off → plain top-1.
   preferCumulative: boolean;
   setPreferCumulative: (v: boolean) => void;
+
+  // Blacklist
+  blacklist: Set<string>; // set of song_name strings
+  hydrateBlacklist: (names: string[]) => void;
+  addToBlacklist: (name: string) => void;
+  removeFromBlacklist: (name: string) => void;
+
+  // Played songs (session-scoped)
+  played: DanmuInfo[];
+  addPlayed: (song: DanmuInfo) => void;
+  removePlayed: (msgId: string) => void;
+  clearPlayed: () => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -116,6 +128,27 @@ export const useAppStore = create<AppStore>((set) => ({
     } catch {}
     set({ preferCumulative: v });
   },
+
+  // Blacklist
+  blacklist: new Set<string>(),
+  hydrateBlacklist: (names) => set({ blacklist: new Set(names) }),
+  addToBlacklist: (name) =>
+    set((state) => {
+      const next = new Set(state.blacklist);
+      next.add(name);
+      return { blacklist: next };
+    }),
+  removeFromBlacklist: (name) =>
+    set((state) => {
+      const next = new Set(state.blacklist);
+      next.delete(name);
+      return { blacklist: next };
+    }),
+
+  played: [],
+  addPlayed: (song) => set((s) => ({ played: [song, ...s.played] })),
+  removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
+  clearPlayed: () => set({ played: [] }),
 }));
 
 // Dedup by song name. Display order:
