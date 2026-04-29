@@ -141,3 +141,30 @@ describe('Matcher.match - filters', () => {
     expect(m.match(raw('点歌 b', { uid: 'u2' })).kind).toBe('song');
   });
 });
+
+describe('Matcher.match - blacklist', () => {
+  it('rejects blacklisted song name', () => {
+    const m = new Matcher(baseConfig({ blacklist: ['bad song'] }));
+    const r = m.match(raw('点歌 bad song'));
+    expect(r.kind).toBe('skip');
+    if (r.kind === 'skip') expect(r.reason).toBe('blacklisted');
+  });
+
+  it('allows non-blacklisted song through', () => {
+    const m = new Matcher(baseConfig({ blacklist: ['bad song'] }));
+    expect(m.match(raw('点歌 good song')).kind).toBe('song');
+  });
+
+  it('blacklist check happens case-sensitively', () => {
+    const m = new Matcher(baseConfig({ blacklist: ['Bad Song'] }));
+    expect(m.match(raw('点歌 bad song')).kind).toBe('song');
+  });
+
+  it('reload clears old blacklist', () => {
+    const m = new Matcher(baseConfig({ blacklist: ['old'] }));
+    expect(m.match(raw('点歌 old')).kind).toBe('skip');
+    m.reload({ ...baseConfig(), blacklist: ['new'] });
+    expect(m.match(raw('点歌 old')).kind).toBe('song');
+    expect(m.match(raw('点歌 new')).kind).toBe('skip');
+  });
+});
