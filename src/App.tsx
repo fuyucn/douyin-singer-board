@@ -267,10 +267,8 @@ export default function App() {
     autoSync,
     songs: display,
     kugouCache,
-    setKugouCache,
     targetPlaylistId: config.target_playlist_id,
     kugouLoggedIn,
-    preferCumulative,
     onSynced: onAutoSynced,
     pushLog,
   });
