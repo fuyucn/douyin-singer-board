@@ -275,7 +275,7 @@ export default function App() {
             {label}
           </button>
         )}
-        <button onClick={() => onCopy(s.song_name)}>复制</button>
+        <button onClick={() => onCopy(entry.status === 'found' ? entry.track.filename : s.song_name)}>复制</button>
         <button onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
       </>
     );
@@ -286,7 +286,10 @@ export default function App() {
   );
 
   const ctxActions = ctxMenu ? [
-    { label: '复制歌名', onClick: () => onCopy(ctxMenu.song.song_name) },
+    { label: '复制歌名', onClick: () => {
+      const entry = kugouCache[ctxMenu.song.song_name.trim()];
+      onCopy(entry?.status === 'found' ? entry.track.filename : ctxMenu.song.song_name);
+    }},
     { label: '删除', onClick: () => onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name) },
     { label: '加入黑名单', onClick: () => {
       addBlacklist(ctxMenu.song.song_name, ctxMenu.song.msg_id);
@@ -393,6 +396,11 @@ export default function App() {
           songs={display}
           emptyText={running ? '等待点歌...' : '点击 "开始" 连接直播间'}
           renderActions={renderSongActions}
+          renderSongName={(s) => {
+            const entry = kugouCache[s.song_name.trim()];
+            if (entry?.status === 'found') return entry.track.filename;
+            return s.song_name;
+          }}
           onContextMenu={openCtxMenu}
         />
       ) : activeTab === 'played' ? (

@@ -7,10 +7,11 @@ interface Props {
   headerLabels?: { uname: string; song: string; actions: string };
   renderActions: (song: DanmuInfo) => React.ReactNode;
   renderUname?: (song: DanmuInfo) => string;
+  renderSongName?: (song: DanmuInfo) => string;
   onContextMenu?: (e: React.MouseEvent, song: DanmuInfo) => void;
 }
 
-export function SongList({ songs, emptyText, showHeader = true, headerLabels, renderActions, renderUname, onContextMenu }: Props) {
+export function SongList({ songs, emptyText, showHeader = true, headerLabels, renderActions, renderUname, renderSongName, onContextMenu }: Props) {
   return (
     <div className="list">
       {showHeader && (
@@ -25,7 +26,7 @@ export function SongList({ songs, emptyText, showHeader = true, headerLabels, re
         {songs.map((s) => (
           <div key={s.msg_id} className="item" onContextMenu={onContextMenu ? (e) => onContextMenu(e, s) : undefined}>
             <div className="col-uname uname">{renderUname ? renderUname(s) : s.uname}</div>
-            <div className="col-song song">{s.song_name}</div>
+            <div className="col-song song">{renderSongName ? renderSongName(s) : s.song_name}</div>
             <div className="col-actions item-actions">
               {renderActions(s)}
             </div>
