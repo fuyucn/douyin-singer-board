@@ -1,6 +1,6 @@
 [package]
 name = "sususongboard"
-version = "0.0.30-28"
+version = "0.0.30-29"
 description = "SUSUSongBoard - 抖音直播点歌助手"
 edition = "2021"
 

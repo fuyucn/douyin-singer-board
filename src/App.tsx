@@ -94,7 +94,7 @@ export default function App() {
   // Pre-fetch KuGou search
   useEffect(() => {
     if (!kugouLoggedIn) return;
-    for (const s of display) {
+    for (const s of [...display, ...played]) {
       const name = s.song_name.trim();
       if (!name || kugouStartedRef.current.has(name)) continue;
       kugouStartedRef.current.add(name);
@@ -111,7 +111,7 @@ export default function App() {
           setKugouCache((prev) => ({ ...prev, [name]: { status: 'error', msg: String(err) } }));
         });
     }
-  }, [display, kugouLoggedIn, preferCumulative]);
+  }, [display, played, kugouLoggedIn, preferCumulative]);
 
   // Startup: config
   useEffect(() => {
@@ -338,6 +338,11 @@ export default function App() {
           <span>点歌冷却 (秒)</span>
           <input type="number" min={0} value={config.sing_cd} disabled={running} onChange={(e) => setConfig({ sing_cd: Math.max(0, Number(e.target.value) || 0) })} />
         </label>
+        {!running ? (
+          <button className="primary" onClick={onStart}>开始</button>
+        ) : (
+          <button className="danger" onClick={onStop}>停止</button>
+        )}
         {kugouLoggedIn && (
         <label className="playlist-target">
           <span>目标歌单</span>
@@ -359,11 +364,6 @@ export default function App() {
             }}>保存</button>
           </div>
         </label>
-        )}
-        {!running ? (
-          <button className="primary" onClick={onStart}>开始</button>
-        ) : (
-          <button className="danger" onClick={onStop}>停止</button>
         )}
       </section>
 
@@ -423,6 +423,23 @@ export default function App() {
             const d = new Date(ts * 1000);
             const pad = (n: number) => String(n).padStart(2, '0');
             return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          }}
+          renderSong={(s) => {
+            const entry = kugouCache[s.song_name.trim()];
+            return (
+              <div className="song-cell">
+                <div className="song-original">{s.song_name}</div>
+                {entry?.status === 'found' ? (
+                  <div className="song-match">{entry.track.filename}</div>
+                ) : entry?.status === 'pending' ? (
+                  <div className="song-status">⋯ 搜索中</div>
+                ) : entry?.status === 'not_found' ? (
+                  <div className="song-status">未找到</div>
+                ) : (
+                  <div className="song-status"></div>
+                )}
+              </div>
+            );
           }}
           onContextMenu={openCtxMenu}
         />
