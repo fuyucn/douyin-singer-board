@@ -405,13 +405,14 @@ body {
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   background: var(--bg-elev);
-  color: var(--fg-muted);
+  color: var(--fg-base);
+  opacity: 0.55;
   cursor: pointer;
   font-size: 13px;
   flex-shrink: 0;
   z-index: 0;
   overflow: hidden;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.2s, border-color 0.2s, opacity 0.2s;
 }
 .auto-sync-btn::before {
   content: '';
@@ -432,7 +433,7 @@ body {
   border-radius: 3px;
   background: var(--bg-elev);
 }
-.auto-sync-btn.active { color: var(--fg-base); font-weight: 500; border-color: transparent; }
+.auto-sync-btn.active { color: var(--fg-base); font-weight: 500; border-color: transparent; opacity: 1; }
 .auto-sync-btn.active::before { opacity: 1; }
 
 @keyframes auto-sync-rotate {
