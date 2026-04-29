@@ -405,7 +405,7 @@ body {
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   background: var(--bg-elev);
-  color: var(--fg-base);
+  color: var(--fg-base) !important;
   opacity: 0.55;
   cursor: pointer;
   font-size: 13px;
@@ -417,13 +417,14 @@ body {
 .auto-sync-btn::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -3px;
   z-index: -1;
-  border-radius: inherit;
-  background: conic-gradient(from 0deg, #4caf50, #2196f3, #9c27b0, #ff9800, #4caf50);
-  animation: auto-sync-rotate 2.5s linear infinite;
+  border-radius: 7px;
+  background: conic-gradient(from 0deg, #00e676, #2979ff, #d500f9, #ff6d00, #00e676);
+  animation: auto-sync-rotate 2s linear infinite;
   opacity: 0;
   transition: opacity 0.25s;
+  filter: blur(2px);
 }
 .auto-sync-btn::after {
   content: '';
@@ -435,6 +436,7 @@ body {
 }
 .auto-sync-btn.active { color: var(--fg-base); font-weight: 500; border-color: transparent; opacity: 1; }
 .auto-sync-btn.active::before { opacity: 1; }
+.auto-sync-btn.active { box-shadow: 0 0 12px rgba(100, 180, 255, 0.4), 0 0 24px rgba(100, 180, 255, 0.2); }
 
 @keyframes auto-sync-rotate {
   100% { transform: rotate(360deg); }
