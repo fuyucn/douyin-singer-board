@@ -36,6 +36,11 @@ interface AppStore {
   preferCumulative: boolean;
   setPreferCumulative: (v: boolean) => void;
 
+  // Auto-sync: when true, songs found in KuGou are automatically added to
+  // the target playlist in FIFO order with a random 3-10s delay between calls.
+  autoSync: boolean;
+  setAutoSync: (v: boolean) => void;
+
   // Blacklist
   blacklist: Set<string>; // set of song_name strings
   hydrateBlacklist: (names: string[]) => void;
@@ -127,6 +132,14 @@ export const useAppStore = create<AppStore>((set) => ({
       localStorage.setItem('sususongboard.kugou-prefer-cumulative', v ? '1' : '0');
     } catch {}
     set({ preferCumulative: v });
+  },
+
+  autoSync: (() => {
+    try { return localStorage.getItem('sususongboard.auto-sync') === '1'; } catch { return false; }
+  })(),
+  setAutoSync: (v) => {
+    try { localStorage.setItem('sususongboard.auto-sync', v ? '1' : '0'); } catch {}
+    set({ autoSync: v });
   },
 
   // Blacklist

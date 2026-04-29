@@ -398,6 +398,46 @@ body {
 }
 .kg-qr-cancel:hover { background: var(--bg-soft); }
 
+/* ─── Auto-sync toggle ─────────────────────────────────────── */
+.auto-sync-btn {
+  position: relative;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.auto-sync-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, #4caf50, #2196f3, #9c27b0, #ff9800, #4caf50);
+  animation: auto-sync-rotate 2.5s linear infinite;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.auto-sync-btn::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: 3px;
+  background: var(--bg-elev);
+}
+.auto-sync-btn.active { color: var(--fg-base); font-weight: 500; }
+.auto-sync-btn.active::before { opacity: 1; }
+
+@keyframes auto-sync-rotate {
+  100% { transform: rotate(360deg); }
+}
+
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
 

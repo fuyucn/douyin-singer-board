@@ -17,18 +17,14 @@ import {
   listenHistoryMap,
   addTrackToPlaylist,
   type KuGouTrack,
+  type KuGouEntry,
 } from './kugouSession';
+import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
 import { SongList } from './components/SongList';
 import { BlacklistPanel } from './components/BlacklistPanel';
 import { ContextMenu } from './components/ContextMenu';
-
-type KuGouEntry =
-  | { status: 'pending' }
-  | { status: 'found'; track: KuGouTrack }
-  | { status: 'not_found' }
-  | { status: 'error'; msg: string };
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -49,6 +45,8 @@ export default function App() {
   const logs = useAppStore((s) => s.logs);
   const pushLog = useAppStore((s) => s.pushLog);
   const preferCumulative = useAppStore((s) => s.preferCumulative);
+  const autoSync = useAppStore((s) => s.autoSync);
+  const setAutoSync = useAppStore((s) => s.setAutoSync);
   const played = useAppStore((s) => s.played);
   const addPlayed = useAppStore((s) => s.addPlayed);
   const clearPlayed = useAppStore((s) => s.clearPlayed);
@@ -256,6 +254,27 @@ export default function App() {
     }
   };
 
+  // Auto-sync callback — track add already done by the hook, just update state.
+  const onAutoSynced = (track: KuGouTrack, song: DanmuInfo) => {
+    removeByMsgId(song.msg_id);
+    addPlayed(song);
+    deleteHistoryByMsgId(song.msg_id).catch(() => {});
+    showToast(`[自动] 已加入歌单: ${track.filename}`);
+  };
+
+  // Auto-sync: background FIFO adder with 3-5s random delay
+  useAutoSync({
+    autoSync,
+    songs: display,
+    kugouCache,
+    setKugouCache,
+    targetPlaylistId: config.target_playlist_id,
+    kugouLoggedIn,
+    preferCumulative,
+    onSynced: onAutoSynced,
+    pushLog,
+  });
+
   // ─── Render helpers ───────────────────────────────────────────
 
   const renderSongActions = (s: DanmuInfo) => {
@@ -369,6 +388,16 @@ export default function App() {
                 showToast(detail.includes('not logged in') ? '请先点 🛠 扫码登录' : `解析失败: ${detail}`, 'error');
               }
             }}>保存</button>
+            {config.target_playlist_id > 0 && (
+              <button
+                type="button"
+                className={`auto-sync-btn${autoSync ? ' active' : ''}`}
+                onClick={() => setAutoSync(!autoSync)}
+                title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
+              >
+                {autoSync ? '自动歌单同步中' : '自动歌单同步'}
+              </button>
+            )}
           </div>
         </label>
         )}

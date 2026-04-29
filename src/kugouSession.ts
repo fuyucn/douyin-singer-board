@@ -166,6 +166,13 @@ export interface KuGouTrack {
   plays?: number;
 }
 
+/** Per-song KuGou search state used by both the UI and auto-sync hook. */
+export type KuGouEntry =
+  | { status: 'pending' }
+  | { status: 'found'; track: KuGouTrack }
+  | { status: 'not_found' }
+  | { status: 'error'; msg: string };
+
 /**
  * Authenticated top-1 search — kept as a fallback. Production callers should
  * prefer `searchKuGouPreferredHit` so we tilt toward versions the streamer
