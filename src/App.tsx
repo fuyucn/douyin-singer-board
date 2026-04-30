@@ -581,7 +581,7 @@ export default function App() {
               {config.target_playlist_id > 0 && (
                 <button
                   type="button"
-                  className={`auto-sync-btn${autoSync ? 'active' : ''}`}
+                  className={`auto-sync-btn${autoSync ? ' active' : ''}`}
                   onClick={() => setAutoSync(!autoSync)}
                   title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
                 >

@@ -12,20 +12,25 @@ function resolveOsTheme(): 'light' | 'dark' {
 }
 
 async function updateTitleBar(t: Theme) {
-  // meta theme-color (macOS)
+  // meta theme-color (helps macOS)
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    if (t === 'dark') meta.setAttribute('content', '#1a1a1a');
-    else if (t === 'light') meta.setAttribute('content', '#ffffff');
-    else meta.setAttribute('content', resolveOsTheme() === 'dark' ? '#1a1a1a' : '#ffffff');
+    const color =
+      t === 'dark'
+        ? '#1a1a1a'
+        : t === 'light'
+          ? '#ffffff'
+          : resolveOsTheme() === 'dark'
+            ? '#1a1a1a'
+            : '#ffffff';
+    meta.setAttribute('content', color);
   }
 
-  // Tauri setTheme (Windows + macOS)
+  // Tauri invoke: plugin:window|set_theme (Windows + macOS)
   try {
-    const { setTheme } = await import('@tauri-apps/api/app');
-    if (t === 'dark') await setTheme('dark');
-    else if (t === 'light') await setTheme('light');
-    else await setTheme(null);
+    const { invoke } = await import('@tauri-apps/api/core');
+    const theme = t === 'dark' ? 'dark' : t === 'light' ? 'light' : null;
+    await invoke('plugin:window|set_theme', { theme });
   } catch {
     // not in Tauri (e.g. browser dev) — ignore
   }
