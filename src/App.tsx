@@ -71,6 +71,7 @@ export default function App() {
   const setAutoSync = useAppStore((s) => s.setAutoSync);
   const played = useAppStore((s) => s.played);
   const addPlayed = useAppStore((s) => s.addPlayed);
+  const removePlayed = useAppStore((s) => s.removePlayed);
   const clearPlayed = useAppStore((s) => s.clearPlayed);
 
   const {
@@ -371,7 +372,16 @@ export default function App() {
   const ctxActions = ctxMenu
     ? [
         { label: '复制歌名', onClick: () => onCopy(ctxMenu.song.song_name) },
-        { label: '删除', onClick: () => onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name) },
+        {
+          label: '删除',
+          onClick: () => {
+            if (activeTab === 'played') {
+              removePlayed(ctxMenu.song.msg_id);
+            } else {
+              onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name);
+            }
+          },
+        },
         {
           label: '加入黑名单',
           onClick: () => {
