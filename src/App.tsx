@@ -25,6 +25,8 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { SongList } from './components/SongList';
 import { BlacklistPanel } from './components/BlacklistPanel';
 import { ContextMenu } from './components/ContextMenu';
+import { AppLogo } from './components/AppLogo';
+import { ConnectionStatus } from './components/ConnectionStatus';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -34,7 +36,6 @@ export default function App() {
   const setRunning = useAppStore((s) => s.setRunning);
   const sessionId = useAppStore((s) => s.sessionId);
   const newSession = useAppStore((s) => s.newSession);
-  const status = useAppStore((s) => s.status);
   const setStatus = useAppStore((s) => s.setStatus);
   const songs = useAppStore((s) => s.songs);
   const addSong = useAppStore((s) => s.addSong);
@@ -89,20 +90,6 @@ export default function App() {
   // KuGou search cache
   const [kugouCache, setKugouCache] = useState<Record<string, KuGouEntry>>({});
   const kugouStartedRef = useRef<Set<string>>(new Set());
-
-  // Easter egg: 7 clicks on logo
-  const easterEggClicks = useRef(0);
-  const easterEggTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const onLogoClick = () => {
-    easterEggClicks.current += 1;
-    if (easterEggTimer.current) clearTimeout(easterEggTimer.current);
-    if (easterEggClicks.current >= 7) {
-      easterEggClicks.current = 0;
-      new Audio('/secret.m4a').play().catch(() => {});
-    } else {
-      easterEggTimer.current = setTimeout(() => { easterEggClicks.current = 0; }, 2000);
-    }
-  };
 
   useEffect(() => { applyTheme(theme); }, [theme]);
 
@@ -340,11 +327,9 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" className="header-logo" alt="" draggable={false} onClick={onLogoClick} />
+        <AppLogo />
         <h1>SUSUSongBoard</h1>
-        <span className={`status ${status.connected ? 'on' : 'off'}`}>
-          {status.connected ? '●' : '○'} {status.message}
-        </span>
+        <ConnectionStatus />
         <button className="header-action header-theme first-tail" onClick={() => { const t = nextTheme(theme); saveTheme(t); setTheme(t); }} title={`主题: ${themeLabel(theme)}`}>
           {themeIcon(theme)}
         </button>
