@@ -1,77 +1,65 @@
-/* ─── Theme tokens ────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* ─── Dark mode variant (data-theme="dark" OR system preference) ┐ */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ─── Design tokens ───────────────────────────────────────── */
 :root {
-  /* Surfaces */
   --bg-base: #ffffff;
   --bg-elev: #ffffff;
   --bg-soft: #f5f5f5;
   --bg-softer: #fafafa;
   --bg-disabled: #f5f5f5;
-
-  /* Text */
   --fg-base: #111;
   --fg-muted: #666;
   --fg-faint: #999;
-
-  /* Borders */
   --border-strong: #ddd;
   --border-medium: #e0e0e0;
   --border-soft: #eee;
   --border-softer: #f0f0f0;
-
-  /* Action / status colors */
   --success: #2e7d32;
   --success-hover: #1b5e20;
   --danger: #c62828;
   --danger-hover: #8e0000;
   --danger-soft-bg: #fdecea;
   --danger-soft-fg: #b71c1c;
-
   --accent: #1976d2;
   --accent-hover: #1565c0;
   --accent-soft-bg: #e3f2fd;
   --accent-soft-fg: #0d47a1;
   --accent-soft-border: #bbdefb;
-
-  /* Misc */
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.2);
-  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.18);
-  --overlay: rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 40px rgba(0,0,0,0.2);
+  --shadow-toast: 0 4px 12px rgba(0,0,0,0.18);
+  --overlay: rgba(0,0,0,0.4);
 }
 
-/* Dark token block, applied either explicitly via data-theme="dark"
-   or implicitly when no data-theme attribute is set AND the OS is dark. */
 :root[data-theme="dark"] {
   --bg-base: #1a1a1a;
   --bg-elev: #242424;
   --bg-soft: #1f1f1f;
   --bg-softer: #1d1d1d;
   --bg-disabled: #2a2a2a;
-
   --fg-base: #e8e8e8;
   --fg-muted: #a0a0a0;
   --fg-faint: #6a6a6a;
-
   --border-strong: #3a3a3a;
   --border-medium: #333;
   --border-soft: #2a2a2a;
   --border-softer: #262626;
-
   --success: #4caf50;
   --success-hover: #66bb6a;
   --danger: #ef5350;
   --danger-hover: #f06b67;
   --danger-soft-bg: #3a1f1f;
   --danger-soft-fg: #ef9a9a;
-
   --accent: #4f9eea;
   --accent-hover: #7ab6f0;
   --accent-soft-bg: #1f2d3d;
   --accent-soft-fg: #90c8f5;
   --accent-soft-border: #2a3f55;
-
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
-  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 16px 40px rgba(0,0,0,0.6);
+  --shadow-toast: 0 4px 12px rgba(0,0,0,0.5);
+  --overlay: rgba(0,0,0,0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -81,269 +69,336 @@
     --bg-soft: #1f1f1f;
     --bg-softer: #1d1d1d;
     --bg-disabled: #2a2a2a;
-
     --fg-base: #e8e8e8;
     --fg-muted: #a0a0a0;
     --fg-faint: #6a6a6a;
-
     --border-strong: #3a3a3a;
     --border-medium: #333;
     --border-soft: #2a2a2a;
     --border-softer: #262626;
-
     --success: #4caf50;
     --success-hover: #66bb6a;
     --danger: #ef5350;
     --danger-hover: #f06b67;
     --danger-soft-bg: #3a1f1f;
     --danger-soft-fg: #ef9a9a;
-
     --accent: #4f9eea;
     --accent-hover: #7ab6f0;
     --accent-soft-bg: #1f2d3d;
     --accent-soft-fg: #90c8f5;
     --accent-soft-border: #2a3f55;
-
-    --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
-    --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
-    --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-modal: 0 16px 40px rgba(0,0,0,0.6);
+    --shadow-toast: 0 4px 12px rgba(0,0,0,0.5);
+    --overlay: rgba(0,0,0,0.6);
   }
 }
 
-/* ─── Layout ──────────────────────────────────────────────── */
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: var(--bg-base); color: var(--fg-base);
-  user-select: none;
+/* Register tokens so Tailwind can use them */
+@theme inline {
+  --color-bg-base: var(--bg-base);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-soft: var(--bg-soft);
+  --color-bg-softer: var(--bg-softer);
+  --color-bg-disabled: var(--bg-disabled);
+  --color-fg-base: var(--fg-base);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-border-strong: var(--border-strong);
+  --color-border-medium: var(--border-medium);
+  --color-border-soft: var(--border-soft);
+  --color-border-softer: var(--border-softer);
+  --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft-bg: var(--danger-soft-bg);
+  --color-danger-soft-fg: var(--danger-soft-fg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft-bg: var(--accent-soft-bg);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+  --color-accent-soft-border: var(--accent-soft-border);
 }
 
-.app { display: flex; flex-direction: column; height: 100vh; }
+/* ─── Base styles ─────────────────────────────────────────── */
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg-base);
+    color: var(--fg-base);
+    user-select: none;
+    font-size: 14px;
+  }
+  input, button { font-family: inherit; font-size: inherit; }
+}
 
-.header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--border-soft); background: var(--bg-elev); }
-.header-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; flex-shrink: 0; }
-.header h1 { font-size: 18px; margin: 0; }
+/* ─── App layout ──────────────────────────────────────────── */
+.app {
+  @apply flex flex-col h-screen;
+}
 
-.status.on { color: var(--success); }
-.status.off { color: var(--fg-faint); }
+/* ─── Header ──────────────────────────────────────────────── */
+.header {
+  @apply flex items-center gap-4 px-5 py-3 border-b border-border-soft bg-bg-elev;
+}
+.header h1 {
+  @apply text-lg m-0;
+}
 
+/* ─── Header actions ──────────────────────────────────────── */
 .header-action {
-  width: 32px; height: 32px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 16px; line-height: 1;
-  background: transparent; border: 1px solid transparent; border-radius: 50%;
-  cursor: pointer; color: var(--fg-muted);
-  flex-shrink: 0;
+  @apply w-8 h-8 p-0 inline-flex items-center justify-center text-base leading-none
+         bg-transparent border border-transparent rounded-full cursor-pointer
+         text-fg-muted shrink-0;
 }
-.header-action:hover { background: var(--bg-soft); border-color: var(--border-strong); color: var(--fg-base); }
-.header-action.first-tail { margin-left: auto; }
-.header-theme { font-size: 14px; }
+.header-action:hover {
+  background: var(--bg-soft);
+  border-color: var(--border-strong);
+  color: var(--fg-base);
+}
+.header-action.first-tail {
+  @apply ml-auto;
+}
+.header-theme {
+  @apply text-sm;
+}
 
-.banner.error { background: var(--danger-soft-bg); color: var(--danger-soft-fg); padding: 8px 20px; }
+/* ─── Banners ─────────────────────────────────────────────── */
+.banner.error {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-fg);
+  @apply py-2 px-5;
+}
 .banner.update {
-  display: flex; align-items: center; gap: 12px;
-  background: var(--accent-soft-bg); color: var(--accent-soft-fg); padding: 8px 20px;
-  border-bottom: 1px solid var(--accent-soft-border);
+  @apply flex items-center gap-3 py-2 px-5 border-b;
+  background: var(--accent-soft-bg);
+  color: var(--accent-soft-fg);
+  border-color: var(--accent-soft-border);
 }
 .banner.update button {
-  padding: 4px 12px; border: 1px solid var(--accent); border-radius: 4px;
-  background: var(--accent); color: #fff; cursor: pointer; font-size: 13px;
+  @apply py-1 px-3 rounded text-white cursor-pointer;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  font-size: 13px;
 }
-.banner.update button:hover { background: var(--accent-hover); }
+.banner.update button:hover {
+  background: var(--accent-hover);
+}
 .banner.update button.dismiss {
-  background: transparent; color: var(--accent-soft-fg); border: none;
-  margin-left: auto; font-size: 18px; padding: 0 8px;
+  @apply bg-transparent border-none ml-auto text-lg py-0 px-2;
+  color: var(--accent-soft-fg);
 }
-.banner.update button.dismiss:hover { background: rgba(0, 0, 0, 0.08); }
+.banner.update button.dismiss:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
 
-.config { display: flex; gap: 12px; align-items: flex-end; padding: 12px 20px; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; background: var(--bg-elev); }
-.config label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; min-width: 140px; }
-.config label > span { font-size: 12px; color: var(--fg-muted); }
+/* ─── Config section ──────────────────────────────────────── */
+.config {
+  @apply flex gap-3 items-end p-3 px-5 border-b border-border-soft flex-wrap bg-bg-elev;
+}
+.config label {
+  @apply flex flex-col gap-1 flex-1;
+  min-width: 140px;
+  flex-basis: 180px;
+}
+.config label > span {
+  @apply text-xs text-fg-muted;
+}
 .config input {
-  padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
-  background: var(--bg-base); color: var(--fg-base);
+  @apply py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base;
 }
-.config input:disabled { background: var(--bg-disabled); color: var(--fg-faint); }
-.config button.primary { background: var(--success); color: #fff; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; font-weight: 500; }
-.config button.primary:hover { background: var(--success-hover); }
-.config button.danger { background: var(--danger); color: #fff; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; font-weight: 500; }
-.config button.danger:hover { background: var(--danger-hover); }
+.config input:disabled {
+  background: var(--bg-disabled);
+  color: var(--fg-faint);
+}
+.config label.playlist-target {
+  min-width: 260px;
+  flex-basis: 320px;
+}
 
-.toolbar { display: flex; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--border-soft); background: var(--bg-elev); }
+/* ─── Playlist row ────────────────────────────────────────── */
+.playlist-row {
+  @apply flex items-center gap-2;
+}
+.playlist-row input {
+  @apply flex-1 min-w-0;
+}
+.playlist-row .listid-display {
+  @apply whitespace-nowrap font-mono text-xs text-fg-muted;
+}
+.playlist-row button {
+  @apply py-1.5 px-3.5 rounded text-white cursor-pointer shrink-0;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  font-size: 13px;
+}
+.playlist-row button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+/* ─── Config action buttons ───────────────────────────────── */
+.config button.primary {
+  @apply text-white border-none py-2 px-6 rounded cursor-pointer font-medium;
+  background: var(--success);
+}
+.config button.primary:hover {
+  background: var(--success-hover);
+}
+.config button.danger {
+  @apply text-white border-none py-2 px-6 rounded cursor-pointer font-medium;
+  background: var(--danger);
+}
+.config button.danger:hover {
+  background: var(--danger-hover);
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────── */
+.toolbar {
+  @apply flex gap-2 px-5 py-3 border-b border-border-soft bg-bg-elev;
+}
 .toolbar input {
-  flex: 1; padding: 6px 10px; border: 1px solid var(--border-strong); border-radius: 4px;
-  background: var(--bg-base); color: var(--fg-base);
+  @apply flex-1 py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base;
 }
 .toolbar button {
-  padding: 6px 14px; border: 1px solid var(--border-strong); border-radius: 4px;
-  background: var(--bg-elev); color: var(--fg-base); cursor: pointer;
+  @apply py-1.5 px-3.5 border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer;
 }
-.toolbar button:hover:not(:disabled) { background: var(--bg-soft); }
-.toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ─── Toolbar hint ───────────────────────────────────────── */
-.toolbar-hint { font-size: 12px; color: var(--fg-muted); align-self: center; }
+.toolbar button:hover:not(:disabled) {
+  background: var(--bg-soft);
+}
+.toolbar button:disabled {
+  @apply opacity-40 cursor-not-allowed;
+}
+.toolbar-hint {
+  @apply text-xs text-fg-muted self-center;
+}
 
 /* ─── Tabs ────────────────────────────────────────────────── */
 .tab-nav {
-  display: flex;
-  border-bottom: 1px solid var(--border-medium);
-  background: var(--bg-elev);
-  padding: 0 20px;
-  gap: 0;
-  flex-shrink: 0;
+  @apply flex border-b border-border-medium bg-bg-elev px-5 gap-0 shrink-0;
 }
 .tab-btn {
-  padding: 10px 20px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--fg-muted);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: color 0.15s, border-color 0.15s;
+  @apply py-2.5 px-5 border-none border-b-2 border-transparent bg-transparent
+         text-fg-muted cursor-pointer text-sm font-medium;
   margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
 }
-.tab-btn:hover { color: var(--fg-base); }
+.tab-btn:hover {
+  color: var(--fg-base);
+}
 .tab-btn.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
 
-/* ─── Context Menu ───────────────────────────────────────── */
+/* ─── Context menu ────────────────────────────────────────── */
 .ctx-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 900;
+  @apply fixed inset-0 z-[900];
 }
 .ctx-menu {
-  position: fixed;
-  z-index: 901;
+  @apply fixed z-[901] rounded-md overflow-hidden min-w-[140px];
   background: var(--bg-elev);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
   box-shadow: var(--shadow-modal);
-  overflow: hidden;
-  min-width: 140px;
 }
 .ctx-menu button {
-  display: block;
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: var(--fg-base);
-  text-align: left;
-  cursor: pointer;
+  @apply block w-full py-2 px-4 border-none bg-transparent text-fg-base text-left cursor-pointer whitespace-nowrap;
   font-size: 13px;
-  white-space: nowrap;
 }
-.ctx-menu button:hover { background: var(--bg-soft); }
-
-.list { display: flex; flex-direction: column; flex: 1; min-height: 0; }
-.list-header {
-  display: flex; padding: 8px 20px;
-  background: var(--bg-soft); border-bottom: 1px solid var(--border-medium);
-  font-size: 12px; color: var(--fg-muted); font-weight: 500;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  position: sticky; top: 0; z-index: 1;
+.ctx-menu button:hover {
+  background: var(--bg-soft);
 }
-.list-body { flex: 1; overflow-y: auto; background: var(--bg-base); }
-.list-body .empty { padding: 40px; text-align: center; color: var(--fg-faint); }
 
-.item { display: flex; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border-softer); }
-.item:hover { background: var(--bg-softer); }
-
-.col-uname { flex: 0 0 140px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-song { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.col-actions { flex: 0 0 200px; display: flex; justify-content: flex-end; gap: 6px; }
-
-.item .uname { color: var(--fg-muted); font-size: 13px; }
-.item .song { font-size: 15px; font-weight: 500; }
-.song-cell { line-height: 1.4; }
-.song-original { font-size: 13px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.song-match { font-size: 14px; font-weight: 500; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.song-status { font-size: 12px; color: var(--fg-muted); }
-.item-actions { opacity: 0.7; transition: opacity 0.15s; }
-.item:hover .item-actions { opacity: 1; }
-.item-actions button {
-  padding: 4px 10px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 3px;
-  background: var(--bg-elev); color: var(--fg-base); cursor: pointer;
-}
-.item-actions button:hover:not(:disabled) { background: var(--bg-soft); }
-.item-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.logs { border-top: 1px solid var(--border-soft); max-height: 220px; overflow-y: auto; font-size: 12px; color: var(--fg-muted); background: var(--bg-base); }
-.logs > summary {
-  position: sticky; top: 0; z-index: 1;
-  padding: 6px 20px; background: var(--bg-softer); cursor: pointer;
-  border-bottom: 1px solid var(--border-soft); user-select: none;
-  list-style: none; color: var(--fg-base);
-}
-.logs > summary::-webkit-details-marker { display: none; }
-.logs > summary::before { content: '▶'; display: inline-block; margin-right: 6px; transition: transform 0.15s; font-size: 10px; }
-.logs[open] > summary::before { transform: rotate(90deg); }
-.logs pre { margin: 0; padding: 6px 20px; white-space: pre-wrap; word-break: break-all; }
-
-.toast {
-  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
-  padding: 10px 20px; border-radius: 6px; color: #fff; font-size: 14px;
-  box-shadow: var(--shadow-toast); cursor: pointer;
-  animation: toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards;
-  z-index: 1000;
-}
-.toast:hover { opacity: 0.85; }
-.toast.success { background: var(--success); }
-.toast.error { background: var(--danger); }
-
-/* About / settings modal */
+/* ─── Modal overlay ───────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: var(--overlay);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 2000; animation: fade-in 0.15s ease-out;
+  @apply fixed inset-0 flex items-center justify-center z-[800];
+  background: var(--overlay);
+  animation: fade-in 0.15s ease-out;
 }
 .modal {
-  background: var(--bg-elev); color: var(--fg-base);
-  border-radius: 8px; min-width: 380px; max-width: 520px;
+  @apply rounded-[10px] overflow-hidden;
+  background: var(--bg-elev);
   box-shadow: var(--shadow-modal);
+  width: 380px;
+  max-width: 90vw;
   animation: scale-in 0.18s ease-out;
 }
-.modal-header {
-  display: flex; align-items: center; padding: 16px 20px;
-  border-bottom: 1px solid var(--border-soft);
-}
-.modal-header h2 { margin: 0; font-size: 16px; flex: 1; }
-.modal-close {
-  background: transparent; border: none; cursor: pointer;
-  font-size: 22px; line-height: 1; color: var(--fg-faint); padding: 0 4px;
-}
-.modal-close:hover { color: var(--fg-base); }
-.modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
-.modal-body .row { display: flex; gap: 12px; align-items: baseline; font-size: 14px; }
-.modal-body .row .label {
-  flex: 0 0 90px; text-align: right;
-  color: var(--fg-muted); font-size: 13px;
-}
-.modal-body .row .value { flex: 1; min-width: 0; word-break: break-all; }
-.modal-body .link {
-  background: transparent; border: none; color: var(--accent); cursor: pointer;
-  padding: 0; font-size: 14px; text-decoration: none;
-}
-.modal-body .link:hover { text-decoration: underline; }
-.modal-body .link.inline { font-size: 12px; margin-left: 4px; }
-.modal-body .actions { margin-top: 8px; display: flex; gap: 8px; justify-content: flex-end; }
-.modal-body .actions .primary {
-  padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer;
-  background: var(--accent); color: #fff; font-size: 14px;
-}
-.modal-body .actions .primary:hover:not(:disabled) { background: var(--accent-hover); }
-.modal-body .actions .primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes scale-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+/* ─── Toast ───────────────────────────────────────────────── */
+.toast {
+  @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] py-2.5 px-5 rounded-md whitespace-nowrap;
+  box-shadow: var(--shadow-toast);
+  font-size: 13px;
+  animation: toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards;
+  cursor: pointer;
+}
+.toast:hover {
+  @apply opacity-85;
+}
+.toast.success {
+  background: var(--success);
+  @apply text-white;
+}
+.toast.error {
+  background: var(--danger);
+  @apply text-white;
+}
 
+/* ─── Logs details ────────────────────────────────────────── */
+.logs {
+  @apply border-t border-border-soft max-h-[220px] overflow-y-auto text-xs text-fg-muted bg-bg-base;
+}
+.logs > summary {
+  @apply sticky top-0 z-[1] py-1.5 px-5 cursor-pointer border-b border-border-soft select-none;
+  background: var(--bg-softer);
+  color: var(--fg-base);
+  list-style: none;
+}
+.logs > summary::-webkit-details-marker {
+  display: none;
+}
+.logs > summary::before {
+  content: '▶';
+  @apply inline-block mr-1.5;
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+.logs[open] > summary::before {
+  transform: rotate(90deg);
+}
+.logs pre {
+  @apply m-0 py-1.5 px-5 whitespace-pre-wrap break-all;
+}
+
+/* ─── Song cell helpers ───────────────────────────────────── */
+.song-cell {
+  @apply leading-[1.4];
+}
+.song-original {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.song-match {
+  @apply font-medium overflow-hidden text-ellipsis whitespace-nowrap;
+  font-size: 14px;
+  color: var(--accent);
+}
+.song-status {
+  @apply text-xs;
+  color: var(--fg-muted);
+}
+
+/* ─── Keyframes ───────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 12px); }
   to { opacity: 1; transform: translate(-50%, 0); }

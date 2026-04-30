@@ -52,26 +52,43 @@ export function AboutModal({ onClose, onShowToast }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>关于 SUSUSongBoard</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-soft">
+          <h2 className="m-0 text-base font-semibold text-fg-base">关于 SUSUSongBoard</h2>
+          <button
+            className="bg-transparent border-none text-xl leading-none cursor-pointer text-fg-muted hover:text-fg-base px-1 py-0"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
-        <div className="modal-body">
-          <div className="row">
-            <span className="label">版本</span>
-            <span className="value">v{CURRENT_VERSION}</span>
+        {/* Body */}
+        <div className="p-5">
+          <div className="flex gap-3 mb-3.5 items-center text-sm">
+            <span className="text-fg-muted min-w-[60px]">版本</span>
+            <span className="text-fg-base">v{CURRENT_VERSION}</span>
           </div>
           {skipped && (
-            <div className="row">
-              <span className="label">已跳过</span>
-              <span className="value">
+            <div className="flex gap-3 mb-3.5 items-center text-sm">
+              <span className="text-fg-muted min-w-[60px]">已跳过</span>
+              <span className="text-fg-base">
                 {skipped}{' '}
-                <button className="link inline" onClick={onResetSkip}>(重置)</button>
+                <button
+                  className="bg-transparent border-none text-accent hover:text-accent-hover cursor-pointer p-0 text-[inherit] underline inline"
+                  onClick={onResetSkip}
+                >
+                  (重置)
+                </button>
               </span>
             </div>
           )}
-          <div className="actions">
-            <button className="primary" onClick={onCheck} disabled={checking}>
+          <div className="mt-4 flex gap-2.5">
+            <button
+              className="px-6 py-2 bg-success hover:bg-success-hover text-white border-none rounded cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={onCheck}
+              disabled={checking}
+            >
               {checking ? '检查中…' : '检查更新'}
             </button>
           </div>
