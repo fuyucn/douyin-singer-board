@@ -396,7 +396,7 @@ export default function App() {
   // ─── Render ────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-screen flex-col">
       {/* Header */}
       <header className="border-border-soft bg-bg-elev flex items-center gap-4 border-b px-5 py-3">
         <AppLogo />

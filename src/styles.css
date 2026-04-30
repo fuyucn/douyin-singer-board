@@ -135,6 +135,7 @@
     color: var(--fg-base);
     user-select: none;
     font-size: 14px;
+    overscroll-behavior: none;
   }
   input,
   button {
