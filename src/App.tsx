@@ -90,6 +90,20 @@ export default function App() {
   const [kugouCache, setKugouCache] = useState<Record<string, KuGouEntry>>({});
   const kugouStartedRef = useRef<Set<string>>(new Set());
 
+  // Easter egg: 7 clicks on logo
+  const easterEggClicks = useRef(0);
+  const easterEggTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onLogoClick = () => {
+    easterEggClicks.current += 1;
+    if (easterEggTimer.current) clearTimeout(easterEggTimer.current);
+    if (easterEggClicks.current >= 7) {
+      easterEggClicks.current = 0;
+      new Audio('/secret.m4a').play().catch(() => {});
+    } else {
+      easterEggTimer.current = setTimeout(() => { easterEggClicks.current = 0; }, 2000);
+    }
+  };
+
   useEffect(() => { applyTheme(theme); }, [theme]);
 
   const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
@@ -326,7 +340,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" className="header-logo" alt="" draggable={false} />
+        <img src="/logo.png" className="header-logo" alt="" draggable={false} onClick={onLogoClick} />
         <h1>SUSUSongBoard</h1>
         <span className={`status ${status.connected ? 'on' : 'off'}`}>
           {status.connected ? '●' : '○'} {status.message}
