@@ -1,9 +1,8 @@
 // Lightweight update checker. Hits GitHub Releases API on startup, compares
 // the latest tag with the current app version. Public repo, no auth.
 //
-// The repo location is hardcoded here for the update fetch. We deliberately
-// don't surface it as a UI link — the About modal shows only the version,
-// and the "前往下载" button opens whatever release URL the API hands back.
+// Channel-aware: pre-release builds only see newer pre-releases;
+// stable builds only see newer stable releases.
 
 import { open } from '@tauri-apps/plugin-shell';
 
@@ -21,26 +20,58 @@ export interface UpdateInfo {
 
 export const CURRENT_VERSION: string = __APP_VERSION__;
 
+const isPrerelease = (v: string): boolean => v.includes('-');
+
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { Accept: 'application/vnd.github+json' },
-    });
-    if (!res.ok) return null;
-    const data: any = await res.json();
-    const tag = String(data.tag_name ?? '');
-    const latest = tag.replace(/^v/, '');
+    const currentPrerelease = isPrerelease(CURRENT_VERSION);
+
+    let latestTag: string;
+    let htmlUrl: string;
+    let body: string;
+    let publishedAt: string;
+
+    if (currentPrerelease) {
+      // Fetch recent releases and pick the latest pre-release
+      const res = await fetch(
+        `https://api.github.com/repos/${REPO}/releases?per_page=30`,
+        { headers: { Accept: 'application/vnd.github+json' } },
+      );
+      if (!res.ok) return null;
+      const releases: any[] = await res.json();
+      const prereleases = releases.filter((r: any) => r.prerelease === true);
+      if (prereleases.length === 0) return null;
+
+      // Sort by semver (descending) — highest first
+      prereleases.sort(
+        (a: any, b: any) => -compareFullSemver(String(a.tag_name).replace(/^v/, ''), String(b.tag_name).replace(/^v/, '')),
+      );
+      const latest = prereleases[0];
+      latestTag = String(latest.tag_name ?? '');
+      htmlUrl = String(latest.html_url ?? '');
+      body = String(latest.body ?? '');
+      publishedAt = String(latest.published_at ?? '');
+    } else {
+      // /releases/latest returns the latest non-prerelease
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      latestTag = String(data.tag_name ?? '');
+      htmlUrl = String(data.html_url ?? '');
+      body = String(data.body ?? '');
+      publishedAt = String(data.published_at ?? '');
+    }
+
+    const latest = latestTag.replace(/^v/, '');
     if (!latest) return null;
-    if (compareSemver(latest, CURRENT_VERSION) <= 0) return null;
-    if (typeof localStorage !== 'undefined' && localStorage.getItem(SKIP_KEY) === tag) {
+    if (compareFullSemver(latest, CURRENT_VERSION) <= 0) return null;
+
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(SKIP_KEY) === latestTag) {
       return null;
     }
-    return {
-      tag,
-      htmlUrl: String(data.html_url ?? ''),
-      body: String(data.body ?? ''),
-      publishedAt: String(data.published_at ?? ''),
-    };
+    return { tag: latestTag, htmlUrl, body, publishedAt };
   } catch {
     return null;
   }
@@ -66,15 +97,27 @@ export async function openInBrowser(url: string): Promise<void> {
   await open(url);
 }
 
-// >0 if a > b, <0 if smaller, 0 if equal. Strips pre-release suffixes.
-export function compareSemver(a: string, b: string): number {
-  const pa = a.split('-')[0].split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = b.split('-')[0].split('.').map((n) => parseInt(n, 10) || 0);
-  const len = Math.max(pa.length, pb.length, 3);
-  for (let i = 0; i < len; i++) {
-    const da = pa[i] ?? 0;
-    const db = pb[i] ?? 0;
-    if (da !== db) return da - db;
+// Compare full semver including pre-release suffix (e.g. 0.0.33-4 > 0.0.33-3).
+// Returns >0 if a > b, <0 if smaller, 0 if equal.
+export function compareFullSemver(a: string, b: string): number {
+  const [baseA, preA] = a.split('-');
+  const [baseB, preB] = b.split('-');
+  const cmp = compareSemver(baseA, baseB);
+  if (cmp !== 0) return cmp;
+  // Same base version — compare pre-release numbers
+  const nA = preA !== undefined ? parseInt(preA, 10) || 0 : -1;
+  const nB = preB !== undefined ? parseInt(preB, 10) || 0 : -1;
+  return nA - nB;
+}
+
+// Compare base semver (x.y.z only). >0 if a > b.
+function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
+  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
   }
   return 0;
 }
+
+

@@ -7,7 +7,7 @@ export function AppLogo() {
   const onClick = () => {
     clicks.current += 1;
     if (timer.current) clearTimeout(timer.current);
-    if (clicks.current >= 7) {
+    if (clicks.current >= 8) {
       clicks.current = 0;
       new Audio('/secret.m4a').play().catch(() => {});
     } else {
