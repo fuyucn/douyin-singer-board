@@ -11,8 +11,8 @@ function resolveOsTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-async function updateMetaTheme(t: Theme) {
-  // macOS: meta theme-color
+async function updateTitleBar(t: Theme) {
+  // meta theme-color (macOS)
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
     if (t === 'dark') meta.setAttribute('content', '#1a1a1a');
@@ -20,16 +20,12 @@ async function updateMetaTheme(t: Theme) {
     else meta.setAttribute('content', resolveOsTheme() === 'dark' ? '#1a1a1a' : '#ffffff');
   }
 
-  // Windows: Tauri window theme
+  // Tauri setTheme (Windows + macOS)
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    if (t === 'dark') {
-      getCurrentWindow().setTheme('dark');
-    } else if (t === 'light') {
-      getCurrentWindow().setTheme('light');
-    } else {
-      getCurrentWindow().setTheme(null);
-    }
+    const { setTheme } = await import('@tauri-apps/api/app');
+    if (t === 'dark') await setTheme('dark');
+    else if (t === 'light') await setTheme('light');
+    else await setTheme(null);
   } catch {
     // not in Tauri (e.g. browser dev) — ignore
   }
@@ -45,7 +41,7 @@ export function applyTheme(t: Theme): void {
   const root = document.documentElement;
   if (t === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', t);
-  updateMetaTheme(t);
+  updateTitleBar(t);
 }
 
 export function saveTheme(t: Theme): void {
@@ -55,7 +51,6 @@ export function saveTheme(t: Theme): void {
 }
 
 export function nextTheme(t: Theme): Theme {
-  // cycle order: system → light → dark → system
   if (t === 'system') return 'light';
   if (t === 'light') return 'dark';
   return 'system';
@@ -64,7 +59,7 @@ export function nextTheme(t: Theme): Theme {
 export function themeIcon(t: Theme): string {
   if (t === 'light') return '☀';
   if (t === 'dark') return '☾';
-  return '◐'; // system / auto
+  return '◐';
 }
 
 export function themeLabel(t: Theme): string {
@@ -76,7 +71,6 @@ export function themeLabel(t: Theme): string {
 // Listen to OS theme changes when in system mode
 if (typeof window !== 'undefined') {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    const current = loadTheme();
-    if (current === 'system') updateMetaTheme('system');
+    if (loadTheme() === 'system') updateTitleBar('system');
   });
 }
