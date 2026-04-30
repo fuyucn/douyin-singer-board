@@ -116,6 +116,7 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   background: var(--bg-base); color: var(--fg-base);
+  user-select: none;
 }
 
 .app { display: flex; flex-direction: column; height: 100vh; }
