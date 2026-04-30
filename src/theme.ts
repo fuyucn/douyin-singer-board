@@ -7,33 +7,22 @@ export type Theme = 'system' | 'light' | 'dark';
 
 const KEY = 'sususongboard.theme';
 
+const LIGHT = '#ffffff';
+const DARK = '#1a1a1a';
+
 function resolveOsTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-async function updateTitleBar(t: Theme) {
+function updateTitleBar(t: Theme) {
+  const html = document.documentElement;
+  const isDark = t === 'dark' || (t === 'system' && resolveOsTheme() === 'dark');
+  html.style.background = isDark ? DARK : LIGHT;
+  html.style.colorScheme = t === 'system' ? 'light dark' : isDark ? 'dark' : 'light';
+
   // meta theme-color (helps macOS)
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) {
-    const color =
-      t === 'dark'
-        ? '#1a1a1a'
-        : t === 'light'
-          ? '#ffffff'
-          : resolveOsTheme() === 'dark'
-            ? '#1a1a1a'
-            : '#ffffff';
-    meta.setAttribute('content', color);
-  }
-
-  // Tauri invoke: plugin:window|set_theme (Windows + macOS)
-  try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    const theme = t === 'dark' ? 'dark' : t === 'light' ? 'light' : null;
-    await invoke('plugin:window|set_theme', { theme });
-  } catch {
-    // not in Tauri (e.g. browser dev) — ignore
-  }
+  if (meta) meta.setAttribute('content', isDark ? DARK : LIGHT);
 }
 
 export function loadTheme(): Theme {
@@ -43,9 +32,9 @@ export function loadTheme(): Theme {
 }
 
 export function applyTheme(t: Theme): void {
-  const root = document.documentElement;
-  if (t === 'system') root.removeAttribute('data-theme');
-  else root.setAttribute('data-theme', t);
+  const html = document.documentElement;
+  if (t === 'system') html.removeAttribute('data-theme');
+  else html.setAttribute('data-theme', t);
   updateTitleBar(t);
 }
 
