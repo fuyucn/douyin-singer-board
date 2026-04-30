@@ -7,6 +7,19 @@ export type Theme = 'system' | 'light' | 'dark';
 
 const KEY = 'sususongboard.theme';
 
+function updateMetaTheme(t: Theme) {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) return;
+  if (t === 'dark') {
+    meta.setAttribute('content', '#1a1a1a');
+  } else if (t === 'light') {
+    meta.setAttribute('content', '#ffffff');
+  } else {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    meta.setAttribute('content', isDark ? '#1a1a1a' : '#ffffff');
+  }
+}
+
 export function loadTheme(): Theme {
   if (typeof localStorage === 'undefined') return 'system';
   const v = localStorage.getItem(KEY) as Theme | null;
@@ -17,6 +30,7 @@ export function applyTheme(t: Theme): void {
   const root = document.documentElement;
   if (t === 'system') root.removeAttribute('data-theme');
   else root.setAttribute('data-theme', t);
+  updateMetaTheme(t);
 }
 
 export function saveTheme(t: Theme): void {
@@ -42,4 +56,12 @@ export function themeLabel(t: Theme): string {
   if (t === 'light') return 'Light';
   if (t === 'dark') return 'Dark';
   return 'Auto';
+}
+
+// Listen to OS theme changes when in system mode
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const current = loadTheme();
+    if (current === 'system') updateMetaTheme('system');
+  });
 }
