@@ -326,7 +326,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <img src="/logo.png" className="header-logo" alt="" />
+        <img src="/logo.png" className="header-logo" alt="" draggable={false} />
         <h1>SUSUSongBoard</h1>
         <span className={`status ${status.connected ? 'on' : 'off'}`}>
           {status.connected ? '●' : '○'} {status.message}
