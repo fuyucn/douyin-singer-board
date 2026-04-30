@@ -126,10 +126,7 @@ export async function saveKugouSession(s: Partial<KugouSession>): Promise<void> 
     }
   }
   if (fields.length === 0) return;
-  await db.execute(
-    `UPDATE kugou_session SET ${fields.join(', ')} WHERE id = 1`,
-    args,
-  );
+  await db.execute(`UPDATE kugou_session SET ${fields.join(', ')} WHERE id = 1`, args);
 }
 
 export async function clearKugouSession(): Promise<void> {
@@ -160,10 +157,7 @@ export async function loadBlacklist(): Promise<string[]> {
 
 export async function addToBlacklist(songName: string): Promise<void> {
   const db = await getDb();
-  await db.execute(
-    'INSERT OR IGNORE INTO blacklist (song_name) VALUES ($1)',
-    [songName],
-  );
+  await db.execute('INSERT OR IGNORE INTO blacklist (song_name) VALUES ($1)', [songName]);
 }
 
 export async function removeFromBlacklist(songName: string): Promise<void> {

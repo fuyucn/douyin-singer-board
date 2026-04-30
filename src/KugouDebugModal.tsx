@@ -3,18 +3,8 @@
 // search → add) before investing in a real QR-login UX.
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  loadKugouSession,
-  saveKugouSession,
-  clearKugouSession,
-  sessionToCookie,
-} from './db';
-import {
-  ensureDeviceRegistered,
-  refreshToken,
-  saveLogin,
-  call,
-} from './kugouSession';
+import { loadKugouSession, saveKugouSession, clearKugouSession, sessionToCookie } from './db';
+import { ensureDeviceRegistered, refreshToken, saveLogin, call } from './kugouSession';
 import { useAppStore } from './store';
 
 interface Props {
@@ -150,19 +140,15 @@ export function KugouDebugModal({ onClose }: Props) {
     setError(null);
   };
 
-  const onUserDetail = () =>
-    run('GET /user/detail', () => call('GET', '/user/detail', cookie));
+  const onUserDetail = () => run('GET /user/detail', () => call('GET', '/user/detail', cookie));
 
   const onListPlaylists = () =>
     run('GET /user/playlist', () => call('GET', '/user/playlist?pagesize=100', cookie));
 
   const onUserListen = () =>
-    run('GET /user/listen?type=1', () =>
-      call('GET', '/user/listen?type=1', cookie),
-    );
+    run('GET /user/listen?type=1', () => call('GET', '/user/listen?type=1', cookie));
 
-  const onUserHistory = () =>
-    run('GET /user/history', () => call('GET', '/user/history', cookie));
+  const onUserHistory = () => run('GET /user/history', () => call('GET', '/user/history', cookie));
 
   const onSearch = () =>
     run('GET /search', () =>
@@ -238,8 +224,7 @@ export function KugouDebugModal({ onClose }: Props) {
 
           const data = r.body?.data ?? {};
           const rawStatus = data.status;
-          const code =
-            typeof rawStatus === 'number' ? rawStatus : Number(rawStatus ?? -1);
+          const code = typeof rawStatus === 'number' ? rawStatus : Number(rawStatus ?? -1);
 
           if (code === 4) {
             stopPoll();
@@ -284,8 +269,7 @@ export function KugouDebugModal({ onClose }: Props) {
             prev.kind === 'waiting'
               ? {
                   ...prev,
-                  statusLabel:
-                    labels[code] ?? `status=${code} raw=${JSON.stringify(rawStatus)}`,
+                  statusLabel: labels[code] ?? `status=${code} raw=${JSON.stringify(rawStatus)}`,
                   pollCount: prev.pollCount + 1,
                   lastResp: r,
                 }
@@ -313,11 +297,16 @@ export function KugouDebugModal({ onClose }: Props) {
       <div className="modal kg-debug" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>KuGou API 调试面板</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
         </div>
         <div className="modal-body">
           <div className="kg-actions">
-            <button onClick={startQrLogin} disabled={qr.kind === 'loading' || qr.kind === 'waiting'}>
+            <button
+              onClick={startQrLogin}
+              disabled={qr.kind === 'loading' || qr.kind === 'waiting'}
+            >
               {qr.kind === 'loading' ? '生成二维码中…' : '扫码登录 (KuGou 手机 App)'}
             </button>
             {(qr.kind === 'waiting' || qr.kind === 'error') && (
@@ -415,9 +404,7 @@ export function KugouDebugModal({ onClose }: Props) {
               checked={preferCumulative}
               onChange={(e) => {
                 setPreferCumulative(e.target.checked);
-                pushLog(
-                  `[kg-dev] 累计播放优先 = ${e.target.checked ? 'on' : 'off'}`,
-                );
+                pushLog(`[kg-dev] 累计播放优先 = ${e.target.checked ? 'on' : 'off'}`);
               }}
             />
             <span>累计播放优先（每行 🎵 用 /user/listen 历史挑版本，关闭则取搜索首条）</span>

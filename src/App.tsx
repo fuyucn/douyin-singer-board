@@ -169,7 +169,9 @@ export default function App() {
 
   // Startup: Kugou token refresh
   useEffect(() => {
-    const t = window.setTimeout(() => { refreshTokenIfStale().catch(() => {}); }, 4000);
+    const t = window.setTimeout(() => {
+      refreshTokenIfStale().catch(() => {});
+    }, 4000);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -324,20 +326,38 @@ export default function App() {
     let title = '';
     let enabled = entry.status === 'found' && hasTarget;
     switch (entry.status) {
-      case 'pending': label = '🎵 ⋯'; title = '正在 KuGou 查找…'; break;
-      case 'found': title = hasTarget ? `加入歌单: ${entry.track.filename}` : '请先保存Kugou歌单'; break;
-      case 'not_found': title = 'KuGou 未找到这首歌'; break;
-      case 'error': title = `KuGou 搜索失败: ${entry.msg}`; break;
+      case 'pending':
+        label = '🎵 ⋯';
+        title = '正在 KuGou 查找…';
+        break;
+      case 'found':
+        title = hasTarget ? `加入歌单: ${entry.track.filename}` : '请先保存Kugou歌单';
+        break;
+      case 'not_found':
+        title = 'KuGou 未找到这首歌';
+        break;
+      case 'error':
+        title = `KuGou 搜索失败: ${entry.msg}`;
+        break;
     }
     return (
       <>
         {kugouLoggedIn && (
-          <button className={btnAction} disabled={!enabled} onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)} title={title}>
+          <button
+            className={btnAction}
+            disabled={!enabled}
+            onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
+            title={title}
+          >
             {label}
           </button>
         )}
-        <button className={btnAction} onClick={() => onCopy(s.song_name)}>复制</button>
-        <button className={btnAction} onClick={() => onRemoveOne(s.msg_id, s.song_name)}>删除</button>
+        <button className={btnAction} onClick={() => onCopy(s.song_name)}>
+          复制
+        </button>
+        <button className={btnAction} onClick={() => onRemoveOne(s.msg_id, s.song_name)}>
+          删除
+        </button>
       </>
     );
   };
@@ -400,7 +420,7 @@ export default function App() {
         >
           <img
             src="/kugou.svg"
-            className={`h-5 w-5 object-contain block ${kugouLoggedIn ? '' : 'grayscale opacity-60'}`}
+            className={`block h-5 w-5 object-contain ${kugouLoggedIn ? '' : 'opacity-60 grayscale'}`}
             alt=""
           />
         </button>
@@ -516,13 +536,13 @@ export default function App() {
             <span className="text-fg-muted text-xs">Kugou歌单</span>
             <div className="flex items-center gap-2">
               <input
-                className={`${configInput} flex-1 min-w-0`}
+                className={`${configInput} min-w-0 flex-1`}
                 type="text"
                 value={config.target_playlist_name}
                 onChange={(e) => setConfig({ target_playlist_name: e.target.value })}
                 placeholder="自动加入歌单的名字"
               />
-              <span className="font-mono text-xs text-fg-muted whitespace-nowrap">
+              <span className="text-fg-muted font-mono text-xs whitespace-nowrap">
                 {config.target_playlist_id ? `id: ${config.target_playlist_id}` : 'id: —'}
               </span>
               <button
@@ -537,12 +557,20 @@ export default function App() {
                   try {
                     const { listid, created } = await resolvePlaylistByName(name);
                     setConfig({ target_playlist_id: listid });
-                    await saveConfig({ ...config, target_playlist_name: name, target_playlist_id: listid });
-                    showToast(created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`);
+                    await saveConfig({
+                      ...config,
+                      target_playlist_name: name,
+                      target_playlist_id: listid,
+                    });
+                    showToast(
+                      created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`,
+                    );
                   } catch (e) {
                     const detail = String(e);
                     showToast(
-                      detail.includes('not logged in') ? '请先点 🛠 扫码登录' : `解析失败: ${detail}`,
+                      detail.includes('not logged in')
+                        ? '请先点 🛠 扫码登录'
+                        : `解析失败: ${detail}`,
                       'error',
                     );
                   }
@@ -553,7 +581,7 @@ export default function App() {
               {config.target_playlist_id > 0 && (
                 <button
                   type="button"
-                  className={`auto-sync-btn${autoSync ? ' active' : ''}`}
+                  className={`auto-sync-btn${autoSync ? 'active' : ''}`}
                   onClick={() => setAutoSync(!autoSync)}
                   title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
                 >

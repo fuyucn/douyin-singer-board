@@ -46,7 +46,10 @@ export function useAutoSync({
     };
 
     const tick = async () => {
-      if (processingRef.current) { schedule(); return; }
+      if (processingRef.current) {
+        schedule();
+        return;
+      }
       processingRef.current = true;
       try {
         const currentSongs = songsRef.current;

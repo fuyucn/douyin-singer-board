@@ -3,12 +3,7 @@
 // drive everything through these helpers; SQLite is the only source of truth.
 
 import { invoke } from '@tauri-apps/api/core';
-import {
-  loadKugouSession,
-  saveKugouSession,
-  sessionToCookie,
-  type KugouSession,
-} from './db';
+import { loadKugouSession, saveKugouSession, sessionToCookie, type KugouSession } from './db';
 
 interface ApiResult {
   status: number;
@@ -71,9 +66,7 @@ export async function refreshToken(): Promise<string> {
   const resp = await call('GET', '/login/token', cookie);
   const newToken = String(resp.body?.data?.token ?? resp.body?.token ?? '');
   if (resp.body?.status !== 1 || !newToken) {
-    throw new Error(
-      `refresh failed: status=${resp.status}, body=${JSON.stringify(resp.body)}`,
-    );
+    throw new Error(`refresh failed: status=${resp.status}, body=${JSON.stringify(resp.body)}`);
   }
   await saveKugouSession({
     token: newToken,
@@ -132,19 +125,11 @@ export async function resolvePlaylistByName(
 
   // 2) create — KuGou's response nests the new playlist under data.info
   // (data.info.listid), not directly under data, so we probe both shapes.
-  const create = await call(
-    'GET',
-    `/playlist/add?name=${encodeURIComponent(trimmed)}`,
-    cookie,
-  );
+  const create = await call('GET', `/playlist/add?name=${encodeURIComponent(trimmed)}`, cookie);
   const data = create.body?.data ?? {};
   const info = data.info ?? {};
   const newId =
-    info.listid ??
-    info.list_create_listid ??
-    data.listid ??
-    data.list_create_listid ??
-    0;
+    info.listid ?? info.list_create_listid ?? data.listid ?? data.list_create_listid ?? 0;
   if (create.body?.status !== 1 || !newId) {
     throw new Error(
       `playlist/add failed: status=${create.status} body=${JSON.stringify(create.body)}`,
@@ -178,18 +163,12 @@ export type KuGouEntry =
  * prefer `searchKuGouPreferredHit` so we tilt toward versions the streamer
  * has actually played (KuGou returns many variants per title).
  */
-export async function searchKuGouTopHit(
-  keyword: string,
-): Promise<KuGouTrack | null> {
+export async function searchKuGouTopHit(keyword: string): Promise<KuGouTrack | null> {
   const k = keyword.trim();
   if (!k) return null;
   const cookie = await currentCookie();
   if (!cookie) return null;
-  const resp = await call(
-    'GET',
-    `/search?keywords=${encodeURIComponent(k)}&pagesize=5`,
-    cookie,
-  );
+  const resp = await call('GET', `/search?keywords=${encodeURIComponent(k)}&pagesize=5`, cookie);
   const top = resp.body?.data?.lists?.[0];
   if (!top) return null;
   const hash = String(top.FileHash ?? '').toUpperCase();
@@ -223,19 +202,13 @@ function extractListenEntries(body: any): Array<{ hash: string; count: number }>
     .filter((x: any) => x && (x.hash || x.FileHash))
     .map((x: any) => ({
       hash: String(x.hash ?? x.FileHash ?? '').toUpperCase(),
-      count: Number(
-        x.listen_count ?? x.play_count ?? x.playcount ?? x.pc ?? x.count ?? 1,
-      ),
+      count: Number(x.listen_count ?? x.play_count ?? x.playcount ?? x.pc ?? x.count ?? 1),
     }));
 }
 
 export async function listenHistoryMap(force = false): Promise<Map<string, number>> {
   const now = Math.floor(Date.now() / 1000);
-  if (
-    !force &&
-    listenHistoryCache &&
-    now - listenHistoryCache.fetched_at < LISTEN_TTL_SECONDS
-  ) {
+  if (!force && listenHistoryCache && now - listenHistoryCache.fetched_at < LISTEN_TTL_SECONDS) {
     return listenHistoryCache.map;
   }
   const cookie = await currentCookie();
@@ -264,25 +237,19 @@ export function clearListenHistoryCache(): void {
  * when no match. Examines both top-level lists and their Grp[] variants
  * (KuGou groups remasters / live / different albums of the same song).
  */
-export async function searchKuGouPreferredHit(
-  keyword: string,
-): Promise<KuGouTrack | null> {
+export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTrack | null> {
   const k = keyword.trim();
   if (!k) return null;
   const cookie = await currentCookie();
   if (!cookie) return null;
 
-  const resp = await call(
-    'GET',
-    `/search?keywords=${encodeURIComponent(k)}&pagesize=10`,
-    cookie,
-  );
+  const resp = await call('GET', `/search?keywords=${encodeURIComponent(k)}&pagesize=10`, cookie);
   const lists = resp.body?.data?.lists ?? [];
   if (!Array.isArray(lists) || lists.length === 0) return null;
 
   type Candidate = KuGouTrack & {
-    plays: number;       // primary: streamer's own play count from /user/listen
-    ownerCount: number;  // secondary: KuGou-wide collectors of this version
+    plays: number; // primary: streamer's own play count from /user/listen
+    ownerCount: number; // secondary: KuGou-wide collectors of this version
   };
   const candidates: Candidate[] = [];
   const playMap = await listenHistoryMap();
@@ -331,10 +298,7 @@ export async function searchKuGouPreferredHit(
  * is the upstream's pipe-delimited shorthand:
  *   name|hash|album_id|mixsongid
  */
-export async function addTrackToPlaylist(
-  track: KuGouTrack,
-  listid: number,
-): Promise<void> {
+export async function addTrackToPlaylist(track: KuGouTrack, listid: number): Promise<void> {
   if (!listid) throw new Error('no target playlist set');
   const cookie = await currentCookie();
   if (!cookie) throw new Error('not logged in');
@@ -345,9 +309,7 @@ export async function addTrackToPlaylist(
     cookie,
   );
   if (resp.body?.status !== 1) {
-    throw new Error(
-      `tracks/add failed: status=${resp.status} body=${JSON.stringify(resp.body)}`,
-    );
+    throw new Error(`tracks/add failed: status=${resp.status} body=${JSON.stringify(resp.body)}`);
   }
 }
 

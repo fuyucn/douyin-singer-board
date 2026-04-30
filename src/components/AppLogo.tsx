@@ -11,7 +11,9 @@ export function AppLogo() {
       clicks.current = 0;
       new Audio('/secret.m4a').play().catch(() => {});
     } else {
-      timer.current = setTimeout(() => { clicks.current = 0; }, 2000);
+      timer.current = setTimeout(() => {
+        clicks.current = 0;
+      }, 2000);
     }
   };
 
