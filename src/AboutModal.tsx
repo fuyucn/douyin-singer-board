@@ -50,13 +50,20 @@ export function AboutModal({ onClose, onShowToast }: Props) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="bg-overlay animate-fade-in fixed inset-0 z-[800] flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[10px]"
+        style={{ boxShadow: 'var(--shadow-modal)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-soft">
-          <h2 className="m-0 text-base font-semibold text-fg-base">关于 SUSUSongBoard</h2>
+        <div className="border-border-soft flex items-center justify-between border-b px-5 py-4">
+          <h2 className="text-fg-base m-0 text-base font-semibold">关于 SUSUSongBoard</h2>
           <button
-            className="bg-transparent border-none text-xl leading-none cursor-pointer text-fg-muted hover:text-fg-base px-1 py-0"
+            className="text-fg-muted hover:text-fg-base cursor-pointer border-none bg-transparent px-1 py-0 text-xl leading-none"
             onClick={onClose}
             aria-label="Close"
           >
@@ -65,17 +72,17 @@ export function AboutModal({ onClose, onShowToast }: Props) {
         </div>
         {/* Body */}
         <div className="p-5">
-          <div className="flex gap-3 mb-3.5 items-center text-sm">
+          <div className="mb-3.5 flex items-center gap-3 text-sm">
             <span className="text-fg-muted min-w-[60px]">版本</span>
             <span className="text-fg-base">v{CURRENT_VERSION}</span>
           </div>
           {skipped && (
-            <div className="flex gap-3 mb-3.5 items-center text-sm">
+            <div className="mb-3.5 flex items-center gap-3 text-sm">
               <span className="text-fg-muted min-w-[60px]">已跳过</span>
               <span className="text-fg-base">
                 {skipped}{' '}
                 <button
-                  className="bg-transparent border-none text-accent hover:text-accent-hover cursor-pointer p-0 text-[inherit] underline inline"
+                  className="text-accent hover:text-accent-hover inline cursor-pointer border-none bg-transparent p-0 text-[inherit] underline"
                   onClick={onResetSkip}
                 >
                   (重置)
@@ -85,7 +92,7 @@ export function AboutModal({ onClose, onShowToast }: Props) {
           )}
           <div className="mt-4 flex gap-2.5">
             <button
-              className="px-6 py-2 bg-success hover:bg-success-hover text-white border-none rounded cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-success hover:bg-success-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onCheck}
               disabled={checking}
             >

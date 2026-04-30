@@ -32,17 +32,20 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     let publishedAt: string;
 
     if (currentPrerelease) {
-      const res = await fetch(
-        `https://api.github.com/repos/${REPO}/releases?per_page=30`,
-        { headers: { Accept: 'application/vnd.github+json' } },
-      );
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
       if (!res.ok) return null;
       const releases: any[] = await res.json();
       const prereleases = releases.filter((r: any) => r.prerelease === true);
       if (prereleases.length === 0) return null;
 
       prereleases.sort(
-        (a: any, b: any) => -compareFullSemver(String(a.tag_name).replace(/^v/, ''), String(b.tag_name).replace(/^v/, '')),
+        (a: any, b: any) =>
+          -compareFullSemver(
+            String(a.tag_name).replace(/^v/, ''),
+            String(b.tag_name).replace(/^v/, ''),
+          ),
       );
       const latest = prereleases[0];
       latestTag = String(latest.tag_name ?? '');

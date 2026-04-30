@@ -1,9 +1,9 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-/* ─── Dark mode variant (data-theme="dark" OR system preference) ┐ */
+/* ─── Dark mode variant (data-theme="dark" OR system preference) ─── */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ─── Design tokens ───────────────────────────────────────── */
+/* ─── Design tokens ─────────────────────────────────────────────── */
 :root {
   --bg-base: #ffffff;
   --bg-elev: #ffffff;
@@ -28,12 +28,12 @@
   --accent-soft-bg: #e3f2fd;
   --accent-soft-fg: #0d47a1;
   --accent-soft-border: #bbdefb;
-  --shadow-modal: 0 16px 40px rgba(0,0,0,0.2);
-  --shadow-toast: 0 4px 12px rgba(0,0,0,0.18);
-  --overlay: rgba(0,0,0,0.4);
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.2);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --overlay: rgba(0, 0, 0, 0.4);
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --bg-base: #1a1a1a;
   --bg-elev: #242424;
   --bg-soft: #1f1f1f;
@@ -57,9 +57,9 @@
   --accent-soft-bg: #1f2d3d;
   --accent-soft-fg: #90c8f5;
   --accent-soft-border: #2a3f55;
-  --shadow-modal: 0 16px 40px rgba(0,0,0,0.6);
-  --shadow-toast: 0 4px 12px rgba(0,0,0,0.5);
-  --overlay: rgba(0,0,0,0.6);
+  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --overlay: rgba(0, 0, 0, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -87,13 +87,13 @@
     --accent-soft-bg: #1f2d3d;
     --accent-soft-fg: #90c8f5;
     --accent-soft-border: #2a3f55;
-    --shadow-modal: 0 16px 40px rgba(0,0,0,0.6);
-    --shadow-toast: 0 4px 12px rgba(0,0,0,0.5);
-    --overlay: rgba(0,0,0,0.6);
+    --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
+    --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --overlay: rgba(0, 0, 0, 0.6);
   }
 }
 
-/* Register tokens so Tailwind can use them */
+/* ─── Tailwind token bridge ──────────────────────────────────────── */
 @theme inline {
   --color-bg-base: var(--bg-base);
   --color-bg-elev: var(--bg-elev);
@@ -118,292 +118,139 @@
   --color-accent-soft-bg: var(--accent-soft-bg);
   --color-accent-soft-fg: var(--accent-soft-fg);
   --color-accent-soft-border: var(--accent-soft-border);
+  --color-overlay: var(--overlay);
+  --animate-fade-in: fade-in 0.15s ease-out;
+  --animate-scale-in: scale-in 0.18s ease-out;
 }
 
-/* ─── Base styles ─────────────────────────────────────────── */
+/* ─── Base reset ─────────────────────────────────────────────────── */
 @layer base {
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
     background: var(--bg-base);
     color: var(--fg-base);
     user-select: none;
     font-size: 14px;
   }
-  input, button { font-family: inherit; font-size: inherit; }
+  input,
+  button {
+    font-family: inherit;
+    font-size: inherit;
+  }
 }
 
-/* ─── App layout ──────────────────────────────────────────── */
-.app {
-  @apply flex flex-col h-screen;
+/* ─── Keyframes ──────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+}
+@keyframes auto-sync-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
-/* ─── Header ──────────────────────────────────────────────── */
-.header {
-  @apply flex items-center gap-4 px-5 py-3 border-b border-border-soft bg-bg-elev;
-}
-.header h1 {
-  @apply text-lg m-0;
-}
-
-/* ─── Header actions ──────────────────────────────────────── */
-.header-action {
-  @apply w-8 h-8 p-0 inline-flex items-center justify-center text-base leading-none
-         bg-transparent border border-transparent rounded-full cursor-pointer
-         text-fg-muted shrink-0;
-}
-.header-action:hover {
-  background: var(--bg-soft);
-  border-color: var(--border-strong);
-  color: var(--fg-base);
-}
-.header-action.first-tail {
-  @apply ml-auto;
-}
-.header-theme {
-  @apply text-sm;
-}
-
-/* ─── Banners ─────────────────────────────────────────────── */
-.banner.error {
-  background: var(--danger-soft-bg);
-  color: var(--danger-soft-fg);
-  @apply py-2 px-5;
-}
-.banner.update {
-  @apply flex items-center gap-3 py-2 px-5 border-b;
-  background: var(--accent-soft-bg);
-  color: var(--accent-soft-fg);
-  border-color: var(--accent-soft-border);
-}
-.banner.update button {
-  @apply py-1 px-3 rounded text-white cursor-pointer;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  font-size: 13px;
-}
-.banner.update button:hover {
-  background: var(--accent-hover);
-}
-.banner.update button.dismiss {
-  @apply bg-transparent border-none ml-auto text-lg py-0 px-2;
-  color: var(--accent-soft-fg);
-}
-.banner.update button.dismiss:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-/* ─── Config section ──────────────────────────────────────── */
-.config {
-  @apply flex gap-3 items-end p-3 px-5 border-b border-border-soft flex-wrap bg-bg-elev;
-}
-.config label {
-  @apply flex flex-col gap-1 flex-1;
-  min-width: 140px;
-  flex-basis: 180px;
-}
-.config label > span {
-  @apply text-xs text-fg-muted;
-}
-.config input {
-  @apply py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base;
-}
-.config input:disabled {
-  background: var(--bg-disabled);
-  color: var(--fg-faint);
-}
-.config label.playlist-target {
-  min-width: 260px;
-  flex-basis: 320px;
-}
-
-/* ─── Playlist row ────────────────────────────────────────── */
-.playlist-row {
-  @apply flex items-center gap-2;
-}
-.playlist-row input {
-  @apply flex-1 min-w-0;
-}
-.playlist-row .listid-display {
-  @apply whitespace-nowrap font-mono text-xs text-fg-muted;
-}
-.playlist-row button {
-  @apply py-1.5 px-3.5 rounded text-white cursor-pointer shrink-0;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  font-size: 13px;
-}
-.playlist-row button:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-/* ─── Config action buttons ───────────────────────────────── */
-.config button.primary {
-  @apply text-white border-none py-2 px-6 rounded cursor-pointer font-medium;
-  background: var(--success);
-}
-.config button.primary:hover {
-  background: var(--success-hover);
-}
-.config button.danger {
-  @apply text-white border-none py-2 px-6 rounded cursor-pointer font-medium;
-  background: var(--danger);
-}
-.config button.danger:hover {
-  background: var(--danger-hover);
-}
-
-/* ─── Toolbar ─────────────────────────────────────────────── */
-.toolbar {
-  @apply flex gap-2 px-5 py-3 border-b border-border-soft bg-bg-elev;
-}
-.toolbar input {
-  @apply flex-1 py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base;
-}
-.toolbar button {
-  @apply py-1.5 px-3.5 border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer;
-}
-.toolbar button:hover:not(:disabled) {
-  background: var(--bg-soft);
-}
-.toolbar button:disabled {
-  @apply opacity-40 cursor-not-allowed;
-}
-.toolbar-hint {
-  @apply text-xs text-fg-muted self-center;
-}
-
-/* ─── Tabs ────────────────────────────────────────────────── */
-.tab-nav {
-  @apply flex border-b border-border-medium bg-bg-elev px-5 gap-0 shrink-0;
-}
-.tab-btn {
-  @apply py-2.5 px-5 border-none border-b-2 border-transparent bg-transparent
-         text-fg-muted cursor-pointer text-sm font-medium;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
-}
-.tab-btn:hover {
-  color: var(--fg-base);
-}
-.tab-btn.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-/* ─── Context menu ────────────────────────────────────────── */
-.ctx-overlay {
-  @apply fixed inset-0 z-[900];
-}
-.ctx-menu {
-  @apply fixed z-[901] rounded-md overflow-hidden min-w-[140px];
+/* ─── Auto-sync rainbow border (cannot be expressed in utilities) ─── */
+.auto-sync-btn {
+  position: relative;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 4px;
   background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
-  box-shadow: var(--shadow-modal);
-}
-.ctx-menu button {
-  @apply block w-full py-2 px-4 border-none bg-transparent text-fg-base text-left cursor-pointer whitespace-nowrap;
-  font-size: 13px;
-}
-.ctx-menu button:hover {
-  background: var(--bg-soft);
-}
-
-/* ─── Modal overlay ───────────────────────────────────────── */
-.modal-overlay {
-  @apply fixed inset-0 flex items-center justify-center z-[800];
-  background: var(--overlay);
-  animation: fade-in 0.15s ease-out;
-}
-.modal {
-  @apply rounded-[10px] overflow-hidden;
-  background: var(--bg-elev);
-  box-shadow: var(--shadow-modal);
-  width: 380px;
-  max-width: 90vw;
-  animation: scale-in 0.18s ease-out;
-}
-
-/* ─── Toast ───────────────────────────────────────────────── */
-.toast {
-  @apply fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] py-2.5 px-5 rounded-md whitespace-nowrap;
-  box-shadow: var(--shadow-toast);
-  font-size: 13px;
-  animation: toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards;
+  color: var(--fg-base) !important;
+  opacity: 0.55;
   cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  z-index: 0;
+  overflow: hidden;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    opacity 0.2s;
 }
-.toast:hover {
-  @apply opacity-85;
+.auto-sync-btn::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: 7px;
+  background: conic-gradient(from 0deg, #00e676, #2979ff, #d500f9, #ff6d00, #00e676);
+  animation: auto-sync-rotate 2s linear infinite;
+  opacity: 0;
+  transition: opacity 0.25s;
+  filter: blur(2px);
 }
-.toast.success {
-  background: var(--success);
-  @apply text-white;
+.auto-sync-btn::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: 3px;
+  background: var(--bg-elev);
 }
-.toast.error {
-  background: var(--danger);
-  @apply text-white;
+.auto-sync-btn.active {
+  color: var(--fg-base);
+  font-weight: 500;
+  border-color: transparent !important;
+  opacity: 1;
+  box-shadow:
+    0 0 12px rgba(100, 180, 255, 0.4),
+    0 0 24px rgba(100, 180, 255, 0.2);
+}
+.auto-sync-btn.active::before {
+  opacity: 1;
 }
 
-/* ─── Logs details ────────────────────────────────────────── */
-.logs {
-  @apply border-t border-border-soft max-h-[220px] overflow-y-auto text-xs text-fg-muted bg-bg-base;
-}
-.logs > summary {
-  @apply sticky top-0 z-[1] py-1.5 px-5 cursor-pointer border-b border-border-soft select-none;
-  background: var(--bg-softer);
-  color: var(--fg-base);
-  list-style: none;
-}
-.logs > summary::-webkit-details-marker {
+/* ─── logs <details> triangle ────────────────────────────────────── */
+.logs-summary::-webkit-details-marker {
   display: none;
 }
-.logs > summary::before {
+.logs-summary::before {
   content: '▶';
-  @apply inline-block mr-1.5;
+  display: inline-block;
+  margin-right: 6px;
   font-size: 10px;
   transition: transform 0.15s;
 }
-.logs[open] > summary::before {
+details[open] .logs-summary::before {
   transform: rotate(90deg);
-}
-.logs pre {
-  @apply m-0 py-1.5 px-5 whitespace-pre-wrap break-all;
-}
-
-/* ─── Song cell helpers ───────────────────────────────────── */
-.song-cell {
-  @apply leading-[1.4];
-}
-.song-original {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-.song-match {
-  @apply font-medium overflow-hidden text-ellipsis whitespace-nowrap;
-  font-size: 14px;
-  color: var(--accent);
-}
-.song-status {
-  @apply text-xs;
-  color: var(--fg-muted);
-}
-
-/* ─── Keyframes ───────────────────────────────────────────── */
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-@keyframes toast-in {
-  from { opacity: 0; transform: translate(-50%, 12px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-@keyframes toast-out {
-  from { opacity: 1; transform: translate(-50%, 0); }
-  to { opacity: 0; transform: translate(-50%, 12px); }
 }

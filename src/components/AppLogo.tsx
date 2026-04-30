@@ -1,5 +1,10 @@
 export function AppLogo() {
   return (
-    <img src="/logo.png" className="w-7 h-7 object-contain rounded-[4px] shrink-0" alt="" draggable={false} />
+    <img
+      src="/logo.png"
+      className="h-7 w-7 shrink-0 rounded-[4px] object-contain"
+      alt=""
+      draggable={false}
+    />
   );
 }
