@@ -1,7 +1,12 @@
 import { useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../store';
-import { loadBlacklist, addToBlacklist as dbAdd, removeFromBlacklist as dbRemove, deleteHistoryByMsgId } from '../db';
+import {
+  loadBlacklist,
+  addToBlacklist as dbAdd,
+  removeFromBlacklist as dbRemove,
+  deleteHistoryByMsgId,
+} from '../db';
 
 export function useBlacklist() {
   const blacklist = useAppStore((s) => s.blacklist);
@@ -19,7 +24,9 @@ export function useBlacklist() {
   }, [hydrateBlacklist, pushLog]);
 
   const sync = async (names: string[]) => {
-    invoke('sidecar_send', { cmd: { cmd: 'reload_config', config: { ...config, blacklist: names } } }).catch(() => {});
+    invoke('sidecar_send', {
+      cmd: { cmd: 'reload_config', config: { ...config, blacklist: names } },
+    }).catch(() => {});
   };
 
   const add = async (songName: string, msgId?: string) => {

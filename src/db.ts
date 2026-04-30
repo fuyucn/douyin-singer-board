@@ -8,11 +8,7 @@ export async function getDb(): Promise<Database> {
   _db = await Database.load('sqlite:sususongboard.db');
   // Ensure blacklist table exists (no migration system, so we do it here)
   await _db.execute(
-    `CREATE TABLE IF NOT EXISTS blacklist (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      song_name  TEXT UNIQUE NOT NULL,
-      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-    )`,
+    "CREATE TABLE IF NOT EXISTS blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, song_name TEXT UNIQUE NOT NULL, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))",
   );
   return _db;
 }
@@ -62,7 +58,17 @@ export async function insertHistory(d: DanmuInfo, sessionId: string): Promise<vo
     `INSERT OR IGNORE INTO history
      (msg_id, uid, uname, song_name, raw_msg, medal_level, medal_name, send_time, session_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [d.msg_id, d.uid, d.uname, d.song_name, d.raw_msg, d.medal_level, d.medal_name, d.send_time, sessionId],
+    [
+      d.msg_id,
+      d.uid,
+      d.uname,
+      d.song_name,
+      d.raw_msg,
+      d.medal_level,
+      d.medal_name,
+      d.send_time,
+      sessionId,
+    ],
   );
 }
 

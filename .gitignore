@@ -20,6 +20,17 @@ src-tauri/gen/schemas/
 # Rust
 **/*.rs.bk
 
+# Backup files
+*.bak
+
+# kugou-api (nested repo / submodule)
+kugou-api/
+
+# Alma / Orka tooling
+.alma-snapshots/
+.orka/
+TASK_BOARD.md
+
 # Editors
 .idea/
 .vscode/

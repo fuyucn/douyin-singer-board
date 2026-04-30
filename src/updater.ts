@@ -32,19 +32,20 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     let publishedAt: string;
 
     if (currentPrerelease) {
-      // Fetch recent releases and pick the latest pre-release
-      const res = await fetch(
-        `https://api.github.com/repos/${REPO}/releases?per_page=30`,
-        { headers: { Accept: 'application/vnd.github+json' } },
-      );
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
       if (!res.ok) return null;
       const releases: any[] = await res.json();
       const prereleases = releases.filter((r: any) => r.prerelease === true);
       if (prereleases.length === 0) return null;
 
-      // Sort by semver (descending) — highest first
       prereleases.sort(
-        (a: any, b: any) => -compareFullSemver(String(a.tag_name).replace(/^v/, ''), String(b.tag_name).replace(/^v/, '')),
+        (a: any, b: any) =>
+          -compareFullSemver(
+            String(a.tag_name).replace(/^v/, ''),
+            String(b.tag_name).replace(/^v/, ''),
+          ),
       );
       const latest = prereleases[0];
       latestTag = String(latest.tag_name ?? '');
@@ -52,7 +53,6 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
       body = String(latest.body ?? '');
       publishedAt = String(latest.published_at ?? '');
     } else {
-      // /releases/latest returns the latest non-prerelease
       const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
         headers: { Accept: 'application/vnd.github+json' },
       });
@@ -97,20 +97,16 @@ export async function openInBrowser(url: string): Promise<void> {
   await open(url);
 }
 
-// Compare full semver including pre-release suffix (e.g. 0.0.33-4 > 0.0.33-3).
-// Returns >0 if a > b, <0 if smaller, 0 if equal.
 export function compareFullSemver(a: string, b: string): number {
   const [baseA, preA] = a.split('-');
   const [baseB, preB] = b.split('-');
   const cmp = compareSemver(baseA, baseB);
   if (cmp !== 0) return cmp;
-  // Same base version — compare pre-release numbers
   const nA = preA !== undefined ? parseInt(preA, 10) || 0 : -1;
   const nB = preB !== undefined ? parseInt(preB, 10) || 0 : -1;
   return nA - nB;
 }
 
-// Compare base semver (x.y.z only). >0 if a > b.
 function compareSemver(a: string, b: string): number {
   const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
   const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
@@ -119,5 +115,3 @@ function compareSemver(a: string, b: string): number {
   }
   return 0;
 }
-
-

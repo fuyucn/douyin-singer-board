@@ -5,7 +5,7 @@ export function ConnectionStatus() {
   const message = useAppStore((s) => s.status.message);
 
   return (
-    <span className={`status ${connected ? 'on' : 'off'}`}>
+    <span className={`text-sm font-medium ${connected ? 'text-success' : 'text-fg-faint'}`}>
       {connected ? '●' : '○'} {message}
     </span>
   );

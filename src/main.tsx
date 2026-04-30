@@ -8,8 +8,7 @@ import './styles.css';
 // so dev tools / right-click → Inspect still work locally.
 window.addEventListener('keydown', (e) => {
   const isReloadCombo =
-    ((e.key === 'r' || e.key === 'R') && (e.metaKey || e.ctrlKey)) ||
-    e.key === 'F5';
+    ((e.key === 'r' || e.key === 'R') && (e.metaKey || e.ctrlKey)) || e.key === 'F5';
   if (isReloadCombo) {
     e.preventDefault();
     e.stopPropagation();

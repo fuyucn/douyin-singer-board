@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.33-6",
+"version": "0.0.36",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,10 @@
     "tauri:build": "pnpm sidecar:build:bin && pnpm kugou-api:build:bin && tauri build",
     "bump": "node scripts/bump-patch.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "oxlint src",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.1.1",
@@ -27,11 +30,16 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2.1.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "@yao-pkg/pkg": "^6.3.0",
+"@yao-pkg/pkg": "^6.3.0",
+    "oxlint": "^1.62.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
+    "tailwindcss": "^4.2.4",
     "typescript": "^5.6.2",
     "vite": "^6.0.3",
     "vitest": "^2.1.8"
