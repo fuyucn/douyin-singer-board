@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-"version": "0.0.36",
+  "version": "0.0.36-1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -35,7 +35,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
-"@yao-pkg/pkg": "^6.3.0",
+    "@yao-pkg/pkg": "^6.3.0",
     "oxlint": "^1.62.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
