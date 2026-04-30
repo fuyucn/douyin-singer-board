@@ -7,16 +7,31 @@ export type Theme = 'system' | 'light' | 'dark';
 
 const KEY = 'sususongboard.theme';
 
-function updateMetaTheme(t: Theme) {
+function resolveOsTheme(): 'light' | 'dark' {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+async function updateMetaTheme(t: Theme) {
+  // macOS: meta theme-color
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) return;
-  if (t === 'dark') {
-    meta.setAttribute('content', '#1a1a1a');
-  } else if (t === 'light') {
-    meta.setAttribute('content', '#ffffff');
-  } else {
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    meta.setAttribute('content', isDark ? '#1a1a1a' : '#ffffff');
+  if (meta) {
+    if (t === 'dark') meta.setAttribute('content', '#1a1a1a');
+    else if (t === 'light') meta.setAttribute('content', '#ffffff');
+    else meta.setAttribute('content', resolveOsTheme() === 'dark' ? '#1a1a1a' : '#ffffff');
+  }
+
+  // Windows: Tauri window theme
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    if (t === 'dark') {
+      getCurrentWindow().setTheme('dark');
+    } else if (t === 'light') {
+      getCurrentWindow().setTheme('light');
+    } else {
+      getCurrentWindow().setTheme(null);
+    }
+  } catch {
+    // not in Tauri (e.g. browser dev) — ignore
   }
 }
 
