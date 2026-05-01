@@ -44,3 +44,4 @@ config.json
 .orka/
 TASK_BOARD.md
 .alma-snapshots
+tmp/
