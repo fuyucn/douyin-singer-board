@@ -243,18 +243,19 @@ export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTra
   const cookie = await currentCookie();
   if (!cookie) return null;
 
-  const resp = await call('GET', `/search?keywords=${encodeURIComponent(k)}&pagesize=10`, cookie);
+  const resp = await call('GET', `/search?keywords=${encodeURIComponent(k)}&pagesize=5`, cookie);
   const lists = resp.body?.data?.lists ?? [];
   if (!Array.isArray(lists) || lists.length === 0) return null;
 
   type Candidate = KuGouTrack & {
-    plays: number; // primary: streamer's own play count from /user/listen
-    ownerCount: number; // secondary: KuGou-wide collectors of this version
+    plays: number; // streamer's own play count from /user/listen
+    ownerCount: number; // KuGou-wide collectors of this version
+    rank: number; // original search rank (0 = best match per KuGou's relevance)
   };
   const candidates: Candidate[] = [];
   const playMap = await listenHistoryMap();
 
-  const visit = (item: any) => {
+  const visit = (item: any, rank: number) => {
     const hash = String(item?.FileHash ?? '').toUpperCase();
     if (!hash) return;
     candidates.push({
@@ -264,24 +265,38 @@ export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTra
       mixsongid: String(item.MixSongID ?? ''),
       plays: playMap.get(hash) ?? 0,
       ownerCount: Number(item.OwnerCount ?? 0),
+      rank,
     });
     if (Array.isArray(item.Grp)) {
-      for (const g of item.Grp) visit(g);
+      for (const g of item.Grp) visit(g, rank);
     }
   };
-  for (const item of lists) visit(item);
+  for (let i = 0; i < lists.length; i++) visit(lists[i], i);
 
   if (candidates.length === 0) return null;
 
-  // Two-stage rank:
-  //   1. play count from listen history (>0 means streamer has played this
-  //      exact version) — strongest signal we have for "preferred version"
-  //   2. OwnerCount (KuGou-wide collectors) — when nothing matches the
-  //      top-120 history, the canonical version usually has orders of
-  //      magnitude more collectors than reissues/live cuts/karaoke
-  // We never break ties on search order alone; OwnerCount handles it.
+  // Played versions ALWAYS win — if the streamer has played this exact hash,
+  // we want that version regardless of KuGou's relevance ranking.
+  const played = candidates.filter((c) => c.plays > 0);
+  if (played.length > 0) {
+    played.sort((a, b) => {
+      if (a.plays !== b.plays) return b.plays - a.plays;
+      return b.ownerCount - a.ownerCount;
+    });
+    const best = played[0];
+    return {
+      filename: best.filename,
+      hash: best.hash,
+      album_id: best.album_id,
+      mixsongid: best.mixsongid,
+    };
+  }
+
+  // No play history match → trust KuGou's relevance ranking, but allow
+  // OwnerCount tie-breaks among versions of THE SAME song (same rank, e.g.
+  // Original / Live / clip — those are Grp siblings sharing the parent's rank).
   candidates.sort((a, b) => {
-    if (a.plays !== b.plays) return b.plays - a.plays;
+    if (a.rank !== b.rank) return a.rank - b.rank;
     return b.ownerCount - a.ownerCount;
   });
   const best = candidates[0];
