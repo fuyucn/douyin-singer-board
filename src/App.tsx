@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useAppStore, dedupedSongs } from './store';
 import {
   loadConfig,
@@ -8,9 +7,8 @@ import {
   insertHistory,
   deleteHistoryByMsgId,
   clearSessionHistory,
-  loadKugouSession,
 } from './db';
-import type { DanmuInfo, SidecarEvent } from './types';
+import type { DanmuInfo } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import {
   CircleBackslashIcon,
@@ -25,11 +23,7 @@ import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
 import { applyTheme, loadTheme, nextTheme, saveTheme, themeLabel, type Theme } from './theme';
 import {
-  refreshTokenIfStale,
   resolvePlaylistByName,
-  searchKuGouPreferredHit,
-  searchKuGouTopHit,
-  listenHistoryMap,
   addTrackToPlaylist,
   type KuGouTrack,
   type KuGouEntry,
@@ -37,11 +31,16 @@ import {
 import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
+import { useKugouAuth } from './hooks/useKugouAuth';
+import { useKugouSearch } from './hooks/useKugouSearch';
+import { useSidecarEvents } from './hooks/useSidecarEvents';
+import { useToast } from './hooks/useToast';
 import { SongList } from './components/SongList';
 import { BlacklistPanel } from './components/BlacklistPanel';
 import { ContextMenu } from './components/ContextMenu';
 import { AppLogo } from './components/AppLogo';
 import { ConnectionStatus } from './components/ConnectionStatus';
+import { HeaderButton } from './components/HeaderButton';
 
 function ThemeIcon({ theme }: { theme: Theme }) {
   if (theme === 'light') return <SunIcon />;
@@ -65,8 +64,6 @@ export default function App() {
   const newSession = useAppStore((s) => s.newSession);
   const setStatus = useAppStore((s) => s.setStatus);
   const songs = useAppStore((s) => s.songs);
-  const addSong = useAppStore((s) => s.addSong);
-  const cancelByUid = useAppStore((s) => s.cancelByUid);
   const removeByMsgId = useAppStore((s) => s.removeByMsgId);
   const clearSongs = useAppStore((s) => s.clearSongs);
   const manualAdd = useAppStore((s) => s.manualAdd);
@@ -87,76 +84,35 @@ export default function App() {
     getNames: getBlacklistNames,
   } = useBlacklist();
   const { ctxMenu, open: openCtxMenu, close: closeCtxMenu } = useContextMenu();
+  const { toast, showToast, dismissToast } = useToast();
 
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
-  const [kugouLoggedIn, setKugouLoggedIn] = useState(false);
 
-  useEffect(() => {
-    loadKugouSession()
-      .then((s) => setKugouLoggedIn(Boolean(s.token && s.userid && s.dfid)))
-      .catch(() => setKugouLoggedIn(false));
-  }, [showKgDebug, showKgLogin]);
+  const kugouLoggedIn = useKugouAuth({ watchTokens: [showKgDebug, showKgLogin] });
 
-  // Turn off auto-sync when logging out (kugouLoggedIn transitions true→false).
-  const kgRef = useRef(kugouLoggedIn);
-  useEffect(() => {
-    if (!kugouLoggedIn && kgRef.current) setAutoSync(false);
-    kgRef.current = kugouLoggedIn;
-  }, [kugouLoggedIn, setAutoSync]);
+  const display = useMemo(() => dedupedSongs(songs), [songs]);
 
-  useEffect(() => {
-    if (!kugouLoggedIn) return;
-    listenHistoryMap()
-      .then((m) => pushLog(`[kugou] listen history cached: ${m.size} hashes`))
-      .catch((e) => pushLog(`[kugou] listen history failed: ${e}`));
-  }, [kugouLoggedIn, pushLog]);
+  const kugouCache = useKugouSearch({
+    songs: display,
+    played,
+    kugouLoggedIn,
+    preferCumulative,
+  });
 
-  // KuGou search cache
-  const [kugouCache, setKugouCache] = useState<Record<string, KuGouEntry>>({});
-  const kugouStartedRef = useRef<Set<string>>(new Set());
+  useSidecarEvents({ blacklist });
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
-  const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
-    setToast({ msg, kind });
-    window.setTimeout(() => setToast(null), 1600);
-  };
-
-  const display = useMemo(() => dedupedSongs(songs), [songs]);
-
-  // Pre-fetch KuGou search
-  useEffect(() => {
-    if (!kugouLoggedIn) return;
-    for (const s of [...display, ...played]) {
-      const name = s.song_name.trim();
-      if (!name || kugouStartedRef.current.has(name)) continue;
-      kugouStartedRef.current.add(name);
-      setKugouCache((prev) => ({ ...prev, [name]: { status: 'pending' } }));
-      const search = preferCumulative ? searchKuGouPreferredHit : searchKuGouTopHit;
-      search(name)
-        .then((track) => {
-          setKugouCache((prev) => ({
-            ...prev,
-            [name]: track ? { status: 'found', track } : { status: 'not_found' },
-          }));
-        })
-        .catch((err) => {
-          setKugouCache((prev) => ({ ...prev, [name]: { status: 'error', msg: String(err) } }));
-        });
-    }
-  }, [display, played, kugouLoggedIn, preferCumulative]);
-
-  // Startup: config
+  // Startup: load config
   useEffect(() => {
     (async () => {
       try {
@@ -173,43 +129,6 @@ export default function App() {
       if (info) setUpdate(info);
     });
   }, []);
-
-  // Startup: Kugou token refresh
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      refreshTokenIfStale().catch(() => {});
-    }, 4000);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  // Sidecar events
-  useEffect(() => {
-    const unlisten = listen<SidecarEvent>('sidecar-event', (e) => {
-      const ev = e.payload;
-      switch (ev.event) {
-        case 'danmu':
-          if (blacklist.has(ev.data.song_name)) break;
-          addSong(ev.data);
-          if (sessionId) insertHistory(ev.data, sessionId).catch((err) => pushLog(`db: ${err}`));
-          break;
-        case 'cancel':
-          cancelByUid(ev.uid);
-          break;
-        case 'status':
-          setStatus({ connected: ev.connected, message: ev.message });
-          break;
-        case 'log':
-          pushLog(`[${ev.level}] ${ev.msg}`);
-          break;
-        case 'error':
-          pushLog(`[error] ${ev.msg}`);
-          break;
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, blacklist]);
 
   const onStart = async () => {
     pushLog('[app] start clicked');
@@ -426,8 +345,8 @@ export default function App() {
         <AppLogo />
         <h1 className="m-0 text-lg">SUSUSongBoard</h1>
         <ConnectionStatus />
-        <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base ml-auto inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-sm leading-none"
+        <HeaderButton
+          className="ml-auto"
           onClick={() => {
             const t = nextTheme(theme);
             saveTheme(t);
@@ -436,9 +355,8 @@ export default function App() {
           title={`主题: ${themeLabel(theme)}`}
         >
           <ThemeIcon theme={theme} />
-        </button>
-        <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-base leading-none"
+        </HeaderButton>
+        <HeaderButton
           onClick={() => setShowKgLogin(true)}
           title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
         >
@@ -447,23 +365,15 @@ export default function App() {
             className={`block h-5 w-5 object-contain ${kugouLoggedIn ? '' : 'opacity-60 grayscale'}`}
             alt=""
           />
-        </button>
+        </HeaderButton>
         {import.meta.env.DEV && (
-          <button
-            className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 leading-none"
-            onClick={() => setShowKgDebug(true)}
-            title="KuGou API 调试面板"
-          >
+          <HeaderButton onClick={() => setShowKgDebug(true)} title="KuGou API 调试面板">
             <GearIcon />
-          </button>
+          </HeaderButton>
         )}
-        <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 leading-none"
-          onClick={() => setShowAbout(true)}
-          title="关于 / 检查更新"
-        >
+        <HeaderButton onClick={() => setShowAbout(true)} title="关于 / 检查更新">
           <InfoCircledIcon />
-        </button>
+        </HeaderButton>
       </header>
 
       {/* Error banner */}
@@ -769,7 +679,7 @@ export default function App() {
             boxShadow: 'var(--shadow-toast)',
             animation: 'toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards',
           }}
-          onClick={() => setToast(null)}
+          onClick={dismissToast}
           title="Click to dismiss"
         >
           {toast.msg}
