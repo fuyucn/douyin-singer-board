@@ -1,3 +1,4 @@
+import { Cross2Icon } from '@radix-ui/react-icons';
 import { useEffect, useState } from 'react';
 import {
   CURRENT_VERSION,
@@ -63,11 +64,11 @@ export function AboutModal({ onClose, onShowToast }: Props) {
         <div className="border-border-soft flex items-center justify-between border-b px-5 py-4">
           <h2 className="text-fg-base m-0 text-base font-semibold">关于 SUSUSongBoard</h2>
           <button
-            className="text-fg-muted hover:text-fg-base cursor-pointer border-none bg-transparent px-1 py-0 text-xl leading-none"
+            className="text-fg-muted hover:text-fg-base inline-flex h-7 w-7 cursor-pointer items-center justify-center border-none bg-transparent leading-none"
             onClick={onClose}
             aria-label="Close"
           >
-            ×
+            <Cross2Icon />
           </button>
         </div>
         {/* Body */}
