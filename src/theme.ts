@@ -14,15 +14,24 @@ function resolveOsTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function updateTitleBar(t: Theme) {
+async function updateTitleBar(t: Theme) {
   const html = document.documentElement;
   const isDark = t === 'dark' || (t === 'system' && resolveOsTheme() === 'dark');
   html.style.background = isDark ? DARK : LIGHT;
   html.style.colorScheme = t === 'system' ? 'light dark' : isDark ? 'dark' : 'light';
 
-  // meta theme-color (helps macOS)
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', isDark ? DARK : LIGHT);
+
+  // Tauri native window theme — controls macOS NSAppearance (titlebar color)
+  // and Windows DwmSetWindowAttribute. Required permission: core:window:allow-set-theme
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window');
+    const native = t === 'system' ? null : t === 'dark' ? 'dark' : 'light';
+    await getCurrentWindow().setTheme(native);
+  } catch {
+    // not running in Tauri (e.g. pure browser dev) — ignore
+  }
 }
 
 export function loadTheme(): Theme {
