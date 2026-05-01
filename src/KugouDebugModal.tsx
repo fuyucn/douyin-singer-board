@@ -407,7 +407,7 @@ export function KugouDebugModal({ onClose }: Props) {
                 pushLog(`[kg-dev] 累计播放优先 = ${e.target.checked ? 'on' : 'off'}`);
               }}
             />
-            <span>累计播放优先（每行 🎵 用 /user/listen 历史挑版本，关闭则取搜索首条）</span>
+            <span>累计播放优先（用 /user/listen 历史挑版本，关闭则取搜索首条）</span>
           </label>
 
           <div className="kg-row inline">

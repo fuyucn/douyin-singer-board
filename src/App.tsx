@@ -12,7 +12,14 @@ import {
 } from './db';
 import type { DanmuInfo, SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
-import { CircleBackslashIcon, InfoCircledIcon, MoonIcon, SunIcon } from '@radix-ui/react-icons';
+import {
+  CircleBackslashIcon,
+  GearIcon,
+  InfoCircledIcon,
+  MoonIcon,
+  PlusCircledIcon,
+  SunIcon,
+} from '@radix-ui/react-icons';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
@@ -322,12 +329,20 @@ export default function App() {
   const renderSongActions = (s: DanmuInfo) => {
     const entry: KuGouEntry = kugouCache[s.song_name.trim()] ?? { status: 'pending' };
     const hasTarget = config.target_playlist_id > 0;
-    let label = '🎵 加入歌单';
+    let label: React.ReactNode = (
+      <>
+        <PlusCircledIcon /> 加入歌单
+      </>
+    );
     let title = '';
     let enabled = entry.status === 'found' && hasTarget;
     switch (entry.status) {
       case 'pending':
-        label = '🎵 ⋯';
+        label = (
+          <>
+            <PlusCircledIcon /> ⋯
+          </>
+        );
         title = '正在 KuGou 查找…';
         break;
       case 'found':
@@ -344,7 +359,7 @@ export default function App() {
       <>
         {kugouLoggedIn && (
           <button
-            className={btnAction}
+            className={`${btnAction} inline-flex items-center gap-1`}
             disabled={!enabled}
             onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
             title={title}
@@ -435,11 +450,11 @@ export default function App() {
         </button>
         {import.meta.env.DEV && (
           <button
-            className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-base leading-none"
+            className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 leading-none"
             onClick={() => setShowKgDebug(true)}
             title="KuGou API 调试面板"
           >
-            🛠
+            <GearIcon />
           </button>
         )}
         <button
@@ -578,7 +593,7 @@ export default function App() {
                     const detail = String(e);
                     showToast(
                       detail.includes('not logged in')
-                        ? '请先点 🛠 扫码登录'
+                        ? '请先点酷狗图标扫码登录'
                         : `解析失败: ${detail}`,
                       'error',
                     );
