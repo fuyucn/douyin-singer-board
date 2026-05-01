@@ -50,12 +50,6 @@ export function nextTheme(t: Theme): Theme {
   return 'system';
 }
 
-export function themeIcon(t: Theme): string {
-  if (t === 'light') return '☀';
-  if (t === 'dark') return '☾';
-  return '◐';
-}
-
 export function themeLabel(t: Theme): string {
   if (t === 'light') return 'Light';
   if (t === 'dark') return 'Dark';

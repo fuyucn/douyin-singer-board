@@ -12,18 +12,11 @@ import {
 } from './db';
 import type { DanmuInfo, SidecarEvent } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
+import { CircleBackslashIcon, InfoCircledIcon, MoonIcon, SunIcon } from '@radix-ui/react-icons';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
-import {
-  applyTheme,
-  loadTheme,
-  nextTheme,
-  saveTheme,
-  themeIcon,
-  themeLabel,
-  type Theme,
-} from './theme';
+import { applyTheme, loadTheme, nextTheme, saveTheme, themeLabel, type Theme } from './theme';
 import {
   refreshTokenIfStale,
   resolvePlaylistByName,
@@ -42,6 +35,12 @@ import { BlacklistPanel } from './components/BlacklistPanel';
 import { ContextMenu } from './components/ContextMenu';
 import { AppLogo } from './components/AppLogo';
 import { ConnectionStatus } from './components/ConnectionStatus';
+
+function ThemeIcon({ theme }: { theme: Theme }) {
+  if (theme === 'light') return <SunIcon />;
+  if (theme === 'dark') return <MoonIcon />;
+  return <CircleBackslashIcon />;
+}
 
 // shared button styles
 const btnBase =
@@ -421,7 +420,7 @@ export default function App() {
           }}
           title={`主题: ${themeLabel(theme)}`}
         >
-          {themeIcon(theme)}
+          <ThemeIcon theme={theme} />
         </button>
         <button
           className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-base leading-none"
@@ -444,11 +443,11 @@ export default function App() {
           </button>
         )}
         <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-base leading-none"
+          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 leading-none"
           onClick={() => setShowAbout(true)}
           title="关于 / 检查更新"
         >
-          ⓘ
+          <InfoCircledIcon />
         </button>
       </header>
 
