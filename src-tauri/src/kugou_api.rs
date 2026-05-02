@@ -36,23 +36,20 @@ impl KugouApiHandle {
         let ext = if cfg!(windows) { ".exe" } else { "" };
         // Use app local data dir instead of temp — macOS may kill processes
         // spawned from temp dirs under memory pressure.
-        // Dedicated subdirectory — safe to wipe entirely on version mismatch
-        let dir = app
+        // Layout: <app_local_data_dir>/kugou-api/<version>/bin[.exe]
+        // On version change the versioned subdir simply won't exist, so we
+        // wipe the whole kugou-api/ parent to remove all old versions at once.
+        let base = app
             .path()
             .app_local_data_dir()
             .map_err(|e| format!("app_local_data_dir: {e}"))?
             .join("kugou-api");
+        let dir = base.join(version);
         let path = dir.join(format!("bin{ext}"));
 
-        // If the directory exists but contains a stale binary, remove the
-        // whole directory so we start clean (avoids stale-name matching).
-        if dir.exists() {
-            let current_ok = path.exists()
-                && std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
-                    == KUGOU_API_BIN.len() as u64;
-            if !current_ok {
-                let _ = std::fs::remove_dir_all(&dir);
-            }
+        // If versioned dir is missing, wipe the parent to clean stale versions.
+        if !dir.exists() {
+            let _ = std::fs::remove_dir_all(&base);
         }
         std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir kugou-api: {e}"))?;
 
