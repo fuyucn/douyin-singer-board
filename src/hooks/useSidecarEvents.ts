@@ -5,7 +5,7 @@ import type { SidecarEvent } from '../types';
 import { useAppStore } from '../store';
 
 interface Options {
-  blacklist: Set<string>;
+  blacklist: Map<string, number>;
 }
 
 /**

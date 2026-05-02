@@ -19,7 +19,7 @@ export function useBlacklist() {
 
   useEffect(() => {
     loadBlacklist()
-      .then((names) => hydrateBlacklist(names))
+      .then((entries) => hydrateBlacklist(entries))
       .catch((e) => pushLog(`[blacklist] load failed: ${e}`));
   }, [hydrateBlacklist, pushLog]);
 
@@ -31,23 +31,23 @@ export function useBlacklist() {
 
   const add = async (songName: string, msgId?: string) => {
     await dbAdd(songName);
-    addToStore(songName);
+    addToStore(songName, Math.floor(Date.now() / 1000));
     if (msgId) {
       removeByMsgId(msgId);
       await deleteHistoryByMsgId(msgId).catch(() => {});
     }
-    const names = await loadBlacklist();
+    const names = await getNames();
     await sync(names);
   };
 
   const remove = async (songName: string) => {
     await dbRemove(songName);
     removeFromStore(songName);
-    const names = await loadBlacklist();
+    const names = await getNames();
     await sync(names);
   };
 
-  const getNames = () => loadBlacklist();
+  const getNames = () => loadBlacklist().then(rows => rows.map(r => r.song_name));
 
   return { blacklist, add, remove, getNames };
 }

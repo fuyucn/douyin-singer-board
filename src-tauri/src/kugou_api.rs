@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::OnceCell;
@@ -34,8 +34,13 @@ impl KugouApiHandle {
         }
         let version = env!("CARGO_PKG_VERSION");
         let ext = if cfg!(windows) { ".exe" } else { "" };
-        let dir = std::env::temp_dir().join("sususongboard");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp: {e}"))?;
+        // Use app local data dir instead of temp — macOS may kill processes
+        // spawned from temp dirs under memory pressure.
+        let dir = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| format!("app_local_data_dir: {e}"))?;
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir data: {e}"))?;
         let path = dir.join(format!("kugou-api-{version}{ext}"));
 
         let needs_extract = !path.exists()
