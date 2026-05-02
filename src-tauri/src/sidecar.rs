@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex;
@@ -41,12 +41,21 @@ impl SidecarHandle {
         }
         let version = env!("CARGO_PKG_VERSION");
         let ext = if cfg!(windows) { ".exe" } else { "" };
-        let dir = std::env::temp_dir().join("sususongboard");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp: {}", e))?;
-        let path = dir.join(format!("sidecar-{}{}", version, ext));
+        // Layout: <app_local_data_dir>/sidecar/<version>/bin[.exe]
+        let base = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| format!("app_local_data_dir: {e}"))?
+            .join("sidecar");
+        let dir = base.join(version);
+        let path = dir.join(format!("bin{ext}"));
 
-        let needs_extract = !path.exists()
-            || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) != SIDECAR_BIN.len() as u64;
+        if !dir.exists() {
+            let _ = std::fs::remove_dir_all(&base);
+        }
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir sidecar: {}", e))?;
+
+        let needs_extract = !path.exists();
         if needs_extract {
             log_to_ui(app, "info", &format!("extracting sidecar to {}", path.display()));
             std::fs::write(&path, SIDECAR_BIN).map_err(|e| format!("write sidecar: {}", e))?;
