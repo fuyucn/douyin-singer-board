@@ -36,23 +36,25 @@ impl KugouApiHandle {
         let ext = if cfg!(windows) { ".exe" } else { "" };
         // Use app local data dir instead of temp — macOS may kill processes
         // spawned from temp dirs under memory pressure.
+        // Dedicated subdirectory — safe to wipe entirely on version mismatch
         let dir = app
             .path()
             .app_local_data_dir()
-            .map_err(|e| format!("app_local_data_dir: {e}"))?;
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir data: {e}"))?;
-        let path = dir.join(format!("kugou-api-{version}{ext}"));
+            .map_err(|e| format!("app_local_data_dir: {e}"))?
+            .join("kugou-api");
+        let path = dir.join(format!("bin{ext}"));
 
-        // Clean up old versions (kugou-api-* that don't match current version)
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if name.starts_with("kugou-api-") && name != format!("kugou-api-{version}{ext}") {
-                    let _ = std::fs::remove_file(entry.path());
-                }
+        // If the directory exists but contains a stale binary, remove the
+        // whole directory so we start clean (avoids stale-name matching).
+        if dir.exists() {
+            let current_ok = path.exists()
+                && std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
+                    == KUGOU_API_BIN.len() as u64;
+            if !current_ok {
+                let _ = std::fs::remove_dir_all(&dir);
             }
         }
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir kugou-api: {e}"))?;
 
         let needs_extract = !path.exists()
             || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
