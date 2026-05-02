@@ -341,7 +341,7 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
-      <header className="border-border-soft bg-bg-elev flex items-center gap-4 border-b px-5 py-3">
+      <header className="border-border-soft bg-bg-elev flex items-center gap-4 border-b px-5 pt-3 pb-3 pl-7">
         <AppLogo />
         <h1 className="m-0 text-lg">SUSUSongBoard</h1>
         <ConnectionStatus />

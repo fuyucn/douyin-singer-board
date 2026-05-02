@@ -23,8 +23,8 @@ async function updateTitleBar(t: Theme) {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', isDark ? DARK : LIGHT);
 
-  // Tauri native window theme — controls macOS NSAppearance (titlebar color)
-  // and Windows DwmSetWindowAttribute. Required permission: core:window:allow-set-theme
+  // Tauri native window theme — used for Windows DwmSetWindowAttribute.
+  // On macOS we use titleBarStyle: "Transparent" so titlebar follows webview bg.
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const native = t === 'system' ? null : t === 'dark' ? 'dark' : 'light';
