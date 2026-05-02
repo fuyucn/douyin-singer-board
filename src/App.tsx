@@ -11,8 +11,8 @@ import {
 import type { DanmuInfo } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
 import {
-  CircleBackslashIcon,
   GearIcon,
+  Half2Icon,
   InfoCircledIcon,
   MoonIcon,
   PlusCircledIcon,
@@ -43,9 +43,9 @@ import { ConnectionStatus } from './components/ConnectionStatus';
 import { HeaderButton } from './components/HeaderButton';
 
 function ThemeIcon({ theme }: { theme: Theme }) {
-  if (theme === 'light') return <SunIcon />;
-  if (theme === 'dark') return <MoonIcon />;
-  return <CircleBackslashIcon />;
+  if (theme === 'light') return <SunIcon className="size-4" />;
+  if (theme === 'dark') return <MoonIcon className="size-4" />;
+  return <Half2Icon className="size-4" />;
 }
 
 // shared button styles
@@ -345,35 +345,38 @@ export default function App() {
         <AppLogo />
         <h1 className="m-0 text-lg">SUSUSongBoard</h1>
         <ConnectionStatus />
-        <HeaderButton
-          className="ml-auto"
-          onClick={() => {
-            const t = nextTheme(theme);
-            saveTheme(t);
-            setTheme(t);
-          }}
-          title={`主题: ${themeLabel(theme)}`}
-        >
-          <ThemeIcon theme={theme} />
-        </HeaderButton>
-        <HeaderButton
-          onClick={() => setShowKgLogin(true)}
-          title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
-        >
-          <img
-            src="/kugou.svg"
-            className={`block h-5 w-5 object-contain ${kugouLoggedIn ? '' : 'opacity-60 grayscale'}`}
-            alt=""
-          />
-        </HeaderButton>
-        {import.meta.env.DEV && (
-          <HeaderButton onClick={() => setShowKgDebug(true)} title="KuGou API 调试面板">
-            <GearIcon />
+        <div className="flex-1"></div>
+        <div className="flex items-center gap-4">
+          <HeaderButton
+            className="ml-auto"
+            onClick={() => {
+              const t = nextTheme(theme);
+              saveTheme(t);
+              setTheme(t);
+            }}
+            title={`主题: ${themeLabel(theme)}`}
+          >
+            <ThemeIcon theme={theme} />
           </HeaderButton>
-        )}
-        <HeaderButton onClick={() => setShowAbout(true)} title="关于 / 检查更新">
-          <InfoCircledIcon />
-        </HeaderButton>
+          <HeaderButton
+            onClick={() => setShowKgLogin(true)}
+            title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
+          >
+            <img
+              src="/kugou.svg"
+              className={`block h-5 w-5 rounded-full object-contain ${kugouLoggedIn ? '' : 'opacity-60 grayscale'}`}
+              alt=""
+            />
+          </HeaderButton>
+          {import.meta.env.DEV && (
+            <HeaderButton onClick={() => setShowKgDebug(true)} title="KuGou API 调试面板">
+              <GearIcon className="size-4" />
+            </HeaderButton>
+          )}
+          <HeaderButton onClick={() => setShowAbout(true)} title="关于 / 检查更新">
+            <InfoCircledIcon className="size-4" />
+          </HeaderButton>
+        </div>
       </header>
 
       {/* Error banner */}
