@@ -10,6 +10,7 @@ interface Options {
 
 /**
  * Listens to sidecar events and dispatches to the store.
+ * Also advances the startup checklist as each stage completes.
  */
 export function useSidecarEvents({ blacklist }: Options) {
   const addSong = useAppStore((s) => s.addSong);
@@ -17,10 +18,13 @@ export function useSidecarEvents({ blacklist }: Options) {
   const setStatus = useAppStore((s) => s.setStatus);
   const pushLog = useAppStore((s) => s.pushLog);
   const sessionId = useAppStore((s) => s.sessionId);
+  const setStartupStep = useAppStore((s) => s.setStartupStep);
+  const running = useAppStore((s) => s.running);
 
   useEffect(() => {
     const unlisten = listen<SidecarEvent>('sidecar-event', (e) => {
       const ev = e.payload;
+
       switch (ev.event) {
         case 'danmu':
           if (blacklist.has(ev.data.song_name)) break;
@@ -32,6 +36,7 @@ export function useSidecarEvents({ blacklist }: Options) {
           break;
         case 'status':
           setStatus({ connected: ev.connected, message: ev.message });
+          if (running && ev.connected) setStartupStep('douyin', 'done');
           break;
         case 'log':
           pushLog(`[${ev.level}] ${ev.msg}`);
@@ -44,5 +49,5 @@ export function useSidecarEvents({ blacklist }: Options) {
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, blacklist]);
+  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, blacklist, setStartupStep, running]);
 }

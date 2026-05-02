@@ -10,24 +10,12 @@ import {
 } from './db';
 import type { DanmuInfo } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
-import {
-  GearIcon,
-  Half2Icon,
-  InfoCircledIcon,
-  MoonIcon,
-  PlusCircledIcon,
-  SunIcon,
-} from '@radix-ui/react-icons';
+import { GearIcon, InfoCircledIcon, PlusCircledIcon } from '@radix-ui/react-icons';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
-import { applyTheme, loadTheme, nextTheme, saveTheme, themeLabel, type Theme } from './theme';
-import {
-  resolvePlaylistByName,
-  addTrackToPlaylist,
-  type KuGouTrack,
-  type KuGouEntry,
-} from './kugouSession';
+import { applyTheme, loadTheme, type Theme } from './theme';
+import { addTrackToPlaylist, type KuGouTrack, type KuGouEntry } from './kugouSession';
 import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
@@ -41,16 +29,15 @@ import { ContextMenu } from './components/ContextMenu';
 import { AppLogo } from './components/AppLogo';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { HeaderButton } from './components/HeaderButton';
+import { ConfigSection } from './components/ConfigSection';
+import { KugouPlaylistSection } from './components/KugouPlaylistSection';
+import { ToolbarSection } from './components/ToolbarSection';
+import { TabBar } from './components/TabBar';
+import { Toast } from './components/Toast';
+import { LogPanel } from './components/LogPanel';
+import { StatusLine } from './components/StatusLine';
+import { ThemeSwitcher } from './components/ThemeSwitcher';
 
-function ThemeIcon({ theme }: { theme: Theme }) {
-  if (theme === 'light') return <SunIcon className="size-4" />;
-  if (theme === 'dark') return <MoonIcon className="size-4" />;
-  return <Half2Icon className="size-4" />;
-}
-
-// shared button styles
-const btnBase =
-  'py-1.5 px-3.5 border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer hover:bg-bg-soft disabled:opacity-40 disabled:cursor-not-allowed';
 const btnAction =
   'px-2.5 py-1 text-xs border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer hover:bg-bg-soft';
 
@@ -76,6 +63,9 @@ export default function App() {
   const addPlayed = useAppStore((s) => s.addPlayed);
   const removePlayed = useAppStore((s) => s.removePlayed);
   const clearPlayed = useAppStore((s) => s.clearPlayed);
+  const startupSteps = useAppStore((s) => s.startupSteps);
+  const setStartupStep = useAppStore((s) => s.setStartupStep);
+  const resetStartupSteps = useAppStore((s) => s.resetStartupSteps);
 
   const {
     blacklist,
@@ -96,6 +86,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
 
   const kugouLoggedIn = useKugouAuth({ watchTokens: [showKgDebug, showKgLogin] });
+
+  useEffect(() => {
+    if (kugouLoggedIn) setStartupStep('kugou', 'done');
+  }, [kugouLoggedIn, setStartupStep]);
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
 
@@ -137,6 +131,8 @@ export default function App() {
       return;
     }
     setBootError(null);
+    resetStartupSteps();
+    setRunning(true);
     try {
       await saveConfig(config);
       const sid = newSession();
@@ -147,9 +143,9 @@ export default function App() {
       await invoke('sidecar_send', {
         cmd: { cmd: 'start', config: { ...config, blacklist: blNames } },
       });
-      setRunning(true);
       pushLog(`[app] sidecar started, session=${sid}`);
     } catch (e) {
+      setRunning(false);
       pushLog(`[app] start failed: ${e}`);
       setBootError(`启动失败: ${e}`);
     }
@@ -250,7 +246,7 @@ export default function App() {
     const hasTarget = config.target_playlist_id > 0;
     let label: React.ReactNode = (
       <>
-        <PlusCircledIcon /> 加入歌单
+        <PlusCircledIcon className="size-4" /> 加入歌单
       </>
     );
     let title = '';
@@ -259,7 +255,7 @@ export default function App() {
       case 'pending':
         label = (
           <>
-            <PlusCircledIcon /> ⋯
+            <PlusCircledIcon className="size-4" /> ⋯
           </>
         );
         title = '正在 KuGou 查找…';
@@ -302,39 +298,43 @@ export default function App() {
     </button>
   );
 
+  const ctxSong = ctxMenu?.song;
+  const kgEntry = ctxSong ? kugouCache[ctxSong.song_name.trim()] : undefined;
+  const kgFound = kgEntry?.status === 'found' && kgEntry.track;
+
   const ctxActions = ctxMenu
     ? [
-        { label: '复制歌名', onClick: () => onCopy(ctxMenu.song.song_name) },
+        { label: '复制弹幕', onClick: () => onCopy(ctxSong!.raw_msg) },
+        {
+          label: kgFound ? '复制歌名' : '复制歌名 (未找到)',
+          onClick: () => kgFound && onCopy(kgFound.filename),
+          disabled: !kgFound,
+        },
         {
           label: '删除',
           onClick: () => {
             if (activeTab === 'played') {
-              removePlayed(ctxMenu.song.msg_id);
+              removePlayed(ctxSong!.msg_id);
             } else {
-              onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name);
+              onRemoveOne(ctxSong!.msg_id, ctxSong!.song_name);
             }
           },
         },
         {
           label: '加入黑名单',
           onClick: () => {
-            addBlacklist(ctxMenu.song.song_name, ctxMenu.song.msg_id);
-            showToast(`已加入黑名单: ${ctxMenu.song.song_name}`);
+            addBlacklist(ctxSong!.song_name, ctxSong!.msg_id);
+            showToast(`已加入黑名单: ${ctxSong!.song_name}`);
           },
         },
       ]
     : [];
 
-  // shared label + input block
-  const configLabel = (label: string, input: React.ReactNode) => (
-    <label className="flex min-w-[140px] flex-1 basis-[180px] flex-col gap-1">
-      <span className="text-fg-muted text-xs">{label}</span>
-      {input}
-    </label>
-  );
-
-  const configInput =
-    'py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base disabled:bg-bg-disabled disabled:text-fg-faint';
+  const tabDefs = [
+    { key: 'songs' as const, label: `点歌列表 (${display.length})` },
+    { key: 'played' as const, label: `已点歌单 (${played.length})` },
+    { key: 'blacklist' as const, label: `黑名单 (${blacklist.size})` },
+  ];
 
   // ─── Render ────────────────────────────────────────────────────
 
@@ -347,17 +347,7 @@ export default function App() {
         <ConnectionStatus />
         <div className="flex-1"></div>
         <div className="flex items-center gap-4">
-          <HeaderButton
-            className="ml-auto"
-            onClick={() => {
-              const t = nextTheme(theme);
-              saveTheme(t);
-              setTheme(t);
-            }}
-            title={`主题: ${themeLabel(theme)}`}
-          >
-            <ThemeIcon theme={theme} />
-          </HeaderButton>
+          <ThemeSwitcher theme={theme} onThemeChange={setTheme} />
           <HeaderButton
             onClick={() => setShowKgLogin(true)}
             title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
@@ -407,185 +397,38 @@ export default function App() {
       )}
 
       {/* Config */}
-      <section className="border-border-soft bg-bg-elev flex flex-wrap items-end gap-3 border-b px-5 py-3">
-        {configLabel(
-          '抖音直播间 ID',
-          <input
-            className={configInput}
-            type="text"
-            value={config.room_id}
-            disabled={running}
-            onChange={(e) => setConfig({ room_id: e.target.value })}
-            placeholder="例如 221321076494"
-          />,
-        )}
-        {configLabel(
-          '点歌指令模板',
-          <input
-            className={configInput}
-            type="text"
-            value={config.sing_prefix}
-            disabled={running}
-            onChange={(e) => setConfig({ sing_prefix: e.target.value })}
-            placeholder="点歌[space][song]"
-            title="Placeholders: [space]=whitespace, [song]=song name"
-          />,
-        )}
-        {configLabel(
-          '最低粉丝团等级',
-          <input
-            className={configInput}
-            type="number"
-            min={0}
-            value={config.fans_level}
-            disabled={running}
-            onChange={(e) => setConfig({ fans_level: Number(e.target.value) || 0 })}
-          />,
-        )}
-        {configLabel(
-          '点歌冷却 (秒)',
-          <input
-            className={configInput}
-            type="number"
-            min={0}
-            value={config.sing_cd}
-            disabled={running}
-            onChange={(e) => setConfig({ sing_cd: Math.max(0, Number(e.target.value) || 0) })}
-          />,
-        )}
-        {!running ? (
-          <button
-            className="bg-success hover:bg-success-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white"
-            onClick={onStart}
-          >
-            开始
-          </button>
-        ) : (
-          <button
-            className="bg-danger hover:bg-danger-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white"
-            onClick={onStop}
-          >
-            停止
-          </button>
-        )}
-        {kugouLoggedIn && (
-          <label className="flex min-w-[260px] flex-1 basis-[320px] flex-col gap-1">
-            <span className="text-fg-muted text-xs">Kugou歌单</span>
-            <div className="flex items-center gap-2">
-              <input
-                className={`${configInput} min-w-0 flex-1`}
-                type="text"
-                value={config.target_playlist_name}
-                onChange={(e) => setConfig({ target_playlist_name: e.target.value })}
-                placeholder="自动加入歌单的名字"
-              />
-              <span className="text-fg-muted font-mono text-xs whitespace-nowrap">
-                {config.target_playlist_id ? `id: ${config.target_playlist_id}` : 'id: —'}
-              </span>
-              <button
-                type="button"
-                className="bg-accent hover:bg-accent-hover shrink-0 cursor-pointer rounded border-none px-3.5 py-1.5 text-[13px] text-white"
-                onClick={async () => {
-                  const name = config.target_playlist_name.trim();
-                  if (!name) {
-                    showToast('请先填歌单名', 'error');
-                    return;
-                  }
-                  try {
-                    const { listid, created } = await resolvePlaylistByName(name);
-                    setConfig({ target_playlist_id: listid });
-                    await saveConfig({
-                      ...config,
-                      target_playlist_name: name,
-                      target_playlist_id: listid,
-                    });
-                    showToast(
-                      created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`,
-                    );
-                  } catch (e) {
-                    const detail = String(e);
-                    showToast(
-                      detail.includes('not logged in')
-                        ? '请先点酷狗图标扫码登录'
-                        : `解析失败: ${detail}`,
-                      'error',
-                    );
-                  }
-                }}
-              >
-                保存
-              </button>
-              {config.target_playlist_id > 0 && (
-                <button
-                  type="button"
-                  className={['auto-sync-btn', autoSync && 'active'].filter(Boolean).join(' ')}
-                  onClick={() => setAutoSync(!autoSync)}
-                  title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
-                >
-                  {autoSync ? '自动歌单同步中' : '自动歌单同步'}
-                </button>
-              )}
-            </div>
-          </label>
-        )}
-      </section>
+      <ConfigSection
+        config={config}
+        running={running}
+        onConfigChange={setConfig}
+        onStart={onStart}
+        onStop={onStop}
+      />
+
+      {/* Kugou playlist + auto-sync */}
+      {kugouLoggedIn && (
+        <KugouPlaylistSection
+          config={config}
+          onConfigChange={setConfig}
+          autoSync={autoSync}
+          onAutoSyncToggle={() => setAutoSync(!autoSync)}
+          showToast={showToast}
+        />
+      )}
 
       {/* Toolbar */}
-      <section className="border-border-soft bg-bg-elev flex gap-2 border-b px-5 py-3">
-        <input
-          className="border-border-strong bg-bg-base text-fg-base flex-1 rounded border px-2.5 py-1.5"
-          type="text"
-          placeholder="手动点歌"
-          value={manualText}
-          onChange={(e) => setManualText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onManualAdd()}
-        />
-        <button className={btnBase} onClick={onManualAdd}>
-          添加
-        </button>
-        {activeTab === 'songs' ? (
-          <>
-            <button className={btnBase} onClick={onCopyAll} disabled={display.length === 0}>
-              复制列表 ({display.length})
-            </button>
-            <button className={btnBase} onClick={onClearList} disabled={display.length === 0}>
-              清空
-            </button>
-          </>
-        ) : (
-          <span className="text-fg-muted self-center text-xs">
-            {activeTab === 'played'
-              ? '已点歌曲列表，当前 session 有效'
-              : '黑名单中的歌曲不会被匹配到'}
-          </span>
-        )}
-      </section>
+      <ToolbarSection
+        manualText={manualText}
+        onManualTextChange={setManualText}
+        onManualAdd={onManualAdd}
+        activeTab={activeTab}
+        displayCount={display.length}
+        onCopyAll={onCopyAll}
+        onClearList={onClearList}
+      />
 
       {/* Tabs */}
-      <nav className="border-border-medium bg-bg-elev flex shrink-0 border-b px-5">
-        {(['songs', 'played', 'blacklist'] as const).map((tab) => {
-          const labels = {
-            songs: `点歌列表 (${display.length})`,
-            played: `已点歌单 (${played.length})`,
-            blacklist: `黑名单 (${blacklist.size})`,
-          };
-          return (
-            <button
-              key={tab}
-              className={[
-                'cursor-pointer border-none bg-transparent px-5 py-2.5 text-sm font-medium transition-colors',
-                '-mb-px border-b-2',
-                activeTab === tab
-                  ? 'text-accent border-accent'
-                  : 'text-fg-muted hover:text-fg-base border-transparent',
-              ].join(' ')}
-              onClick={() => setActiveTab(tab)}
-            >
-              {labels[tab]}
-            </button>
-          );
-        })}
-      </nav>
+      <TabBar tabs={tabDefs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Tab content */}
       {activeTab === 'songs' ? (
@@ -664,30 +507,13 @@ export default function App() {
       )}
 
       {/* Logs */}
-      <details className="border-border-soft text-fg-muted bg-bg-base max-h-[220px] overflow-y-auto border-t text-xs">
-        <summary className="logs-summary border-border-soft bg-bg-softer text-fg-base sticky top-0 z-10 cursor-pointer list-none border-b px-5 py-1.5 select-none">
-          日志 ({logs.length})
-        </summary>
-        <pre className="m-0 px-5 py-1.5 break-all whitespace-pre-wrap">{logs.join('\n')}</pre>
-      </details>
+      <LogPanel logs={logs} />
+
+      {/* Status line — startup checklist, auto-hides when done */}
+      <StatusLine steps={startupSteps} />
 
       {/* Toast */}
-      {toast && (
-        <div
-          className={[
-            'fixed bottom-6 left-1/2 z-[1000] -translate-x-1/2 cursor-pointer rounded-md px-5 py-2.5 text-[13px] whitespace-nowrap text-white hover:opacity-85',
-            toast.kind === 'success' ? 'bg-success' : 'bg-danger',
-          ].join(' ')}
-          style={{
-            boxShadow: 'var(--shadow-toast)',
-            animation: 'toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards',
-          }}
-          onClick={dismissToast}
-          title="Click to dismiss"
-        >
-          {toast.msg}
-        </div>
-      )}
+      {toast && <Toast toast={toast} onDismiss={dismissToast} />}
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} onShowToast={showToast} />}
       {showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}

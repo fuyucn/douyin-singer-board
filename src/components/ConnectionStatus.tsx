@@ -2,16 +2,31 @@ import { useAppStore } from '../store';
 
 export function ConnectionStatus() {
   const connected = useAppStore((s) => s.status.connected);
-  const message = useAppStore((s) => s.status.message);
+  const running = useAppStore((s) => s.running);
+  const connecting = running && !connected;
+
+  let dotClass: string;
+  let textClass: string;
+  let label: string;
+
+  if (connecting) {
+    dotClass = 'bg-amber-400 border-amber-400 border animate-pulse';
+    textClass = 'text-amber-500';
+    label = '连接中';
+  } else if (connected) {
+    dotClass = 'bg-success border-success border';
+    textClass = 'text-success';
+    label = '已连接';
+  } else {
+    dotClass = 'border-border-strong border bg-transparent';
+    textClass = 'text-fg-faint';
+    label = '未连接';
+  }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs ${connected ? 'text-success' : 'text-fg-faint'}`}
-    >
-      <div
-        className={`${connected ? 'bg-success border-success border' : 'border-border-strong border bg-transparent'} size-3 rounded-full`}
-      ></div>
-      {message}
+    <span className={`inline-flex items-center gap-1 text-xs ${textClass}`}>
+      <div className={`${dotClass} size-3 rounded-full`} />
+      {label}
     </span>
   );
 }
