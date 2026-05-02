@@ -11,9 +11,18 @@ const levelDot: Record<string, string> = {
 };
 
 function parseLevel(log: string): string {
-  if (log.includes('[error]') || log.includes('失败') || log.includes('Error')) return 'error';
-  if (log.includes('成功') || log.includes('已连接') || log.includes('done')) return 'success';
-  if (log.includes('未连接') || log.includes('Warning') || log.includes('warn')) return 'warning';
+  // Demote known stderr noise to warning even if tagged [error]
+  const isStderrNoise =
+    log.includes('[stderr]') ||
+    log.includes('DeprecationWarning') ||
+    log.includes('decode tap setup failed') ||
+    log.includes('dynamic import callback');
+
+  if (isStderrNoise) return 'warning';
+
+  if (log.includes('[error]') || log.includes('失败') || log.includes('process exited')) return 'error';
+  if (log.includes('[warn]') || log.includes('Warning') || log.includes('warn') || log.includes('未连接')) return 'warning';
+  if (log.includes('成功') || log.includes('已连接') || log.includes('connected') || log.includes('done')) return 'success';
   return 'info';
 }
 

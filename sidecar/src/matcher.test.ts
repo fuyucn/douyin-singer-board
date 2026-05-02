@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Matcher } from './matcher.js';
 import type { Config } from './types.js';
 
@@ -49,6 +49,11 @@ describe('Matcher.templateToRegex', () => {
     const re = Matcher.templateToRegex('点歌[SPACE][SONG]');
     expect(re.source).toBe('^点歌\\s+(.+?)$');
   });
+
+  it('accepts [歌名] as [song] placeholder', () => {
+    const re = Matcher.templateToRegex('点歌[space][歌名]');
+    expect(re.source).toBe('^点歌\\s+(.+?)$');
+  });
 });
 
 describe('Matcher.match - prefix matching', () => {
@@ -97,6 +102,14 @@ describe('Matcher.match - prefix matching', () => {
     if (r.kind !== 'song') throw new Error('expected song');
     expect(r.danmu.song_name).toBe('周杰伦');
   });
+
+  it('template with no [song] placeholder falls back gracefully', () => {
+    const m = new Matcher(baseConfig({ sing_prefix: '点歌' }));
+    // No capture group → falls back to content.slice → empty → skip
+    const r = m.match(raw('点歌'));
+    expect(r.kind).toBe('skip');
+    expect(r.reason).toBe('empty song name');
+  });
 });
 
 describe('Matcher.match - cancel', () => {
@@ -139,6 +152,20 @@ describe('Matcher.match - filters', () => {
     const m = new Matcher(baseConfig({ sing_cd: 60 }));
     expect(m.match(raw('点歌 a', { uid: 'u1' })).kind).toBe('song');
     expect(m.match(raw('点歌 b', { uid: 'u2' })).kind).toBe('song');
+  });
+
+  it('accepts request after cooldown expires', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+
+    const m = new Matcher(baseConfig({ sing_cd: 60 }));
+    expect(m.match(raw('点歌 a')).kind).toBe('song');
+    expect(m.match(raw('点歌 b')).kind).toBe('skip');
+
+    vi.advanceTimersByTime(61_000);
+    expect(m.match(raw('点歌 c')).kind).toBe('song');
+
+    vi.useRealTimers();
   });
 });
 
