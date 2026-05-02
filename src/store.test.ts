@@ -88,7 +88,7 @@ describe('useAppStore', () => {
     useAppStore.setState({
       songs: [],
       played: [],
-      blacklist: new Set<string>(),
+      blacklist: new Map<string, number>(),
       autoSync: false,
     });
   });
@@ -172,13 +172,13 @@ describe('useAppStore', () => {
     });
 
     it('hydrateBlacklist replaces the set', () => {
-      useAppStore.getState().hydrateBlacklist(['a', 'b', 'c']);
+      useAppStore.getState().hydrateBlacklist([{song_name: 'a', created_at: 123}, {song_name: 'b', created_at: 123}, {song_name: 'c', created_at: 123}]);
       expect(useAppStore.getState().blacklist.size).toBe(3);
       expect(useAppStore.getState().blacklist.has('a')).toBe(true);
     });
 
     it('blacklist set is independent per add (no mutation of previous)', () => {
-      useAppStore.getState().hydrateBlacklist(['x']);
+      useAppStore.getState().hydrateBlacklist([{song_name: 'x', created_at: 123}]);
       const first = useAppStore.getState().blacklist;
       useAppStore.getState().addToBlacklist('y');
       expect(first.has('y')).toBe(false);

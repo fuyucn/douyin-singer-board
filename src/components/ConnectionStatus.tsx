@@ -24,8 +24,8 @@ export function ConnectionStatus() {
   }
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs ${textClass}`}>
-      <div className={`${dotClass} size-3 rounded-full`} />
+    <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs ${textClass}`}>
+      <div className={`${dotClass} size-2 rounded-full`} />
       {label}
     </span>
   );

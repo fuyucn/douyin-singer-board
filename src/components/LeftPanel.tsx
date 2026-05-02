@@ -1,19 +1,18 @@
 import type { Config } from '../types';
-import type { ToastKind } from '../hooks/useToast';
 import { resolvePlaylistByName } from '../kugouSession';
+import { toast } from 'sonner';
 import { saveConfig } from '../db';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import {
-  Tv2,
-  Shield,
-  Music2,
-  Plus,
-  RefreshCw,
-  HelpCircle,
-} from 'lucide-react';
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Props {
   config: Config;
@@ -21,11 +20,11 @@ interface Props {
   autoSync: boolean;
   kugouLoggedIn: boolean;
   manualText: string;
+  compact?: boolean;
   onConfigChange: (patch: Partial<Config>) => void;
   onManualTextChange: (text: string) => void;
   onManualAdd: () => void;
   onAutoSyncToggle: () => void;
-  showToast: (msg: string, kind?: ToastKind) => void;
   appVersion: string;
 }
 
@@ -35,35 +34,41 @@ export function LeftPanel({
   autoSync,
   kugouLoggedIn,
   manualText,
+  compact,
   onConfigChange,
   onManualTextChange,
   onManualAdd,
   onAutoSyncToggle,
-  showToast,
   appVersion,
 }: Props) {
   const handleSavePlaylist = async () => {
     const name = config.target_playlist_name.trim();
     if (!name) {
-      showToast('请先填歌单名', 'error');
+      toast.error('请先填歌单名');
       return;
     }
     try {
       const { listid, created } = await resolvePlaylistByName(name);
       onConfigChange({ target_playlist_id: listid });
       await saveConfig({ ...config, target_playlist_name: name, target_playlist_id: listid });
-      showToast(created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`);
+      toast(created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`);
     } catch (e) {
       const detail = String(e);
-      showToast(
+      toast.error(
         detail.includes('not logged in') ? '请先点酷狗图标扫码登录' : `解析失败: ${detail}`,
-        'error',
       );
     }
   };
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-[var(--border-soft)] bg-[var(--bg-elev)]">
+    <aside
+      className={cn(
+        'flex flex-col bg-[var(--bg-elev)]',
+        compact
+          ? 'w-full'
+          : 'w-72 shrink-0 overflow-y-auto border-r border-[var(--border-soft)]',
+      )}
+    >
       {/* 直播间配置 */}
       <div className="p-4">
         <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
@@ -84,14 +89,45 @@ export function LeftPanel({
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1 text-xs text-[var(--fg-muted)]">
               点歌指令模板
-              <HelpCircle className="size-3 text-[var(--fg-faint)]" />
+              <Tooltip>
+                <TooltipTrigger>
+                  <HelpCircle className="size-3 cursor-help text-[var(--fg-faint)] hover:text-[var(--fg-muted)]" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[260px] space-y-2 p-3 text-xs leading-relaxed">
+                  <p className="font-semibold">占位符说明</p>
+                  <div className="space-y-1 text-muted-foreground">
+                    <p>
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[song]</code>
+                      {' '}或{' '}
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[歌曲]</code>
+                      {' '}— 歌曲名
+                    </p>
+                    <p>
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[space]</code>
+                      {' '}或{' '}
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[空格]</code>
+                      {' '}— 空格
+                    </p>
+                  </div>
+                  <div className="space-y-1 border-t border-border pt-2">
+                    <p className="font-medium text-foreground">示例：</p>
+                    <div className="space-y-0.5">
+                      <p><code className="rounded bg-black/10 px-1 dark:bg-white/10">点歌[space][song]</code></p>
+                      <p className="text-muted-foreground">→ 「点歌 七里香」</p>
+                    </div>
+                    <div className="space-y-0.5 mt-1">
+                      <p><code className="rounded bg-black/10 px-1 dark:bg-white/10">点歌[song]</code></p>
+                      <p className="text-muted-foreground">→ 「点歌七里香」</p>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             </Label>
             <Input
               value={config.sing_prefix}
               disabled={running}
               onChange={(e) => onConfigChange({ sing_prefix: e.target.value })}
               placeholder="[song]"
-              title="Placeholders: [space]=whitespace, [song]=song name"
               className="h-8 bg-[var(--bg-base)] text-sm"
             />
           </div>
@@ -170,12 +206,11 @@ export function LeftPanel({
                   <Button
                     size="sm"
                     variant="outline"
-                    className={[
-                      'h-8 flex-1 text-xs',
-                      autoSync
-                        ? 'auto-sync-btn active border-transparent!'
-                        : 'auto-sync-btn border-[var(--border-strong)]',
-                    ].join(' ')}
+                    className={cn(
+                      'h-8 flex-1 text-xs auto-sync-btn border-[var(--border-strong)]',
+                      autoSync && 'active border-transparent!'
+
+                    )}
                     onClick={onAutoSyncToggle}
                     title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
                   >
@@ -221,7 +256,7 @@ export function LeftPanel({
       <div className="mt-auto p-4 text-[11px] text-[var(--fg-faint)]">
         <div>SUSUSongBoard v{appVersion}</div>
         <div>
-          Made with <span className="text-red-400">♥</span> by SUSU
+          Made with <span className="text-red-400">♥</span> by HYPN
         </div>
       </div>
     </aside>

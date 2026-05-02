@@ -10,7 +10,14 @@ import {
 } from './db';
 import type { DanmuInfo } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
-import { PlusCircledIcon } from '@radix-ui/react-icons';
+import { Button } from '@/components/ui/button';
+
+import { Copy, Trash2, ListPlus, Loader2 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
@@ -22,19 +29,18 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { useKugouAuth } from './hooks/useKugouAuth';
 import { useKugouSearch } from './hooks/useKugouSearch';
 import { useSidecarEvents } from './hooks/useSidecarEvents';
-import { useToast } from './hooks/useToast';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { ContextMenu } from './components/ContextMenu';
-import { Toast } from './components/Toast';
 import { StatusLine } from './components/StatusLine';
 import { AppHeader } from './components/AppHeader';
 import { LeftPanel } from './components/LeftPanel';
 import { MainContent } from './components/MainContent';
+import { CollapsiblePanel } from './components/CollapsiblePanel';
+import { useWindowWidth } from './hooks/useWindowWidth';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 declare const __APP_VERSION__: string;
-
-const btnAction =
-  'px-2.5 py-1 text-xs border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer hover:bg-bg-soft';
 
 export default function App() {
   const config = useAppStore((s) => s.config);
@@ -51,6 +57,7 @@ export default function App() {
   const manualAdd = useAppStore((s) => s.manualAdd);
   const logs = useAppStore((s) => s.logs);
   const pushLog = useAppStore((s) => s.pushLog);
+  const clearLogs = useAppStore((s) => s.clearLogs);
   const preferCumulative = useAppStore((s) => s.preferCumulative);
   const autoSync = useAppStore((s) => s.autoSync);
   const setAutoSync = useAppStore((s) => s.setAutoSync);
@@ -69,7 +76,6 @@ export default function App() {
     getNames: getBlacklistNames,
   } = useBlacklist();
   const { ctxMenu, open: openCtxMenu, close: closeCtxMenu } = useContextMenu();
-  const { toast, showToast, dismissToast } = useToast();
 
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
@@ -79,6 +85,9 @@ export default function App() {
   const [showKgLogin, setShowKgLogin] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
+
+  const windowWidth = useWindowWidth();
+  const isNarrow = windowWidth < 720;
 
   const kugouLoggedIn = useKugouAuth({ watchTokens: [showKgDebug, showKgLogin] });
 
@@ -161,9 +170,9 @@ export default function App() {
   const onCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      showToast(`已复制: ${text}`);
+      toast(`已复制: ${text}`);
     } catch (e) {
-      showToast(`复制失败: ${e}`, 'error');
+      toast.error(`复制失败: ${e}`);
     }
   };
 
@@ -173,25 +182,25 @@ export default function App() {
     const item = manualAdd(t);
     if (sessionId) insertHistory(item, sessionId).catch(() => {});
     setManualText('');
-    showToast(`已添加: ${t}`);
+    toast(`已添加: ${t}`);
   };
 
   const onRemoveOne = async (msgId: string, name: string) => {
     removeByMsgId(msgId);
     await deleteHistoryByMsgId(msgId).catch(() => {});
-    showToast(`已删除: ${name}`);
+    toast(`已删除: ${name}`);
   };
 
   const onClearList = async () => {
     const n = display.length;
     clearSongs();
     if (sessionId) await clearSessionHistory(sessionId).catch(() => {});
-    showToast(`已清空 ${n} 条`);
+    toast(`已清空 ${n} 条`);
   };
 
   const onAddToPlaylist = async (track: KuGouTrack, song: DanmuInfo) => {
     if (!config.target_playlist_id) {
-      showToast('请先在"Kugou歌单"里保存一个歌单', 'error');
+      toast.error('请先在"Kugou歌单"里保存一个歌单');
       return;
     }
     try {
@@ -199,9 +208,9 @@ export default function App() {
       removeByMsgId(song.msg_id);
       addPlayed(song);
       await deleteHistoryByMsgId(song.msg_id).catch(() => {});
-      showToast(`已加入歌单: ${track.filename}`);
+      toast(`已加入歌单: ${track.filename}`);
     } catch (e) {
-      showToast(`加入歌单失败: ${e}`, 'error');
+      toast.error(`加入歌单失败: ${e}`);
     }
   };
 
@@ -209,7 +218,7 @@ export default function App() {
     removeByMsgId(song.msg_id);
     addPlayed(song);
     deleteHistoryByMsgId(song.msg_id).catch(() => {});
-    showToast(`[自动] 已加入歌单: ${track.filename}`);
+    toast(`[自动] 已加入歌单: ${track.filename}`);
   };
 
   useAutoSync({
@@ -227,20 +236,10 @@ export default function App() {
   const renderSongActions = (s: DanmuInfo) => {
     const entry: KuGouEntry = kugouCache[s.song_name.trim()] ?? { status: 'pending' };
     const hasTarget = config.target_playlist_id > 0;
-    let label: React.ReactNode = (
-      <>
-        <PlusCircledIcon className="size-4" /> 加入歌单
-      </>
-    );
     let title = '';
     let enabled = entry.status === 'found' && hasTarget;
     switch (entry.status) {
       case 'pending':
-        label = (
-          <>
-            <PlusCircledIcon className="size-4" /> ⋯
-          </>
-        );
         title = '正在 KuGou 查找…';
         break;
       case 'found':
@@ -254,31 +253,70 @@ export default function App() {
         break;
     }
     return (
-      <>
+      <div className="flex items-center gap-1">
         {kugouLoggedIn && (
-          <button
-            className={`${btnAction} inline-flex items-center gap-1`}
-            disabled={!enabled}
-            onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
-            title={title}
-          >
-            {label}
-          </button>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 text-[var(--fg-muted)] hover:text-blue-500"
+                disabled={!enabled}
+                onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
+              >
+                {entry.status === 'pending'
+                  ? <Loader2 className="size-3.5 animate-spin" />
+                  : <ListPlus className="size-3.5" />
+                }
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">{title || '加入歌单'}</TooltipContent>
+          </Tooltip>
         )}
-        <button className={btnAction} onClick={() => onCopy(s.song_name)}>
-          复制
-        </button>
-        <button className={btnAction} onClick={() => onRemoveOne(s.msg_id, s.song_name)}>
-          删除
-        </button>
-      </>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
+              onClick={() => onCopy(s.song_name)}
+            >
+              <Copy className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">复制歌名</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 text-[var(--fg-muted)] hover:text-red-500"
+              onClick={() => onRemoveOne(s.msg_id, s.song_name)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">删除</TooltipContent>
+        </Tooltip>
+      </div>
     );
   };
 
   const renderPlayedActions = (s: DanmuInfo) => (
-    <button className={btnAction} onClick={() => onCopy(s.song_name)}>
-      复制
-    </button>
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
+          onClick={() => onCopy(s.song_name)}
+        >
+          <Copy className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">复制歌名</TooltipContent>
+    </Tooltip>
   );
 
   const ctxSong = ctxMenu?.song;
@@ -307,7 +345,7 @@ export default function App() {
           label: '加入黑名单',
           onClick: () => {
             addBlacklist(ctxSong!.song_name, ctxSong!.msg_id);
-            showToast(`已加入黑名单: ${ctxSong!.song_name}`);
+            toast(`已加入黑名单: ${ctxSong!.song_name}`);
           },
         },
       ]
@@ -345,63 +383,106 @@ export default function App() {
         {update && (
           <div className="border-accent-soft-border bg-accent-soft-bg text-accent-soft-fg flex items-center gap-3 border-b px-5 py-2 text-sm">
             <span>新版本 {update.tag} 可用</span>
-            <button
-              className="border-accent bg-accent hover:bg-accent-hover cursor-pointer rounded border px-3 py-1 text-[13px] text-white"
+            <Button
+              size="sm"
+              className="h-7 px-3 text-[13px]"
               onClick={() => openInBrowser(update.htmlUrl)}
             >
               前往下载
-            </button>
-            <button
-              className="text-accent-soft-fg ml-auto cursor-pointer border-none bg-transparent px-2 py-0 text-lg hover:bg-black/[.08]"
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto text-lg"
               onClick={() => {
                 skipVersion(update.tag);
                 setUpdate(null);
               }}
             >
               跳过
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* Main two-column layout */}
-        <div className="flex min-h-0 flex-1">
-          {/* Left panel */}
-          <LeftPanel
-            config={config}
-            running={running}
-            autoSync={autoSync}
-            kugouLoggedIn={kugouLoggedIn}
-            manualText={manualText}
-            onConfigChange={setConfig}
-            onManualTextChange={setManualText}
-            onManualAdd={onManualAdd}
-            onAutoSyncToggle={() => setAutoSync(!autoSync)}
-            showToast={showToast}
-            appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
-          />
+        {/* Main layout — side-by-side on wide, stacked on narrow */}
+        {isNarrow ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <CollapsiblePanel>
+              <LeftPanel
+                config={config}
+                running={running}
+                autoSync={autoSync}
+                kugouLoggedIn={kugouLoggedIn}
+                manualText={manualText}
+                compact
+                onConfigChange={setConfig}
+                onManualTextChange={setManualText}
+                onManualAdd={onManualAdd}
+                onAutoSyncToggle={() => setAutoSync(!autoSync)}
+              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+              />
+            </CollapsiblePanel>
 
-          {/* Right main content */}
-          <MainContent
-            songs={display}
-            played={played}
-            blacklist={blacklist}
-            running={running}
-            kugouLoggedIn={kugouLoggedIn}
-            kugouCache={kugouCache}
-            logs={logs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            onClearList={onClearList}
-            onClearPlayed={clearPlayed}
-            onContextMenu={openCtxMenu}
-            renderSongActions={renderSongActions}
-            renderPlayedActions={renderPlayedActions}
-            onRemoveBlacklist={(name) => {
-              removeBlacklist(name);
-              showToast(`已移出黑名单: ${name}`);
-            }}
-          />
-        </div>
+            <MainContent
+              songs={display}
+              played={played}
+              blacklist={blacklist}
+              running={running}
+              kugouLoggedIn={kugouLoggedIn}
+              kugouCache={kugouCache}
+              logs={logs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onClearList={onClearList}
+              onClearPlayed={clearPlayed}
+              onClearLogs={clearLogs}
+              onContextMenu={openCtxMenu}
+              renderSongActions={renderSongActions}
+              renderPlayedActions={renderPlayedActions}
+              onRemoveBlacklist={(name) => {
+                removeBlacklist(name);
+                toast(`已移出黑名单: ${name}`);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1">
+            <LeftPanel
+              config={config}
+              running={running}
+              autoSync={autoSync}
+              kugouLoggedIn={kugouLoggedIn}
+              manualText={manualText}
+              onConfigChange={setConfig}
+              onManualTextChange={setManualText}
+              onManualAdd={onManualAdd}
+              onAutoSyncToggle={() => setAutoSync(!autoSync)}
+              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+            />
+
+            <MainContent
+              songs={display}
+              played={played}
+              blacklist={blacklist}
+              running={running}
+              kugouLoggedIn={kugouLoggedIn}
+              kugouCache={kugouCache}
+              logs={logs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onClearList={onClearList}
+              onClearPlayed={clearPlayed}
+              onClearLogs={clearLogs}
+              onContextMenu={openCtxMenu}
+              renderSongActions={renderSongActions}
+              renderPlayedActions={renderPlayedActions}
+              onRemoveBlacklist={(name) => {
+                removeBlacklist(name);
+                toast(`已移出黑名单: ${name}`);
+              }}
+            />
+          </div>
+        )}
 
         {/* Context menu */}
         {ctxMenu && (
@@ -417,10 +498,9 @@ export default function App() {
         {/* Status line */}
         <StatusLine steps={startupSteps} />
 
-        {/* Toast */}
-        {toast && <Toast toast={toast} onDismiss={dismissToast} />}
+        <Toaster position="bottom-right" richColors />
 
-        {showAbout && <AboutModal onClose={() => setShowAbout(false)} onShowToast={showToast} />}
+        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
         {showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
         {showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
       </div>

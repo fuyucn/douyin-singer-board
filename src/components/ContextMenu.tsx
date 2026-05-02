@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import type { DanmuInfo } from '../types';
 
 interface Action {
@@ -23,19 +24,19 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
         style={{ left: x, top: y, boxShadow: 'var(--shadow-modal)' }}
       >
         {items.map((item) => (
-          <button
+          <Button
             key={item.label}
-            className="text-fg-base hover:bg-bg-soft block w-full cursor-pointer border-none bg-transparent px-4 py-2 text-left text-[13px] whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+            variant="ghost"
+            size="sm"
+            className="block w-full justify-start rounded-none px-4 py-2 text-left text-[13px] whitespace-nowrap"
             disabled={item.disabled}
             onClick={() => {
-              if (!item.disabled) {
-                item.onClick();
-                onClose();
-              }
+              item.onClick();
+              onClose();
             }}
           >
             {item.label}
-          </button>
+          </Button>
         ))}
       </div>
     </>

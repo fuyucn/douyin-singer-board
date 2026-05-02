@@ -147,12 +147,17 @@ export function sessionToCookie(s: KugouSession): string {
 
 // ─── Blacklist ────────────────────────────────────────────────────────────────
 
-export async function loadBlacklist(): Promise<string[]> {
+export interface BlacklistEntry {
+  song_name: string;
+  created_at: number;
+}
+
+export async function loadBlacklist(): Promise<BlacklistEntry[]> {
   const db = await getDb();
-  const rows = await db.select<{ song_name: string }[]>(
-    'SELECT song_name FROM blacklist ORDER BY created_at ASC',
+  const rows = await db.select<BlacklistEntry[]>(
+    'SELECT song_name, created_at FROM blacklist ORDER BY created_at DESC',
   );
-  return rows.map((r) => r.song_name);
+  return rows;
 }
 
 export async function addToBlacklist(songName: string): Promise<void> {

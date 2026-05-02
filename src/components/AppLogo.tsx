@@ -20,7 +20,7 @@ export function AppLogo() {
   return (
     <img
       src="/logo.png"
-      className="-m-3 size-10 shrink-0 rounded-[4px] object-contain"
+      className="size-10 shrink-0 rounded-[4px] object-contain"
       alt=""
       draggable={false}
       onClick={onClick}

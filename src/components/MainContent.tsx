@@ -1,15 +1,18 @@
+import { useMemo } from 'react';
+import { useWindowWidth } from '@/hooks/useWindowWidth';
 import { Trash2, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { SongList } from './SongList';
+import { SongTable, songColumnHelper } from './SongTable';
 import { BlacklistPanel } from './BlacklistPanel';
 import { LogPanel } from './LogPanel';
 import type { DanmuInfo } from '../types';
 import type { KuGouEntry } from '../kugouSession';
+
 interface Props {
   songs: DanmuInfo[];
   played: DanmuInfo[];
-  blacklist: Set<string>;
+  blacklist: Map<string, number>;
   running: boolean;
   kugouLoggedIn: boolean;
   kugouCache: Record<string, KuGouEntry>;
@@ -18,11 +21,180 @@ interface Props {
   onTabChange: (tab: 'songs' | 'played' | 'blacklist') => void;
   onClearList: () => void;
   onClearPlayed: () => void;
+  onClearLogs: () => void;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
   renderSongActions: (s: DanmuInfo) => React.ReactNode;
   renderPlayedActions: (s: DanmuInfo) => React.ReactNode;
   onRemoveBlacklist: (name: string) => void;
 }
+
+// ─── Column definitions ───────────────────────────────────────────────────────
+
+type SongsMeta = {
+  kugouCache: Record<string, KuGouEntry>;
+  renderActions: (s: DanmuInfo) => React.ReactNode;
+  onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
+};
+
+type PlayedMeta = {
+  kugouCache: Record<string, KuGouEntry>;
+  renderActions: (s: DanmuInfo) => React.ReactNode;
+  onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
+};
+
+function useSongsColumns() {
+  return useMemo(
+    () => [
+      songColumnHelper.display({
+        id: 'index',
+        header: '#',
+        size: 40,
+        cell: (ctx) => (
+          <span className="text-xs text-[var(--fg-faint)]">{ctx.row.index + 1}</span>
+        ),
+      }),
+      songColumnHelper.accessor('uname', {
+        header: '用户',
+        size: 120,
+        cell: (ctx) => (
+          <span className="truncate block text-xs text-[var(--fg-muted)]">
+            {ctx.getValue()}
+          </span>
+        ),
+      }),
+      songColumnHelper.accessor('song_name', {
+        header: '点歌',
+        size: 160,
+        meta: { grow: true },
+        cell: (ctx) => {
+          const meta = ctx.table.options.meta as SongsMeta;
+          const song = ctx.row.original;
+          const entry = meta?.kugouCache?.[song.song_name.trim()];
+          return (
+            <div
+              className="leading-snug cursor-default"
+              onContextMenu={(e) => meta?.onContextMenu(e, song)}
+            >
+              <div className="truncate text-[13px] font-medium text-[var(--fg-base)]">
+                {song.song_name}
+              </div>
+              {entry?.status === 'found' ? (
+                <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+              ) : entry?.status === 'pending' ? (
+                <div className="text-[11px] text-[var(--fg-faint)]">⋯ 搜索中</div>
+              ) : entry?.status === 'not_found' ? (
+                <div className="text-[11px] text-[var(--fg-faint)]">未找到</div>
+              ) : null}
+            </div>
+          );
+        },
+      }),
+      songColumnHelper.accessor('send_time', {
+        header: '时间',
+        size: 72,
+        cell: (ctx) => {
+          const d = new Date(ctx.getValue() * 1000);
+          const pad = (n: number) => String(n).padStart(2, '0');
+          return (
+            <span className="text-xs text-[var(--fg-faint)]">
+              {pad(d.getHours())}:{pad(d.getMinutes())}:{pad(d.getSeconds())}
+            </span>
+          );
+        },
+      }),
+      songColumnHelper.display({
+        id: 'actions',
+        header: '',
+        size: 110,
+        cell: (ctx) => {
+          const meta = ctx.table.options.meta as SongsMeta;
+          return (
+            <div className="flex justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+              {meta?.renderActions(ctx.row.original)}
+            </div>
+          );
+        },
+      }),
+    ],
+    [],
+  );
+}
+
+function usePlayedColumns() {
+  return useMemo(
+    () => [
+      songColumnHelper.display({
+        id: 'index',
+        header: '#',
+        size: 40,
+        cell: (ctx) => (
+          <span className="text-xs text-[var(--fg-faint)]">{ctx.row.index + 1}</span>
+        ),
+      }),
+      songColumnHelper.accessor('played_at', {
+        id: 'played_time',
+        header: '时间',
+        size: 80,
+        cell: (ctx) => {
+          const ts = ctx.getValue() ?? ctx.row.original.send_time;
+          const d = new Date(ts * 1000);
+          const pad = (n: number) => String(n).padStart(2, '0');
+          return (
+            <span className="text-xs text-[var(--fg-faint)]">
+              {pad(d.getHours())}:{pad(d.getMinutes())}:{pad(d.getSeconds())}
+            </span>
+          );
+        },
+      }),
+      songColumnHelper.accessor('uname', {
+        header: '用户',
+        size: 110,
+        cell: (ctx) => (
+          <span className="truncate block text-xs text-[var(--fg-muted)]">{ctx.getValue()}</span>
+        ),
+      }),
+      songColumnHelper.accessor('song_name', {
+        header: '点歌',
+        size: 160,
+        meta: { grow: true },
+        cell: (ctx) => {
+          const meta = ctx.table.options.meta as PlayedMeta;
+          const song = ctx.row.original;
+          const entry = meta?.kugouCache?.[song.song_name.trim()];
+          return (
+            <div
+              className="leading-snug cursor-default"
+              onContextMenu={(e) => meta?.onContextMenu(e, song)}
+            >
+              <div className="truncate text-[13px] font-medium text-[var(--fg-base)]">
+                {song.song_name}
+              </div>
+              {entry?.status === 'found' && (
+                <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+              )}
+            </div>
+          );
+        },
+      }),
+      songColumnHelper.display({
+        id: 'actions',
+        header: '',
+        size: 48,
+        cell: (ctx) => {
+          const meta = ctx.table.options.meta as PlayedMeta;
+          return (
+            <div className="flex justify-end gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+              {meta?.renderActions(ctx.row.original)}
+            </div>
+          );
+        },
+      }),
+    ],
+    [],
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 
 export function MainContent({
   songs,
@@ -35,11 +207,34 @@ export function MainContent({
   onTabChange,
   onClearList,
   onClearPlayed,
+  onClearLogs,
   onContextMenu,
   renderSongActions,
   renderPlayedActions,
   onRemoveBlacklist,
 }: Props) {
+  const songsColumns = useSongsColumns();
+  const playedColumns = usePlayedColumns();
+
+  const songsMeta: SongsMeta = useMemo(
+    () => ({ kugouCache, renderActions: renderSongActions, onContextMenu }),
+    [kugouCache, renderSongActions, onContextMenu],
+  );
+
+  const playedMeta: PlayedMeta = useMemo(
+    () => ({ kugouCache, renderActions: renderPlayedActions, onContextMenu }),
+    [kugouCache, renderPlayedActions, onContextMenu],
+  );
+
+  const windowWidth = useWindowWidth();
+  const isNarrow = windowWidth < 720;
+
+  // Hide less-important columns when window is narrow
+  const narrowVisibility = useMemo(
+    (): Record<string, boolean> => isNarrow ? { uname: false, send_time: false, played_time: false } : {},
+    [isNarrow],
+  );
+
   const tabDefs = [
     { key: 'songs' as const, label: `点歌列表 (${songs.length})` },
     { key: 'played' as const, label: `已点歌单 (${played.length})` },
@@ -48,20 +243,21 @@ export function MainContent({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Top tab area */}
-      <div className="flex-1 overflow-hidden border border-[var(--border-soft)] rounded-lg m-3 mb-2 flex flex-col bg-[var(--bg-elev)]">
+      {/* Tab area */}
+      <div className="m-3 mb-2 flex flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-soft)] bg-[var(--bg-elev)]">
         <Tabs
           value={activeTab}
           onValueChange={(v) => onTabChange(v as 'songs' | 'played' | 'blacklist')}
-          className="flex flex-col flex-1 min-h-0"
+          className="flex min-h-0 flex-1 flex-col gap-y-0"
         >
-          <div className="flex items-center justify-between px-4 pt-3 pb-0 shrink-0">
-            <TabsList className="h-9 bg-transparent gap-0 p-0 border-b-0">
+          {/* Tab bar */}
+          <div className="flex shrink-0 items-center justify-between px-4">
+            <TabsList variant={'line'} className="">
               {tabDefs.map((t) => (
                 <TabsTrigger
+                  className={'after:opacity-0!'}
                   key={t.key}
                   value={t.key}
-                  className="rounded-none border-b-2 border-transparent px-4 py-2 text-sm data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-blue-500 data-[state=active]:shadow-none text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
                 >
                   {t.label}
                 </TabsTrigger>
@@ -71,7 +267,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-[var(--danger)]"
+                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-red-500"
                 onClick={onClearList}
               >
                 <Trash2 className="size-3.5" />
@@ -82,7 +278,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-[var(--danger)]"
+                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-red-500"
                 onClick={onClearPlayed}
               >
                 <Trash2 className="size-3.5" />
@@ -91,84 +287,45 @@ export function MainContent({
             )}
           </div>
 
-          {/* Column header */}
-          {(activeTab === 'songs' || activeTab === 'played') && (
-            <div className="border-b border-[var(--border-soft)] px-5 py-2 text-xs font-medium text-[var(--fg-muted)] flex shrink-0">
-              <div className="w-8 shrink-0 text-center">#</div>
-              <div className="w-32 shrink-0 ml-2">用户</div>
-              <div className="flex-1">点歌</div>
-              <div className="w-20 shrink-0 text-center">时间</div>
-              <div className="w-32 text-right">操作</div>
-            </div>
-          )}
-
-          <TabsContent value="songs" className="flex-1 min-h-0 m-0 overflow-hidden">
+          <TabsContent value="songs"
+            className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
             {songs.length === 0 ? (
               <EmptyState running={running} />
             ) : (
-              <SongList
+              <SongTable
                 songs={songs}
                 emptyText={running ? '等待点歌...' : '点击 "开始" 连接直播间'}
-                showHeader={false}
-                renderActions={renderSongActions}
-                renderSong={(s) => {
-                  const entry = kugouCache[s.song_name.trim()];
-                  return (
-                    <div className="song-cell">
-                      <div className="song-original">{s.song_name}</div>
-                      {entry?.status === 'found' ? (
-                        <div className="song-match">{entry.track.filename}</div>
-                      ) : entry?.status === 'pending' ? (
-                        <div className="song-status">⋯ 搜索中</div>
-                      ) : entry?.status === 'not_found' ? (
-                        <div className="song-status">未找到</div>
-                      ) : (
-                        <div className="song-status">搜索失败</div>
-                      )}
-                    </div>
-                  );
-                }}
-                onContextMenu={onContextMenu}
+                columns={songsColumns}
+                meta={songsMeta}
+                columnVisibility={narrowVisibility}
               />
             )}
           </TabsContent>
 
-          <TabsContent value="played" className="flex-1 min-h-0 m-0 overflow-hidden">
-            <SongList
+          <TabsContent value="played"
+            className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
+            <SongTable
               songs={played}
               emptyText="暂无已点歌曲"
-              showHeader={false}
-              renderActions={renderPlayedActions}
-              renderUname={(s) => {
-                const ts = s.played_at ?? s.send_time;
-                const d = new Date(ts * 1000);
-                const pad = (n: number) => String(n).padStart(2, '0');
-                return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-              }}
-              renderSong={(s) => {
-                const entry = kugouCache[s.song_name.trim()];
-                return (
-                  <div className="song-cell">
-                    <div className="song-original">{s.song_name}</div>
-                    {entry?.status === 'found' ? (
-                      <div className="song-match">{entry.track.filename}</div>
-                    ) : null}
-                  </div>
-                );
-              }}
-              onContextMenu={onContextMenu}
+              columns={playedColumns}
+              meta={playedMeta}
+              columnVisibility={narrowVisibility}
             />
           </TabsContent>
 
-          <TabsContent value="blacklist" className="flex-1 min-h-0 m-0 overflow-hidden">
-            <BlacklistPanel items={Array.from(blacklist)} onRemove={onRemoveBlacklist} />
+          <TabsContent value="blacklist"
+            className="m-0 min-h-0 flex-1 overflow-hidden"
+          >
+            <BlacklistPanel items={Array.from(blacklist.entries()).map(([name, createdAt]) => ({ name, createdAt }))} onRemove={onRemoveBlacklist} />
           </TabsContent>
         </Tabs>
       </div>
 
       {/* Log panel */}
-      <div className="shrink-0 mx-3 mb-3">
-        <LogPanel logs={logs} />
+      <div className="mx-3 mb-3 shrink-0">
+        <LogPanel logs={logs} onClear={onClearLogs} />
       </div>
     </div>
   );
@@ -184,12 +341,8 @@ function EmptyState({ running }: { running: boolean }) {
         <div className="font-medium text-[var(--fg-muted)]">
           {running ? '等待点歌...' : '当前点歌列表为空'}
         </div>
-        <div className="mt-1 text-xs">
-          {running ? '正在监听直播间弹幕' : '观众点歌后会显示在这里'}
-        </div>
+        <div className="mt-1 text-xs">{running ? '正在监听直播间弹幕' : '观众点歌后会显示在这里'}</div>
       </div>
     </div>
   );
 }
-
-

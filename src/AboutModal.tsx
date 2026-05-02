@@ -1,5 +1,6 @@
 import { Cross2Icon } from '@radix-ui/react-icons';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   CURRENT_VERSION,
   openInBrowser,
@@ -7,13 +8,13 @@ import {
   clearSkippedVersion,
   getSkippedVersion,
 } from './updater';
+import { Button } from './components/ui/button';
 
 interface Props {
   onClose: () => void;
-  onShowToast: (msg: string, kind?: 'success' | 'error') => void;
 }
 
-export function AboutModal({ onClose, onShowToast }: Props) {
+export function AboutModal({ onClose }: Props) {
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
 
@@ -31,14 +32,14 @@ export function AboutModal({ onClose, onShowToast }: Props) {
     try {
       const info = await checkForUpdate();
       if (info) {
-        onShowToast(`新版本 ${info.tag} 可用`, 'success');
+        toast.success(`新版本 ${info.tag} 可用`);
         await openInBrowser(info.htmlUrl);
         onClose();
       } else {
-        onShowToast('已是最新版本', 'success');
+        toast.success('已是最新版本');
       }
     } catch (e) {
-      onShowToast(`检查失败: ${e}`, 'error');
+      toast.error(`检查失败: ${e}`);
     } finally {
       setChecking(false);
     }
@@ -47,7 +48,7 @@ export function AboutModal({ onClose, onShowToast }: Props) {
   const onResetSkip = () => {
     clearSkippedVersion();
     setSkipped(null);
-    onShowToast('已重置跳过记录');
+    toast('已重置跳过记录');
   };
 
   return (
@@ -63,13 +64,9 @@ export function AboutModal({ onClose, onShowToast }: Props) {
         {/* Header */}
         <div className="border-border-soft flex items-center justify-between border-b px-5 py-4">
           <h2 className="text-fg-base m-0 text-base font-semibold">关于 SUSUSongBoard</h2>
-          <button
-            className="text-fg-muted hover:text-fg-base inline-flex h-7 w-7 cursor-pointer items-center justify-center border-none bg-transparent leading-none"
-            onClick={onClose}
-            aria-label="Close"
-          >
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             <Cross2Icon />
-          </button>
+          </Button>
         </div>
         {/* Body */}
         <div className="p-5">
@@ -82,23 +79,24 @@ export function AboutModal({ onClose, onShowToast }: Props) {
               <span className="text-fg-muted min-w-[60px]">已跳过</span>
               <span className="text-fg-base">
                 {skipped}{' '}
-                <button
-                  className="text-accent hover:text-accent-hover inline cursor-pointer border-none bg-transparent p-0 text-[inherit] underline"
+                <Button
+                  variant="link"
+                  className="text-accent hover:text-accent-hover h-auto p-0 text-[inherit] underline"
                   onClick={onResetSkip}
                 >
                   (重置)
-                </button>
+                </Button>
               </span>
             </div>
           )}
           <div className="mt-4 flex gap-2.5">
-            <button
-              className="bg-success hover:bg-success-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            <Button
+              className="bg-success hover:bg-success-hover text-white"
               onClick={onCheck}
               disabled={checking}
             >
               {checking ? '检查中…' : '检查更新'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
