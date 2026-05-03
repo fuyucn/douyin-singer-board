@@ -239,7 +239,7 @@ export function KugouDebugModal({ onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[min(90vw,680px)] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
@@ -329,7 +329,7 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {/* Prefer cumulative */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <Switch
               id="prefer-cumulative"
               checked={preferCumulative}
@@ -337,8 +337,9 @@ export function KugouDebugModal({ onClose }: Props) {
                 setPreferCumulative(checked);
                 pushLog(`[kg-dev] 累计播放优先 = ${checked ? 'on' : 'off'}`);
               }}
+              className="mt-0.5 shrink-0"
             />
-            <Label htmlFor="prefer-cumulative" className="text-sm cursor-pointer">
+            <Label htmlFor="prefer-cumulative" className="text-sm cursor-pointer leading-snug">
               累计播放优先（用 /user/listen 历史挑版本，关闭则取搜索首条）
             </Label>
           </div>
