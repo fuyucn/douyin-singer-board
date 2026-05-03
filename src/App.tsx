@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore, dedupedSongs } from './store';
+import { useShallow } from 'zustand/react/shallow';
 import {
   loadConfig,
   saveConfig,
@@ -43,31 +44,27 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 declare const __APP_VERSION__: string;
 
 export default function App() {
-  const config = useAppStore((s) => s.config);
-  const setConfig = useAppStore((s) => s.setConfig);
-  const hydrateConfig = useAppStore((s) => s.hydrateConfig);
-  const running = useAppStore((s) => s.running);
-  const setRunning = useAppStore((s) => s.setRunning);
-  const sessionId = useAppStore((s) => s.sessionId);
-  const newSession = useAppStore((s) => s.newSession);
-  const setStatus = useAppStore((s) => s.setStatus);
-  const songs = useAppStore((s) => s.songs);
-  const removeByMsgId = useAppStore((s) => s.removeByMsgId);
-  const clearSongs = useAppStore((s) => s.clearSongs);
-  const manualAdd = useAppStore((s) => s.manualAdd);
-  const logs = useAppStore((s) => s.logs);
-  const pushLog = useAppStore((s) => s.pushLog);
-  const clearLogs = useAppStore((s) => s.clearLogs);
-  const preferCumulative = useAppStore((s) => s.preferCumulative);
-  const autoSync = useAppStore((s) => s.autoSync);
-  const setAutoSync = useAppStore((s) => s.setAutoSync);
-  const played = useAppStore((s) => s.played);
-  const addPlayed = useAppStore((s) => s.addPlayed);
-  const removePlayed = useAppStore((s) => s.removePlayed);
-  const clearPlayed = useAppStore((s) => s.clearPlayed);
-  const startupSteps = useAppStore((s) => s.startupSteps);
-  const setStartupStep = useAppStore((s) => s.setStartupStep);
-  const resetStartupSteps = useAppStore((s) => s.resetStartupSteps);
+  const {
+    config, setConfig, hydrateConfig,
+    running, setRunning,
+    sessionId, newSession, setStatus,
+    songs, removeByMsgId, clearSongs, manualAdd,
+    logs, pushLog, clearLogs,
+    preferCumulative,
+    autoSync, setAutoSync,
+    played, addPlayed, removePlayed, clearPlayed,
+    startupSteps, setStartupStep, resetStartupSteps,
+  } = useAppStore(useShallow((s) => ({
+    config: s.config, setConfig: s.setConfig, hydrateConfig: s.hydrateConfig,
+    running: s.running, setRunning: s.setRunning,
+    sessionId: s.sessionId, newSession: s.newSession, setStatus: s.setStatus,
+    songs: s.songs, removeByMsgId: s.removeByMsgId, clearSongs: s.clearSongs, manualAdd: s.manualAdd,
+    logs: s.logs, pushLog: s.pushLog, clearLogs: s.clearLogs,
+    preferCumulative: s.preferCumulative,
+    autoSync: s.autoSync, setAutoSync: s.setAutoSync,
+    played: s.played, addPlayed: s.addPlayed, removePlayed: s.removePlayed, clearPlayed: s.clearPlayed,
+    startupSteps: s.startupSteps, setStartupStep: s.setStartupStep, resetStartupSteps: s.resetStartupSteps,
+  })));
 
   const {
     blacklist,
