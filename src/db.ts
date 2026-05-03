@@ -8,18 +8,16 @@ export async function getDb(): Promise<Database> {
   _db = await Database.load('sqlite:sususongboard.db');
 
   // Migrate/create blacklist table (frontend-managed, not in Tauri migrations).
-  // Use try/catch probing instead of sqlite_master queries — more robust across
-  // tauri-plugin-sql versions that may not expose system tables via select().
+  // Use try/catch probing — db.execute() may throw for non-schema reasons on
+  // SELECT, so all CREATE paths are guarded with IF NOT EXISTS for idempotency.
   try {
-    // Probe: does the new schema already exist?
     await _db.execute("SELECT entry_type FROM blacklist LIMIT 0");
   } catch {
-    // New schema not found — check if the OLD schema exists
     try {
       await _db.execute("SELECT song_name FROM blacklist LIMIT 0");
-      // Old schema exists → migrate
+      // Old schema found → migrate
       await _db.execute(
-        `CREATE TABLE blacklist_new (
+        `CREATE TABLE IF NOT EXISTS blacklist_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
           song_name TEXT NOT NULL DEFAULT '',
@@ -27,10 +25,17 @@ export async function getDb(): Promise<Database> {
           created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
         )`,
       );
-      await _db.execute(
-        "INSERT INTO blacklist_new (id, entry_type, song_name, singer_name, created_at) SELECT id, 'song', song_name, '', created_at FROM blacklist",
+      // Only copy if blacklist_new was just created (empty), otherwise a prior
+      // partial migration left it behind and we need to start fresh.
+      const count = await _db.select<{ cnt: number }[]>(
+        'SELECT COUNT(*) as cnt FROM blacklist_new',
       );
-      await _db.execute('DROP TABLE blacklist');
+      if (count[0].cnt === 0) {
+        await _db.execute(
+          "INSERT INTO blacklist_new (id, entry_type, song_name, singer_name, created_at) SELECT id, 'song', song_name, '', created_at FROM blacklist",
+        );
+      }
+      await _db.execute('DROP TABLE IF EXISTS blacklist');
       await _db.execute('ALTER TABLE blacklist_new RENAME TO blacklist');
       await _db.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
@@ -39,9 +44,9 @@ export async function getDb(): Promise<Database> {
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
       );
     } catch {
-      // Neither schema exists → fresh install
+      // Neither probe succeeded — create fresh (safe against prior partial state)
       await _db.execute(
-        `CREATE TABLE blacklist (
+        `CREATE TABLE IF NOT EXISTS blacklist (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
           song_name TEXT NOT NULL DEFAULT '',
