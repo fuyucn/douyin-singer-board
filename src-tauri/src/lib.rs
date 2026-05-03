@@ -119,13 +119,24 @@ pub fn run() {
             let win = app.get_webview_window("main").unwrap();
             let handle_exit = handle.clone();
             let kugou_exit = kugou_api_handle.clone();
+            let win_clone = win.clone();
             win.on_window_event(move |event| {
-                if let tauri::WindowEvent::Destroyed = event {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    // Prevent the default close so we can do cleanup first.
+                    api.prevent_close();
                     let h = handle_exit.clone();
                     let k = kugou_exit.clone();
+                    let w = win_clone.clone();
                     tauri::async_runtime::spawn(async move {
+                        // 1. Send stop to sidecar — disconnects live room and stops autoSync.
+                        let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
+                        // 2. Brief grace period for sidecar to disconnect cleanly.
+                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                        // 3. Kill both child process trees.
                         h.kill().await;
                         k.kill().await;
+                        // 4. Now actually close the window.
+                        let _ = w.close();
                     });
                 }
             });
