@@ -131,18 +131,19 @@ impl KugouApiHandle {
             .env("HOST", "127.0.0.1")
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
-        #[cfg(windows)]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
         // Use process-wrap to bind the entire process tree to a Job Object on
         // Windows (or a process group on Unix). This ensures all grandchild
         // processes are killed when the Tauri app exits, even on crash.
+        //
+        // On Windows: CreationFlags MUST come before JobObject so JobObject's
+        // pre_spawn merges our CREATE_NO_WINDOW into its CREATE_SUSPENDED flag.
         let mut wrap = CommandWrap::from(cmd);
         #[cfg(windows)]
-        wrap.wrap(JobObject);
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            wrap.wrap(CreationFlags(CREATE_NO_WINDOW.into()));
+            wrap.wrap(JobObject);
+        }
         #[cfg(unix)]
         wrap.wrap(ProcessGroup::leader());
 

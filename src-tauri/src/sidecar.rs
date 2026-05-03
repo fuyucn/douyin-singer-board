@@ -91,17 +91,16 @@ impl SidecarHandle {
             .stderr(Stdio::piped())
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
+        // Bind entire process tree via Job Object (Windows) / process group (Unix).
+        // CreationFlags MUST come before JobObject so our CREATE_NO_WINDOW is
+        // merged into JobObject's CREATE_SUSPENDED in pre_spawn.
+        let mut wrap = CommandWrap::from(cmd);
         #[cfg(windows)]
         {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
+            wrap.wrap(CreationFlags(CREATE_NO_WINDOW.into()));
+            wrap.wrap(JobObject);
         }
-
-        // Bind entire process tree via Job Object (Windows) / process group (Unix)
-        // so grandchild processes are killed when the Tauri app exits.
-        let mut wrap = CommandWrap::from(cmd);
-        #[cfg(windows)]
-        wrap.wrap(JobObject);
         #[cfg(unix)]
         wrap.wrap(ProcessGroup::leader());
 
