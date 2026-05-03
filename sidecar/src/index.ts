@@ -204,13 +204,17 @@ process.on('SIGINT', () => void stop().then(() => process.exit(0)));
 
 // Parent process watchdog — exit if the Tauri parent disappears.
 // Covers crashes and force-kills where Destroyed event never fires.
+// Only exit on ESRCH (process not found); ignore EPERM/other errors
+// so we don't false-positive on Windows permission checks.
 const parentPid = process.ppid;
 setInterval(() => {
   try {
-    process.kill(parentPid, 0); // signal 0 = existence check, no actual signal
-  } catch {
-    log('info', 'parent process gone, exiting');
-    void stop().then(() => process.exit(0));
+    process.kill(parentPid, 0);
+  } catch (e: any) {
+    if (e?.code === 'ESRCH') {
+      log('info', 'parent process gone, exiting');
+      void stop().then(() => process.exit(0));
+    }
   }
 }, 2000);
 
