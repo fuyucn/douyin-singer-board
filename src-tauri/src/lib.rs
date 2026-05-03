@@ -3,6 +3,7 @@ mod kugou_api;
 mod sidecar;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -121,23 +122,36 @@ pub fn run() {
             let kugou_exit = kugou_api_handle.clone();
             let win_clone = win.clone();
             win.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    // Prevent the default close so we can do cleanup first.
-                    api.prevent_close();
-                    let h = handle_exit.clone();
-                    let k = kugou_exit.clone();
-                    let w = win_clone.clone();
-                    tauri::async_runtime::spawn(async move {
-                        // 1. Send stop to sidecar — disconnects live room and stops autoSync.
-                        let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
-                        // 2. Brief grace period for sidecar to disconnect cleanly.
-                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                        // 3. Kill both child process trees.
-                        h.kill().await;
-                        k.kill().await;
-                        // 4. Now actually close the window.
-                        let _ = w.close();
-                    });
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        // Intercept close: do graceful cleanup first.
+                        api.prevent_close();
+                        let h = handle_exit.clone();
+                        let k = kugou_exit.clone();
+                        let w = win_clone.clone();
+                        tauri::async_runtime::spawn(async move {
+                            // 1. Stop sidecar — disconnects live room + stops autoSync.
+                            let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
+                            // 2. Grace period for clean disconnect.
+                            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                            // 3. Kill both process trees.
+                            h.kill().await;
+                            k.kill().await;
+                            // 4. Now close the window.
+                            let _ = w.close();
+                        });
+                    }
+                    tauri::WindowEvent::Destroyed => {
+                        // Fallback: if window is destroyed without CloseRequested
+                        // (e.g. OS force-kill, crash), still kill child processes.
+                        let h = handle_exit.clone();
+                        let k = kugou_exit.clone();
+                        tauri::async_runtime::spawn(async move {
+                            h.kill().await;
+                            k.kill().await;
+                        });
+                    }
+                    _ => {}
                 }
             });
 
