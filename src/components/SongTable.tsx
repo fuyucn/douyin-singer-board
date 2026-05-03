@@ -71,9 +71,13 @@ export function SongTable({ songs, emptyText, meta, columns, columnVisibility }:
                   <div
                     key={header.id}
                     className="px-3 py-2 text-left text-xs font-medium text-[var(--fg-muted)] select-none"
-                    style={grow ? { flex: '1 1 0', minWidth: 0 } : { flex: `0 0 ${header.getSize()}px` }}
+                    style={
+                      grow ? { flex: '1 1 0', minWidth: 0 } : { flex: `0 0 ${header.getSize()}px` }
+                    }
                   >
-                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
                   </div>
                 );
               })}
@@ -86,36 +90,37 @@ export function SongTable({ songs, emptyText, meta, columns, columnVisibility }:
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-auto">
         <div style={{ minWidth: totalWidth, height: totalHeight, position: 'relative' }}>
           {virtualRows.map((vRow) => {
-              const row = rows[vRow.index];
-              return (
-                <div
-                  key={row.id}
-                  data-index={vRow.index}
-                  ref={virtualizer.measureElement}
-                  className="group absolute top-0 left-0 flex w-full items-center border-b border-[var(--border-softer)] transition-colors hover:bg-[var(--bg-softer)]"
-                  style={{
-                    transform: `translateY(${vRow.start}px)`,
-                    height: ROW_HEIGHT,
-                  }}
-                >
-                  {row.getVisibleCells().map((cell) => {
-                    const grow = (cell.column.columnDef.meta as { grow?: boolean } | undefined)?.grow;
-                    return (
-                      <div
-                        key={cell.id}
-                        className="overflow-hidden px-2 py-2 text-sm"
-                        style={grow
+            const row = rows[vRow.index];
+            return (
+              <div
+                key={row.id}
+                data-index={vRow.index}
+                ref={virtualizer.measureElement}
+                className="group absolute top-0 left-0 flex w-full items-center border-b border-[var(--border-softer)] transition-colors hover:bg-[var(--bg-softer)]"
+                style={{
+                  transform: `translateY(${vRow.start}px)`,
+                  height: ROW_HEIGHT,
+                }}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const grow = (cell.column.columnDef.meta as { grow?: boolean } | undefined)?.grow;
+                  return (
+                    <div
+                      key={cell.id}
+                      className="overflow-hidden px-2 py-2 text-sm"
+                      style={
+                        grow
                           ? { flex: '1 1 0', minWidth: 0 }
                           : { flex: `0 0 ${cell.column.getSize()}px` }
-                        }
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      }
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -6,11 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -64,9 +60,7 @@ export function LeftPanel({
     <aside
       className={cn(
         'flex flex-col bg-[var(--bg-elev)]',
-        compact
-          ? 'w-full'
-          : 'w-72 shrink-0 overflow-y-auto border-r border-[var(--border-soft)]',
+        compact ? 'w-full' : 'w-72 shrink-0 overflow-y-auto border-r border-[var(--border-soft)]',
       )}
     >
       {/* 直播间配置 */}
@@ -93,30 +87,39 @@ export function LeftPanel({
                 <TooltipTrigger>
                   <HelpCircle className="size-3 cursor-help text-[var(--fg-faint)] hover:text-[var(--fg-muted)]" />
                 </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-[260px] space-y-2 p-3 text-xs leading-relaxed">
+                <TooltipContent
+                  side="right"
+                  className="max-w-[260px] space-y-2 p-3 text-xs leading-relaxed"
+                >
                   <p className="font-semibold">占位符说明</p>
-                  <div className="space-y-1 text-muted-foreground">
+                  <div className="text-muted-foreground space-y-1">
                     <p>
-                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[song]</code>
-                      {' '}或{' '}
-                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[歌曲]</code>
-                      {' '}— 歌曲名
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[song]</code> 或{' '}
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[歌曲]</code> —
+                      歌曲名
                     </p>
                     <p>
-                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[space]</code>
-                      {' '}或{' '}
-                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[空格]</code>
-                      {' '}— 空格
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[space]</code> 或{' '}
+                      <code className="rounded bg-black/10 px-1 dark:bg-white/10">[空格]</code> —
+                      空格
                     </p>
                   </div>
-                  <div className="space-y-1 border-t border-border pt-2">
-                    <p className="font-medium text-foreground">示例：</p>
+                  <div className="border-border space-y-1 border-t pt-2">
+                    <p className="text-foreground font-medium">示例：</p>
                     <div className="space-y-0.5">
-                      <p><code className="rounded bg-black/10 px-1 dark:bg-white/10">点歌[space][song]</code></p>
+                      <p>
+                        <code className="rounded bg-black/10 px-1 dark:bg-white/10">
+                          点歌[space][song]
+                        </code>
+                      </p>
                       <p className="text-muted-foreground">→ 「点歌 七里香」</p>
                     </div>
-                    <div className="space-y-0.5 mt-1">
-                      <p><code className="rounded bg-black/10 px-1 dark:bg-white/10">点歌[song]</code></p>
+                    <div className="mt-1 space-y-0.5">
+                      <p>
+                        <code className="rounded bg-black/10 px-1 dark:bg-white/10">
+                          点歌[song]
+                        </code>
+                      </p>
                       <p className="text-muted-foreground">→ 「点歌七里香」</p>
                     </div>
                   </div>
@@ -207,9 +210,8 @@ export function LeftPanel({
                     size="sm"
                     variant="outline"
                     className={cn(
-                      'h-8 flex-1 text-xs auto-sync-btn border-[var(--border-strong)]',
-                      autoSync && 'active border-transparent!'
-
+                      'auto-sync-btn h-8 flex-1 border-[var(--border-strong)] text-xs',
+                      autoSync && 'active border-transparent!',
                     )}
                     onClick={onAutoSyncToggle}
                     title={autoSync ? '自动歌单同步中' : '自动歌单同步'}

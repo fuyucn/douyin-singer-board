@@ -49,17 +49,13 @@ function useSongsColumns() {
         id: 'index',
         header: '#',
         size: 40,
-        cell: (ctx) => (
-          <span className="text-xs text-[var(--fg-faint)]">{ctx.row.index + 1}</span>
-        ),
+        cell: (ctx) => <span className="text-fg-faint text-xs">{ctx.row.index + 1}</span>,
       }),
       songColumnHelper.accessor('uname', {
         header: '用户',
         size: 120,
         cell: (ctx) => (
-          <span className="truncate block text-xs text-[var(--fg-muted)]">
-            {ctx.getValue()}
-          </span>
+          <span className="text-fg-muted block truncate text-xs">{ctx.getValue()}</span>
         ),
       }),
       songColumnHelper.accessor('song_name', {
@@ -72,18 +68,16 @@ function useSongsColumns() {
           const entry = meta?.kugouCache?.[song.song_name.trim()];
           return (
             <div
-              className="leading-snug cursor-default"
+              className="cursor-default leading-snug"
               onContextMenu={(e) => meta?.onContextMenu(e, song)}
             >
-              <div className="truncate text-[13px] font-medium text-[var(--fg-base)]">
-                {song.song_name}
-              </div>
+              <div className="text-fg-base truncate text-[13px] font-medium">{song.song_name}</div>
               {entry?.status === 'found' ? (
                 <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
               ) : entry?.status === 'pending' ? (
-                <div className="text-[11px] text-[var(--fg-faint)]">⋯ 搜索中</div>
+                <div className="text-fg-faint text-[11px]">⋯ 搜索中</div>
               ) : entry?.status === 'not_found' ? (
-                <div className="text-[11px] text-[var(--fg-faint)]">未找到</div>
+                <div className="text-fg-faint text-[11px]">未找到</div>
               ) : null}
             </div>
           );
@@ -96,7 +90,7 @@ function useSongsColumns() {
           const d = new Date(ctx.getValue() * 1000);
           const pad = (n: number) => String(n).padStart(2, '0');
           return (
-            <span className="text-xs text-[var(--fg-faint)]">
+            <span className="text-fg-faint text-xs">
               {pad(d.getHours())}:{pad(d.getMinutes())}:{pad(d.getSeconds())}
             </span>
           );
@@ -127,9 +121,7 @@ function usePlayedColumns() {
         id: 'index',
         header: '#',
         size: 40,
-        cell: (ctx) => (
-          <span className="text-xs text-[var(--fg-faint)]">{ctx.row.index + 1}</span>
-        ),
+        cell: (ctx) => <span className="text-fg-faint text-xs">{ctx.row.index + 1}</span>,
       }),
       songColumnHelper.accessor('played_at', {
         id: 'played_time',
@@ -140,7 +132,7 @@ function usePlayedColumns() {
           const d = new Date(ts * 1000);
           const pad = (n: number) => String(n).padStart(2, '0');
           return (
-            <span className="text-xs text-[var(--fg-faint)]">
+            <span className="text-fg-faint text-xs">
               {pad(d.getHours())}:{pad(d.getMinutes())}:{pad(d.getSeconds())}
             </span>
           );
@@ -150,7 +142,7 @@ function usePlayedColumns() {
         header: '用户',
         size: 110,
         cell: (ctx) => (
-          <span className="truncate block text-xs text-[var(--fg-muted)]">{ctx.getValue()}</span>
+          <span className="text-fg-muted block truncate text-xs">{ctx.getValue()}</span>
         ),
       }),
       songColumnHelper.accessor('song_name', {
@@ -163,12 +155,10 @@ function usePlayedColumns() {
           const entry = meta?.kugouCache?.[song.song_name.trim()];
           return (
             <div
-              className="leading-snug cursor-default"
+              className="cursor-default leading-snug"
               onContextMenu={(e) => meta?.onContextMenu(e, song)}
             >
-              <div className="truncate text-[13px] font-medium text-[var(--fg-base)]">
-                {song.song_name}
-              </div>
+              <div className="text-fg-base truncate text-[13px] font-medium">{song.song_name}</div>
               {entry?.status === 'found' && (
                 <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
               )}
@@ -231,7 +221,8 @@ export function MainContent({
 
   // Hide less-important columns when window is narrow
   const narrowVisibility = useMemo(
-    (): Record<string, boolean> => isNarrow ? { uname: false, send_time: false, played_time: false } : {},
+    (): Record<string, boolean> =>
+      isNarrow ? { uname: false, send_time: false, played_time: false } : {},
     [isNarrow],
   );
 
@@ -244,7 +235,7 @@ export function MainContent({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tab area */}
-      <div className="m-3 mb-2 flex flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-soft)] bg-[var(--bg-elev)]">
+      <div className="border-border-soft bg-bg-elev mx-3 mt-2 mb-2 flex flex-1 flex-col overflow-hidden rounded-lg border">
         <Tabs
           value={activeTab}
           onValueChange={(v) => onTabChange(v as 'songs' | 'played' | 'blacklist')}
@@ -254,11 +245,7 @@ export function MainContent({
           <div className="flex shrink-0 items-center justify-between px-4">
             <TabsList variant={'line'} className="">
               {tabDefs.map((t) => (
-                <TabsTrigger
-                  className={'after:opacity-0!'}
-                  key={t.key}
-                  value={t.key}
-                >
+                <TabsTrigger className={'after:opacity-0!'} key={t.key} value={t.key}>
                   {t.label}
                 </TabsTrigger>
               ))}
@@ -267,7 +254,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-red-500"
+                className="text-fg-muted h-7 gap-1 text-xs hover:text-red-500"
                 onClick={onClearList}
               >
                 <Trash2 className="size-3.5" />
@@ -278,7 +265,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs text-[var(--fg-muted)] hover:text-red-500"
+                className="text-fg-muted h-7 gap-1 text-xs hover:text-red-500"
                 onClick={onClearPlayed}
               >
                 <Trash2 className="size-3.5" />
@@ -287,9 +274,7 @@ export function MainContent({
             )}
           </div>
 
-          <TabsContent value="songs"
-            className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden"
-          >
+          <TabsContent value="songs" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
             {songs.length === 0 ? (
               <EmptyState running={running} />
             ) : (
@@ -303,9 +288,7 @@ export function MainContent({
             )}
           </TabsContent>
 
-          <TabsContent value="played"
-            className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden"
-          >
+          <TabsContent value="played" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
             <SongTable
               songs={played}
               emptyText="暂无已点歌曲"
@@ -315,16 +298,20 @@ export function MainContent({
             />
           </TabsContent>
 
-          <TabsContent value="blacklist"
-            className="m-0 min-h-0 flex-1 overflow-hidden"
-          >
-            <BlacklistPanel items={Array.from(blacklist.entries()).map(([name, createdAt]) => ({ name, createdAt }))} onRemove={onRemoveBlacklist} />
+          <TabsContent value="blacklist" className="m-0 min-h-0 flex-1 overflow-hidden">
+            <BlacklistPanel
+              items={Array.from(blacklist.entries()).map(([name, createdAt]) => ({
+                name,
+                createdAt,
+              }))}
+              onRemove={onRemoveBlacklist}
+            />
           </TabsContent>
         </Tabs>
       </div>
 
       {/* Log panel */}
-      <div className="mx-3 mb-3 shrink-0">
+      <div className="mx-3 mb-2 shrink-0">
         <LogPanel logs={logs} onClear={onClearLogs} />
       </div>
     </div>
@@ -333,15 +320,17 @@ export function MainContent({
 
 function EmptyState({ running }: { running: boolean }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-[var(--fg-faint)]">
-      <div className="flex size-16 items-center justify-center rounded-2xl bg-[var(--bg-soft)]">
-        <Music className="size-8 text-[var(--fg-faint)]" />
+    <div className="text-fg-faint flex flex-1 flex-col items-center justify-center gap-3 py-16">
+      <div className="bg-bg-soft flex size-16 items-center justify-center rounded-2xl">
+        <Music className="text-fg-faint size-8" />
       </div>
       <div className="text-center">
-        <div className="font-medium text-[var(--fg-muted)]">
+        <div className="text-fg-muted font-medium">
           {running ? '等待点歌...' : '当前点歌列表为空'}
         </div>
-        <div className="mt-1 text-xs">{running ? '正在监听直播间弹幕' : '观众点歌后会显示在这里'}</div>
+        <div className="mt-1 text-xs">
+          {running ? '正在监听直播间弹幕' : '观众点歌后会显示在这里'}
+        </div>
       </div>
     </div>
   );

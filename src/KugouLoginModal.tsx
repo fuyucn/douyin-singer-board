@@ -4,6 +4,7 @@ import { call, ensureDeviceRegistered, saveLogin } from './kugouSession';
 import { useAppStore } from './store';
 import { Button } from './components/ui/button';
 import { Label } from './components/ui/label';
+import { Cross2Icon } from '@radix-ui/react-icons';
 
 interface Props {
   onClose: () => void;
@@ -154,7 +155,7 @@ export function KugouLoginModal({ onClose }: Props) {
 
   return (
     <div
-      className="bg-overlay animate-fade-in fixed inset-0 z-[800] flex items-center justify-center"
+      className="bg-overlay animate-fade-in fixed inset-0 z-800 flex items-center justify-center"
       onClick={onClose}
     >
       <div
@@ -163,10 +164,10 @@ export function KugouLoginModal({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-border-soft flex items-center justify-between border-b px-5 py-4">
+        <div className="border-border-soft flex items-center justify-between border-b px-5 py-2">
           <h2 className="text-fg-base m-0 text-base font-semibold">酷狗登录</h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            ×
+            <Cross2Icon className="size-4" />
           </Button>
         </div>
 
@@ -196,8 +197,8 @@ export function KugouLoginModal({ onClose }: Props) {
               </Label>
 
               <Button
-                variant="outline"
-                className="border-danger text-danger hover:bg-danger-soft-bg"
+                variant="destructive"
+                className="border-danger"
                 onClick={onLogout}
                 disabled={busy}
               >
@@ -212,7 +213,8 @@ export function KugouLoginModal({ onClose }: Props) {
                     使用酷狗音乐 App 扫码登录后，可自动将点歌加入酷狗歌单
                   </p>
                   <Button
-                    className="bg-accent hover:bg-accent-hover text-white"
+                    variant={'default'}
+                    className={'hover:bg-blue-600'}
                     onClick={startQrLogin}
                   >
                     扫码登录
@@ -251,12 +253,7 @@ export function KugouLoginModal({ onClose }: Props) {
                   <div className="text-fg-muted max-w-[320px] text-center text-xs">
                     用 <b>酷狗音乐 App</b>（不是概念版/微信小程序）扫码
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={cancelQr}
-                  >
+                  <Button variant="outline" size="sm" className="mt-2" onClick={cancelQr}>
                     取消
                   </Button>
                 </div>
@@ -264,11 +261,7 @@ export function KugouLoginModal({ onClose }: Props) {
               {qr.kind === 'error' && (
                 <div className="flex flex-col items-center gap-3">
                   <div className="text-danger-soft-fg text-sm">{qr.msg}</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQr({ kind: 'idle' })}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setQr({ kind: 'idle' })}>
                     重试
                   </Button>
                 </div>

@@ -5,12 +5,7 @@ import { loadKugouSession, saveKugouSession, clearKugouSession, sessionToCookie 
 import { ensureDeviceRegistered, refreshToken, saveLogin, call } from './kugouSession';
 import { useAppStore } from './store';
 import { useShallow } from 'zustand/react/shallow';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,14 +27,14 @@ type QrState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | {
-    kind: 'waiting';
-    key: string;
-    image: string;
-    qrUrl: string;
-    statusLabel: string;
-    pollCount: number;
-    lastResp: ApiResult | null;
-  }
+      kind: 'waiting';
+      key: string;
+      image: string;
+      qrUrl: string;
+      statusLabel: string;
+      pollCount: number;
+      lastResp: ApiResult | null;
+    }
   | { kind: 'error'; msg: string };
 
 export function KugouDebugModal({ onClose }: Props) {
@@ -120,7 +115,10 @@ export function KugouDebugModal({ onClose }: Props) {
     try {
       const newToken = await refreshToken();
       await refreshFromDb();
-      setResult({ label: 'login/token (refreshed)', data: { status: 200, body: { token: newToken } } });
+      setResult({
+        label: 'login/token (refreshed)',
+        data: { status: 200, body: { token: newToken } },
+      });
     } catch (e) {
       setError(`token refresh failed: ${e}`);
     } finally {
@@ -136,16 +134,31 @@ export function KugouDebugModal({ onClose }: Props) {
   };
 
   const onUserDetail = () => run('GET /user/detail', () => call('GET', '/user/detail', cookie));
-  const onListPlaylists = () => run('GET /user/playlist', () => call('GET', '/user/playlist?pagesize=100', cookie));
-  const onUserListen = () => run('GET /user/listen?type=1', () => call('GET', '/user/listen?type=1', cookie));
+  const onListPlaylists = () =>
+    run('GET /user/playlist', () => call('GET', '/user/playlist?pagesize=100', cookie));
+  const onUserListen = () =>
+    run('GET /user/listen?type=1', () => call('GET', '/user/listen?type=1', cookie));
   const onUserHistory = () => run('GET /user/history', () => call('GET', '/user/history', cookie));
-  const onSearch = () => run('GET /search', () => call('GET', `/search?keywords=${encodeURIComponent(keyword)}&pagesize=5`, cookie));
+  const onSearch = () =>
+    run('GET /search', () =>
+      call('GET', `/search?keywords=${encodeURIComponent(keyword)}&pagesize=5`, cookie),
+    );
 
   const onAddTrack = () => {
-    if (!listid.trim()) { setError('listid required'); return; }
-    if (!songData.trim()) { setError('songData required (name|hash|album_id|mixsongid)'); return; }
+    if (!listid.trim()) {
+      setError('listid required');
+      return;
+    }
+    if (!songData.trim()) {
+      setError('songData required (name|hash|album_id|mixsongid)');
+      return;
+    }
     return run('GET /playlist/tracks/add', () =>
-      call('GET', `/playlist/tracks/add?listid=${encodeURIComponent(listid)}&data=${encodeURIComponent(songData)}`, cookie),
+      call(
+        'GET',
+        `/playlist/tracks/add?listid=${encodeURIComponent(listid)}&data=${encodeURIComponent(songData)}`,
+        cookie,
+      ),
     );
   };
 
@@ -166,14 +179,26 @@ export function KugouDebugModal({ onClose }: Props) {
         setQr({ kind: 'error', msg: `/login/qr/key 没返回 qrcode (status ${keyResp.status})` });
         return;
       }
-      const createResp = await call('GET', `/login/qr/create?key=${encodeURIComponent(key)}&qrimg=true`, '');
+      const createResp = await call(
+        'GET',
+        `/login/qr/create?key=${encodeURIComponent(key)}&qrimg=true`,
+        '',
+      );
       const image = String(createResp.body?.data?.base64 ?? '');
       const qrUrl = String(createResp.body?.data?.url ?? '');
       if (!image) {
         setQr({ kind: 'error', msg: '/login/qr/create 没返回 base64 图片' });
         return;
       }
-      setQr({ kind: 'waiting', key, image, qrUrl, statusLabel: '等待手机扫码', pollCount: 0, lastResp: null });
+      setQr({
+        kind: 'waiting',
+        key,
+        image,
+        qrUrl,
+        statusLabel: '等待手机扫码',
+        pollCount: 0,
+        lastResp: null,
+      });
 
       pollRef.current = window.setInterval(async () => {
         try {
@@ -194,7 +219,10 @@ export function KugouDebugModal({ onClose }: Props) {
             await saveLogin(token, userid);
             try {
               const dfid = await ensureDeviceRegistered();
-              setResult({ label: 'login complete (dfid acquired)', data: { status: 200, body: { dfid } } });
+              setResult({
+                label: 'login complete (dfid acquired)',
+                data: { status: 200, body: { dfid } },
+              });
             } catch (e) {
               setError(`register/dev 失败: ${e}`);
             }
@@ -210,12 +238,19 @@ export function KugouDebugModal({ onClose }: Props) {
           const labels: Record<number, string> = { 1: '等待手机扫码', 2: '已扫码，等待手机确认' };
           setQr((prev) =>
             prev.kind === 'waiting'
-              ? { ...prev, statusLabel: labels[code] ?? `status=${code}`, pollCount: prev.pollCount + 1, lastResp: r }
+              ? {
+                  ...prev,
+                  statusLabel: labels[code] ?? `status=${code}`,
+                  pollCount: prev.pollCount + 1,
+                  lastResp: r,
+                }
               : prev,
           );
         } catch (e) {
           setError(`qr check err: ${e}`);
-          setQr((prev) => prev.kind === 'waiting' ? { ...prev, pollCount: prev.pollCount + 1 } : prev);
+          setQr((prev) =>
+            prev.kind === 'waiting' ? { ...prev, pollCount: prev.pollCount + 1 } : prev,
+          );
         }
       }, 2500);
     } catch (e) {
@@ -239,51 +274,56 @@ export function KugouDebugModal({ onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[min(90vw,600px)] sm:max-w-[680px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="max-h-[85vh] w-[min(90vw,600px)] overflow-x-hidden overflow-y-auto sm:max-w-[680px]">
         <DialogHeader>
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
 
-
-        <div className="space-y-4 w-full h-full flex flex-col">
+        <div className="flex h-full w-full flex-col space-y-4">
           {/* QR Login */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={startQrLogin}
               disabled={qr.kind === 'loading' || qr.kind === 'waiting'}
             >
-              {qr.kind === 'loading' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {qr.kind === 'loading' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               扫码登录 (KuGou 手机 App)
             </Button>
             {(qr.kind === 'waiting' || qr.kind === 'error') && (
-              <Button variant="ghost" onClick={cancelQr}>取消</Button>
+              <Button variant="ghost" onClick={cancelQr}>
+                取消
+              </Button>
             )}
           </div>
 
           {qr.kind === 'waiting' && (
-            <div className="flex flex-col items-center gap-2 p-4 border rounded-lg">
-              <img src={qr.image} alt="KuGou QR" className="w-40 h-40" />
-              <Badge variant="secondary">{qr.statusLabel}（已轮询 {qr.pollCount} 次）</Badge>
+            <div className="flex flex-col items-center gap-2 rounded-lg border p-4">
+              <img src={qr.image} alt="KuGou QR" className="h-40 w-40" />
+              <Badge variant="secondary">
+                {qr.statusLabel}（已轮询 {qr.pollCount} 次）
+              </Badge>
               {qr.qrUrl && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <code className="truncate max-w-xs">{qr.qrUrl}</code>
-                  <Button size="sm" variant="ghost" onClick={() => navigator.clipboard.writeText(qr.qrUrl as string)}>
+                <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <code className="max-w-xs truncate">{qr.qrUrl}</code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigator.clipboard.writeText(qr.qrUrl as string)}
+                  >
                     复制
                   </Button>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-muted-foreground text-center text-xs">
                 用 <b>酷狗音乐 App</b>（不是概念版）扫码
               </p>
             </div>
           )}
-          {qr.kind === 'error' && (
-            <p className="text-sm text-destructive">QR: {qr.msg}</p>
-          )}
+          {qr.kind === 'error' && <p className="text-destructive text-sm">QR: {qr.msg}</p>}
 
           {/* Cookie */}
-          <div className="space-y-1.5 w-full">
+          <div className="w-full space-y-1.5">
             <Label>Cookie</Label>
             <Textarea
               rows={3}
@@ -297,10 +337,14 @@ export function KugouDebugModal({ onClose }: Props) {
                   const idx = p.indexOf('=');
                   if (idx > 0) parsed[p.slice(0, idx).trim()] = p.slice(idx + 1).trim();
                 });
-                await saveKugouSession({ token: parsed.token ?? '', userid: parsed.userid ?? '', dfid: parsed.dfid ?? '' });
+                await saveKugouSession({
+                  token: parsed.token ?? '',
+                  userid: parsed.userid ?? '',
+                  dfid: parsed.dfid ?? '',
+                });
               }}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               {refreshedAt > 0
                 ? `登录态已持久化 — token 上次刷新: ${new Date(refreshedAt * 1000).toLocaleString()}`
                 : '未登录'}
@@ -308,30 +352,73 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {/* Session actions */}
-          <div className="flex gap-2 flex-wrap w-full">
-            <Button size="sm" variant="outline" onClick={onRefreshToken} disabled={!cookie || busy !== null}>
-              {busy === 'login/token' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+          <div className="flex w-full flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRefreshToken}
+              disabled={!cookie || busy !== null}
+            >
+              {busy === 'login/token' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               刷新 Token
             </Button>
-            <Button size="sm" variant="outline" onClick={onRegisterDev} disabled={!cookie || busy !== null}>
-              {busy === 'register/dev' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRegisterDev}
+              disabled={!cookie || busy !== null}
+            >
+              {busy === 'register/dev' && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
               重新注册设备
             </Button>
-            <Button size="sm" variant="ghost" onClick={onLogout} disabled={!cookie || busy !== null}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onLogout}
+              disabled={!cookie || busy !== null}
+            >
               清空 session
             </Button>
           </div>
 
           {/* API actions */}
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={onUserDetail} disabled={!cookie || busy !== null}>测试登录</Button>
-            <Button size="sm" variant="outline" onClick={onListPlaylists} disabled={!cookie || busy !== null}>列我的歌单</Button>
-            <Button size="sm" variant="outline" onClick={onUserListen} disabled={!cookie || busy !== null}>累计播放榜</Button>
-            <Button size="sm" variant="outline" onClick={onUserHistory} disabled={!cookie || busy !== null}>最近播放流水</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onUserDetail}
+              disabled={!cookie || busy !== null}
+            >
+              测试登录
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onListPlaylists}
+              disabled={!cookie || busy !== null}
+            >
+              列我的歌单
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onUserListen}
+              disabled={!cookie || busy !== null}
+            >
+              累计播放榜
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onUserHistory}
+              disabled={!cookie || busy !== null}
+            >
+              最近播放流水
+            </Button>
           </div>
 
           {/* Prefer cumulative */}
-          <div className="flex items-start gap-2 w-full">
+          <div className="flex w-full items-start gap-2">
             <Switch
               id="prefer-cumulative"
               checked={preferCumulative}
@@ -341,50 +428,87 @@ export function KugouDebugModal({ onClose }: Props) {
               }}
               className="mt-0.5 shrink-0"
             />
-            <Label htmlFor="prefer-cumulative" className="text-sm cursor-pointer leading-snug">
+            <Label htmlFor="prefer-cumulative" className="cursor-pointer text-sm leading-snug">
               累计播放优先（用 /user/listen 历史挑版本，关闭则取搜索首条）
             </Label>
           </div>
 
           {/* Search */}
-          <div className="flex gap-2 items-center w-full">
+          <div className="flex w-full items-center gap-2">
             <Label className="shrink-0">关键词</Label>
-            <Input className="min-w-0" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-            <Button size="sm" className="shrink-0" onClick={onSearch} disabled={!cookie || busy !== null}>搜索</Button>
+            <Input
+              className="min-w-0"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+            <Button
+              size="sm"
+              className="shrink-0"
+              onClick={onSearch}
+              disabled={!cookie || busy !== null}
+            >
+              搜索
+            </Button>
           </div>
 
           {/* Add track */}
-          <div className="space-y-2 w-full">
-            <div className="flex gap-2 items-center">
-              <Label className="shrink-0 w-12">listid</Label>
-              <Input className="min-w-0" value={listid} onChange={(e) => setListid(e.target.value)} placeholder="从「列我的歌单」结果里挑一个 listid" />
+          <div className="w-full space-y-2">
+            <div className="flex items-center gap-2">
+              <Label className="w-12 shrink-0">listid</Label>
+              <Input
+                className="min-w-0"
+                value={listid}
+                onChange={(e) => setListid(e.target.value)}
+                placeholder="从「列我的歌单」结果里挑一个 listid"
+              />
             </div>
-            <div className="flex gap-2 items-center">
-              <Label className="shrink-0 w-12">data</Label>
-              <Input className="min-w-0" value={songData} onChange={(e) => setSongData(e.target.value)} placeholder="name|hash|album_id|mixsongid" />
-              <Button size="sm" className="shrink-0" onClick={onAddTrack} disabled={!cookie || busy !== null}>加入歌单</Button>
+            <div className="flex items-center gap-2">
+              <Label className="w-12 shrink-0">data</Label>
+              <Input
+                className="min-w-0"
+                value={songData}
+                onChange={(e) => setSongData(e.target.value)}
+                placeholder="name|hash|album_id|mixsongid"
+              />
+              <Button
+                size="sm"
+                className="shrink-0"
+                onClick={onAddTrack}
+                disabled={!cookie || busy !== null}
+              >
+                加入歌单
+              </Button>
             </div>
           </div>
 
           {/* Status */}
           {busy && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
               {busy}
             </div>
           )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-destructive text-sm">{error}</p>}
 
           {/* Result */}
           {result && (
-            <details className="border rounded-lg" open>
-              <summary className="flex items-center justify-between px-3 py-2 cursor-pointer text-sm font-medium select-none">
-                <span>{result.label} → status {result.data.status}</span>
-                <Button size="sm" variant="ghost" onClick={(e) => { e.preventDefault(); copyResult(); }}>
+            <details className="rounded-lg border" open>
+              <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-medium select-none">
+                <span>
+                  {result.label} → status {result.data.status}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    copyResult();
+                  }}
+                >
                   复制
                 </Button>
               </summary>
-              <pre className="p-3 text-xs overflow-auto max-h-60 bg-muted/50 rounded-b-lg whitespace-pre-wrap break-all">
+              <pre className="bg-muted/50 max-h-60 overflow-auto rounded-b-lg p-3 text-xs break-all whitespace-pre-wrap">
                 {JSON.stringify(result.data.body, null, 2)}
               </pre>
             </details>

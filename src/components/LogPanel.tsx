@@ -20,9 +20,22 @@ function parseLevel(log: string): string {
 
   if (isStderrNoise) return 'warning';
 
-  if (log.includes('[error]') || log.includes('失败') || log.includes('process exited')) return 'error';
-  if (log.includes('[warn]') || log.includes('Warning') || log.includes('warn') || log.includes('未连接')) return 'warning';
-  if (log.includes('成功') || log.includes('已连接') || log.includes('connected') || log.includes('done')) return 'success';
+  if (log.includes('[error]') || log.includes('失败') || log.includes('process exited'))
+    return 'error';
+  if (
+    log.includes('[warn]') ||
+    log.includes('Warning') ||
+    log.includes('warn') ||
+    log.includes('未连接')
+  )
+    return 'warning';
+  if (
+    log.includes('成功') ||
+    log.includes('已连接') ||
+    log.includes('connected') ||
+    log.includes('done')
+  )
+    return 'success';
   return 'info';
 }
 
@@ -53,16 +66,16 @@ export function LogPanel({ logs, onClear }: Props) {
   if (logs.length === 0) return null;
 
   return (
-    <details className="overflow-hidden rounded-lg border border-[var(--border-soft)] bg-[var(--bg-elev)] text-xs">
-      <summary className="logs-summary flex cursor-pointer select-none list-none items-center justify-between px-4 py-2 text-[var(--fg-base)] hover:bg-[var(--bg-softer)]">
+    <details className="border-border-soft bg-bg-elev overflow-hidden rounded-lg border text-xs">
+      <summary className="logs-summary text-fg-base hover:bg-bg-softer flex cursor-pointer list-none items-center justify-between px-4 py-1 select-none">
         <span className="font-medium">日志</span>
         <div className="flex items-center gap-2">
-          <span className="text-[var(--fg-faint)]">{logs.length} 条</span>
+          <span className="text-fg-faint">{logs.length} 条</span>
           {onClear && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 gap-1 px-1 text-xs text-[var(--fg-faint)] hover:text-red-500"
+              className="text-fg-faint h-6 gap-1 px-1 text-xs hover:text-red-500"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -77,10 +90,7 @@ export function LogPanel({ logs, onClear }: Props) {
       </summary>
 
       {/* Virtual scrollable log body */}
-      <div
-        ref={bodyRef}
-        className="max-h-[200px] overflow-y-auto border-t border-[var(--border-soft)]"
-      >
+      <div ref={bodyRef} className="border-border-soft max-h-[200px] overflow-y-auto border-t">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {virtualizer.getVirtualItems().map((vRow) => {
             const log = logs[vRow.index];
@@ -91,16 +101,16 @@ export function LogPanel({ logs, onClear }: Props) {
                 key={vRow.index}
                 data-index={vRow.index}
                 ref={virtualizer.measureElement}
-                className="absolute top-0 left-0 flex w-full items-start gap-2 border-b border-[var(--border-softer)] px-4 py-1 text-[var(--fg-muted)] select-text cursor-text"
+                className="border-border-softer text-fg-muted absolute top-0 left-0 flex w-full cursor-text items-start gap-2 border-b px-4 py-1 select-text"
                 style={{ transform: `translateY(${vRow.start}px)` }}
               >
                 {time && (
-                  <span className="mt-0.5 w-14 shrink-0 font-mono text-[10px] text-[var(--fg-faint)]">
+                  <span className="text-fg-faint mt-0.5 w-14 shrink-0 font-mono text-[10px]">
                     {time}
                   </span>
                 )}
                 <span className={`mt-[5px] size-1.5 shrink-0 rounded-full ${levelDot[level]}`} />
-                <span className="min-w-0 break-all leading-relaxed">{log}</span>
+                <span className="min-w-0 leading-relaxed break-all">{log}</span>
               </div>
             );
           })}

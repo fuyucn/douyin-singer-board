@@ -62,10 +62,10 @@ export function AboutModal({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-border-soft flex items-center justify-between border-b px-5 py-4">
+        <div className="border-border-soft flex items-center justify-between border-b px-5 py-2">
           <h2 className="text-fg-base m-0 text-base font-semibold">关于 SUSUSongBoard</h2>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            <Cross2Icon />
+            <Cross2Icon className="size-4" />
           </Button>
         </div>
         {/* Body */}

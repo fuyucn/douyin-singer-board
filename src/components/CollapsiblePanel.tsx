@@ -21,11 +21,7 @@ export function CollapsiblePanel({ children }: Props) {
           <ChevronDown className="ml-auto size-4" />
         )}
       </button>
-      {expanded && (
-        <div className="max-h-[40vh] overflow-y-auto">
-          {children}
-        </div>
-      )}
+      {expanded && <div className="max-h-[40vh] overflow-y-auto">{children}</div>}
     </div>
   );
 }

@@ -14,11 +14,7 @@ import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './u
 import { Button } from '@/components/ui/button';
 
 import { Copy, Trash2, ListPlus, Loader2 } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
@@ -45,26 +41,60 @@ declare const __APP_VERSION__: string;
 
 export default function App() {
   const {
-    config, setConfig, hydrateConfig,
-    running, setRunning,
-    sessionId, newSession, setStatus,
-    songs, removeByMsgId, clearSongs, manualAdd,
-    logs, pushLog, clearLogs,
+    config,
+    setConfig,
+    hydrateConfig,
+    running,
+    setRunning,
+    sessionId,
+    newSession,
+    setStatus,
+    songs,
+    removeByMsgId,
+    clearSongs,
+    manualAdd,
+    logs,
+    pushLog,
+    clearLogs,
     preferCumulative,
-    autoSync, setAutoSync,
-    played, addPlayed, removePlayed, clearPlayed,
-    startupSteps, setStartupStep, resetStartupSteps,
-  } = useAppStore(useShallow((s) => ({
-    config: s.config, setConfig: s.setConfig, hydrateConfig: s.hydrateConfig,
-    running: s.running, setRunning: s.setRunning,
-    sessionId: s.sessionId, newSession: s.newSession, setStatus: s.setStatus,
-    songs: s.songs, removeByMsgId: s.removeByMsgId, clearSongs: s.clearSongs, manualAdd: s.manualAdd,
-    logs: s.logs, pushLog: s.pushLog, clearLogs: s.clearLogs,
-    preferCumulative: s.preferCumulative,
-    autoSync: s.autoSync, setAutoSync: s.setAutoSync,
-    played: s.played, addPlayed: s.addPlayed, removePlayed: s.removePlayed, clearPlayed: s.clearPlayed,
-    startupSteps: s.startupSteps, setStartupStep: s.setStartupStep, resetStartupSteps: s.resetStartupSteps,
-  })));
+    autoSync,
+    setAutoSync,
+    played,
+    addPlayed,
+    removePlayed,
+    clearPlayed,
+    startupSteps,
+    setStartupStep,
+    resetStartupSteps,
+  } = useAppStore(
+    useShallow((s) => ({
+      config: s.config,
+      setConfig: s.setConfig,
+      hydrateConfig: s.hydrateConfig,
+      running: s.running,
+      setRunning: s.setRunning,
+      sessionId: s.sessionId,
+      newSession: s.newSession,
+      setStatus: s.setStatus,
+      songs: s.songs,
+      removeByMsgId: s.removeByMsgId,
+      clearSongs: s.clearSongs,
+      manualAdd: s.manualAdd,
+      logs: s.logs,
+      pushLog: s.pushLog,
+      clearLogs: s.clearLogs,
+      preferCumulative: s.preferCumulative,
+      autoSync: s.autoSync,
+      setAutoSync: s.setAutoSync,
+      played: s.played,
+      addPlayed: s.addPlayed,
+      removePlayed: s.removePlayed,
+      clearPlayed: s.clearPlayed,
+      startupSteps: s.startupSteps,
+      setStartupStep: s.setStartupStep,
+      resetStartupSteps: s.resetStartupSteps,
+    })),
+  );
 
   const {
     blacklist,
@@ -104,8 +134,6 @@ export default function App() {
     splash.style.opacity = '0';
     setTimeout(() => splash.remove(), 200);
   }, []);
-
-
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
 
@@ -276,13 +304,16 @@ export default function App() {
                 disabled={!enabled}
                 onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
               >
-                {entry.status === 'pending'
-                  ? <Loader2 className="size-3.5 animate-spin" />
-                  : <ListPlus className="size-3.5" />
-                }
+                {entry.status === 'pending' ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ListPlus className="size-3.5" />
+                )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">{title || '加入歌单'}</TooltipContent>
+            <TooltipContent side="top" className="text-xs">
+              {title || '加入歌单'}
+            </TooltipContent>
           </Tooltip>
         )}
         <Tooltip>
@@ -296,7 +327,9 @@ export default function App() {
               <Copy className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">复制歌名</TooltipContent>
+          <TooltipContent side="top" className="text-xs">
+            复制歌名
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger>
@@ -309,7 +342,9 @@ export default function App() {
               <Trash2 className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">删除</TooltipContent>
+          <TooltipContent side="top" className="text-xs">
+            删除
+          </TooltipContent>
         </Tooltip>
       </div>
     );
@@ -327,7 +362,9 @@ export default function App() {
           <Copy className="size-3.5" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top" className="text-xs">复制歌名</TooltipContent>
+      <TooltipContent side="top" className="text-xs">
+        复制歌名
+      </TooltipContent>
     </Tooltip>
   );
 
@@ -386,9 +423,7 @@ export default function App() {
 
         {/* Error banner */}
         {bootError && (
-          <div className="bg-danger-soft-bg text-danger-soft-fg px-5 py-2 text-sm">
-            {bootError}
-          </div>
+          <div className="bg-danger-soft-bg text-danger-soft-fg px-5 py-2 text-sm">{bootError}</div>
         )}
 
         {/* Update banner */}
@@ -431,7 +466,7 @@ export default function App() {
                 onManualTextChange={setManualText}
                 onManualAdd={onManualAdd}
                 onAutoSyncToggle={() => setAutoSync(!autoSync)}
-              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+                appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
               />
             </CollapsiblePanel>
 

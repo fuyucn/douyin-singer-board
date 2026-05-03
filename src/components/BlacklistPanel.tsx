@@ -1,11 +1,7 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { X, ShieldOff } from 'lucide-react';
 
 interface Props {
@@ -73,7 +69,9 @@ export function BlacklistPanel({ items, onRemove }: Props) {
                       <X className="size-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left" className="text-xs">移出黑名单</TooltipContent>
+                  <TooltipContent side="left" className="text-xs">
+                    移出黑名单
+                  </TooltipContent>
                 </Tooltip>
               </div>
             );

@@ -34,7 +34,7 @@ export function AppHeader({
   const isNarrow = windowWidth < 720;
 
   return (
-    <header className="flex h-12 shrink-0 items-center border-b border-[var(--border-soft)] bg-[var(--bg-elev)] px-4 gap-3">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--border-soft)] bg-[var(--bg-elev)] px-4">
       {/* Logo + title */}
       <AppLogo />
       <span className="font-semibold text-[var(--fg-base)]">SUSUSongBoard</span>
@@ -65,8 +65,9 @@ export function AppHeader({
         >
           <img
             src="/kugou.svg"
-            className={`block h-5 w-5 rounded-full object-contain ${kugouLoggedIn ? '' : 'opacity-40 grayscale'}`}
+            className={`block size-4 rounded-full object-contain ${kugouLoggedIn ? '' : 'opacity-80 grayscale'}`}
             alt="KuGou"
+            draggable={false}
           />
         </Button>
 
@@ -87,7 +88,7 @@ export function AppHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
+          className="text-fg-muted hover:text-fg-base size-8"
           onClick={onShowAbout}
           title="关于 / 检查更新"
         >
@@ -98,7 +99,11 @@ export function AppHeader({
         {!running ? (
           <Button
             size={isNarrow ? 'icon' : 'sm'}
-            className={isNarrow ? 'ml-2 size-8 bg-blue-500 text-white hover:bg-blue-600' : 'ml-2 h-8 gap-1.5 bg-blue-500 px-4 text-white hover:bg-blue-600'}
+            className={
+              isNarrow
+                ? 'ml-2 size-8 bg-blue-500 text-white hover:bg-blue-600'
+                : 'ml-2 h-8 gap-1.5 bg-blue-500 px-4 text-white hover:bg-blue-600'
+            }
             onClick={onStart}
             title="开始"
           >

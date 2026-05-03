@@ -47,7 +47,7 @@ export function useBlacklist() {
     await sync(names);
   };
 
-  const getNames = () => loadBlacklist().then(rows => rows.map(r => r.song_name));
+  const getNames = () => loadBlacklist().then((rows) => rows.map((r) => r.song_name));
 
   return { blacklist, add, remove, getNames };
 }
