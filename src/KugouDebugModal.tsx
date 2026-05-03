@@ -32,14 +32,14 @@ type QrState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | {
-      kind: 'waiting';
-      key: string;
-      image: string;
-      qrUrl: string;
-      statusLabel: string;
-      pollCount: number;
-      lastResp: ApiResult | null;
-    }
+    kind: 'waiting';
+    key: string;
+    image: string;
+    qrUrl: string;
+    statusLabel: string;
+    pollCount: number;
+    lastResp: ApiResult | null;
+  }
   | { kind: 'error'; msg: string };
 
 export function KugouDebugModal({ onClose }: Props) {
@@ -239,12 +239,12 @@ export function KugouDebugModal({ onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[90vw] sm:max-w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="w-[min(90vw,600px)] sm:max-w-[680px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
 
-    
+
         <div className="space-y-4 w-full h-full flex flex-col">
           {/* QR Login */}
           <div className="flex gap-2 flex-wrap">
@@ -384,7 +384,7 @@ export function KugouDebugModal({ onClose }: Props) {
                   复制
                 </Button>
               </summary>
-              <pre className="p-3 text-xs overflow-auto max-h-60 bg-muted/50 rounded-b-lg">
+              <pre className="p-3 text-xs overflow-auto max-h-60 bg-muted/50 rounded-b-lg whitespace-pre-wrap break-all">
                 {JSON.stringify(result.data.body, null, 2)}
               </pre>
             </details>
