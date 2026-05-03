@@ -28,7 +28,7 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
             key={item.label}
             variant="ghost"
             size="sm"
-            className="block w-full justify-start rounded-none px-3 py-1.5 text-left text-xs truncate"
+            className="block w-full justify-start truncate rounded-none px-3 py-1.5 text-left text-xs"
             disabled={item.disabled}
             onClick={() => {
               item.onClick();
