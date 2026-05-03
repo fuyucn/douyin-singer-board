@@ -12,6 +12,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, copyFileSync, rmSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { patchWindowsSubsystem } from '../../scripts/patch-pe-subsystem.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sidecarDir = resolve(__dirname, '..');
@@ -68,4 +69,8 @@ execSync(`npx @yao-pkg/pkg build/index.cjs --target ${target} --output ${tmp}`, 
 });
 
 copyFileSync(tmp, outPath);
+
+// Patch Windows .exe to use WINDOWS subsystem (no console window on startup).
+if (ext === '.exe') patchWindowsSubsystem(outPath);
+
 console.log(`[ok] ${outPath}`);

@@ -14,6 +14,7 @@ import { mkdirSync, existsSync, copyFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { patchWindowsSubsystem } from './patch-pe-subsystem.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -80,4 +81,8 @@ execSync(
 
 copyFileSync(tmp, outPath);
 try { rmSync(tmp); } catch {}
+
+// Patch Windows .exe to use WINDOWS subsystem (no console window on startup).
+if (ext === '.exe') patchWindowsSubsystem(outPath);
+
 console.log(`[ok] ${outPath}`);
