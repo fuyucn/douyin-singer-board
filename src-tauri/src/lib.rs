@@ -86,9 +86,22 @@ pub fn run() {
             app.manage(handle.clone());
 
             let app_handle = app.handle().clone();
+            let handle_spawn = handle.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = handle.spawn(app_handle.clone()).await {
+                if let Err(e) = handle_spawn.spawn(app_handle.clone()).await {
                     eprintln!("[tauri] sidecar spawn failed: {}", e);
+                }
+            });
+
+            // Kill sidecar when the main window is destroyed (covers Alt+F4,
+            // taskbar close, and OS shutdown on Windows where kill_on_drop
+            // is unreliable).
+            let win = app.get_webview_window("main").unwrap();
+            let handle_exit = handle.clone();
+            win.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    let h = handle_exit.clone();
+                    tauri::async_runtime::spawn(async move { h.kill().await });
                 }
             });
 

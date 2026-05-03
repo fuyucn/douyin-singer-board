@@ -24,11 +24,31 @@ const SIDECAR_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sidecar.bin
 
 pub struct SidecarHandle {
     stdin: Mutex<Option<ChildStdin>>,
+    pid: Mutex<Option<u32>>,
 }
 
 impl SidecarHandle {
     pub fn new() -> Self {
-        Self { stdin: Mutex::new(None) }
+        Self { stdin: Mutex::new(None), pid: Mutex::new(None) }
+    }
+
+    pub async fn kill(&self) {
+        if let Some(pid) = *self.pid.lock().await {
+            #[cfg(windows)]
+            {
+                // taskkill /F /T kills the whole process tree, including any
+                // child Node processes spawned by the sidecar.
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .output();
+            }
+            #[cfg(unix)]
+            {
+                let _ = std::process::Command::new("kill")
+                    .args(["-TERM", &pid.to_string()])
+                    .output();
+            }
+        }
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
@@ -104,6 +124,7 @@ impl SidecarHandle {
         let stdin = child.stdin.take().ok_or("no stdin")?;
 
         *self.stdin.lock().await = Some(stdin);
+        *self.pid.lock().await = child.id();
 
         // stdout: parse JSON, forward as sidecar-event.
         let app_out = app.clone();
