@@ -95,6 +95,8 @@ export default function App() {
     if (kugouLoggedIn) setStartupStep('kugou', 'done');
   }, [kugouLoggedIn, setStartupStep]);
 
+
+
   const display = useMemo(() => dedupedSongs(songs), [songs]);
 
   const kugouCache = useKugouSearch({

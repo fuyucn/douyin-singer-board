@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles.css';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // Disable in-app refresh: Cmd+R / Ctrl+R / F5 always; right-click context menu
 // (which contains "Reload" on Linux/Windows WebViews) only in production builds
@@ -19,12 +18,8 @@ if (import.meta.env.PROD) {
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
-root.render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
 );
-
-// Show window only after React has rendered, avoiding the black-screen flash.
-getCurrentWindow().show();
