@@ -287,12 +287,6 @@ export default function App() {
     toast(`[自动] 已加入歌单: ${track.filename}`);
   };
 
-  const onAutoBlocked = (_track: KuGouTrack, song: DanmuInfo, reason: string) => {
-    removeByMsgId(song.msg_id);
-    deleteHistoryByMsgId(song.msg_id).catch(() => {});
-    pushLog(`[auto-sync] skipped: ${song.song_name} (${reason})`);
-  };
-
   useAutoSync({
     autoSync,
     songs: display,
@@ -300,7 +294,6 @@ export default function App() {
     targetPlaylistId: config.target_playlist_id,
     kugouLoggedIn,
     onSynced: onAutoSynced,
-    onBlocked: onAutoBlocked,
     pushLog,
   });
 
