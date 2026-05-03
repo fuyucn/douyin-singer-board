@@ -239,7 +239,7 @@ export function KugouDebugModal({ onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[min(90vw,680px)] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[min(90vw,680px)] sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
