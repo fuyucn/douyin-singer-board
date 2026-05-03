@@ -41,18 +41,15 @@ impl SidecarHandle {
         }
         let version = env!("CARGO_PKG_VERSION");
         let ext = if cfg!(windows) { ".exe" } else { "" };
-        // Layout: <app_local_data_dir>/sidecar/<version>/bin[.exe]
-        let base = app
+        // Layout: <app_local_data_dir>/<version>/sidecar/bin[.exe]
+        let data_dir = app
             .path()
             .app_local_data_dir()
-            .map_err(|e| format!("app_local_data_dir: {e}"))?
-            .join("sidecar");
-        let dir = base.join(version);
+            .map_err(|e| format!("app_local_data_dir: {e}"))?;
+        let dir = data_dir.join(version).join("sidecar");
         let path = dir.join(format!("bin{ext}"));
 
-        if !dir.exists() {
-            let _ = std::fs::remove_dir_all(&base);
-        }
+        // Stale version cleanup is handled by kugou_api on startup.
         std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir sidecar: {}", e))?;
 
         let needs_extract = !path.exists();
