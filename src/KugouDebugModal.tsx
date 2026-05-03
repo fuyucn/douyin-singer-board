@@ -347,20 +347,20 @@ export function KugouDebugModal({ onClose }: Props) {
           {/* Search */}
           <div className="flex gap-2 items-center">
             <Label className="shrink-0">关键词</Label>
-            <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} />
-            <Button size="sm" onClick={onSearch} disabled={!cookie || busy !== null}>搜索</Button>
+            <Input className="min-w-0" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+            <Button size="sm" className="shrink-0" onClick={onSearch} disabled={!cookie || busy !== null}>搜索</Button>
           </div>
 
           {/* Add track */}
           <div className="space-y-2">
             <div className="flex gap-2 items-center">
               <Label className="shrink-0 w-12">listid</Label>
-              <Input value={listid} onChange={(e) => setListid(e.target.value)} placeholder="从「列我的歌单」结果里挑一个 listid" />
+              <Input className="min-w-0" value={listid} onChange={(e) => setListid(e.target.value)} placeholder="从「列我的歌单」结果里挑一个 listid" />
             </div>
             <div className="flex gap-2 items-center">
               <Label className="shrink-0 w-12">data</Label>
-              <Input value={songData} onChange={(e) => setSongData(e.target.value)} placeholder="name|hash|album_id|mixsongid" />
-              <Button size="sm" onClick={onAddTrack} disabled={!cookie || busy !== null}>加入歌单</Button>
+              <Input className="min-w-0" value={songData} onChange={(e) => setSongData(e.target.value)} placeholder="name|hash|album_id|mixsongid" />
+              <Button size="sm" className="shrink-0" onClick={onAddTrack} disabled={!cookie || busy !== null}>加入歌单</Button>
             </div>
           </div>
 
