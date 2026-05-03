@@ -271,10 +271,6 @@ export default function App() {
       );
       return;
     }
-    if (isInCooldown(song.song_name)) {
-      toast(`${song.song_name} 已在30分钟内添加过，跳过`);
-      return;
-    }
     try {
       await addTrackToPlaylist(track, config.target_playlist_id);
       removeByMsgId(song.msg_id);

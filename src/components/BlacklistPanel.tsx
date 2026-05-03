@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputGroup } from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { X, ShieldOff, Plus } from 'lucide-react';
 
@@ -45,24 +45,23 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
   };
 
   const addBar = (
-    <div className="flex shrink-0 items-center border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2">
-      <InputGroup className="h-7 flex-1">
-        <Input
+    <div className="flex shrink-0 items-center bg-bg-elev dark:bg-bg-soft px-3 py-2">
+      <InputGroup >
+        <InputGroupInput
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="输入歌手名…"
-          className="h-full flex-1 border-0 bg-transparent px-2 text-xs shadow-none focus-visible:ring-0"
         />
-        <Button
-          size="sm"
-          className="h-full shrink-0 rounded-none rounded-r-[7px] px-3 text-xs"
-          disabled={!input.trim()}
-          onClick={handleAdd}
-        >
-          <Plus className="size-3" />
-          添加
-        </Button>
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            disabled={!input.trim()}
+            onClick={handleAdd}
+          >
+            <Plus className="size-4" />
+            添加
+          </InputGroupButton>
+        </InputGroupAddon>
       </InputGroup>
     </div>
   );
@@ -71,7 +70,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {addBar}
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--fg-faint)]">
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-fg-faint">
           <ShieldOff className="size-8 opacity-30" />
           <p className="text-sm">黑名单为空</p>
           <p className="text-xs">右键点歌列表可添加歌曲/歌手</p>
@@ -85,7 +84,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
       {addBar}
 
       {/* Header */}
-      <div className="flex shrink-0 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2 text-xs font-medium text-[var(--fg-muted)]">
+      <div className="flex shrink-0 border-b border-border-soft bg-bg-soft px-4 py-2 text-xs font-medium text-fg-muted">
         <div className="w-12">类型</div>
         <div className="flex-1">歌曲名</div>
         <div className="w-28">歌手</div>
@@ -106,16 +105,15 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                 key={id}
                 data-index={vRow.index}
                 ref={virtualizer.measureElement}
-                className="group absolute top-0 left-0 flex w-full items-center border-b border-[var(--border-softer)] px-4 transition-colors hover:bg-[var(--bg-softer)]"
+                className="group absolute top-0 left-0 flex w-full items-center border-b border-border-softer px-4 transition-colors hover:bg-[var(--bg-softer)]"
                 style={{ transform: `translateY(${vRow.start}px)`, height: ROW_HEIGHT }}
               >
                 <span className="w-12 shrink-0">
                   <span
-                    className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                      entryType === 'singer'
-                        ? 'bg-purple-500/10 text-purple-400'
-                        : 'bg-blue-500/10 text-blue-400'
-                    }`}
+                    className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${entryType === 'singer'
+                      ? 'bg-purple-500/10 text-purple-400'
+                      : 'bg-blue-500/10 text-blue-400'
+                      }`}
                   >
                     {entryType === 'singer' ? '歌手' : '歌曲'}
                   </span>
@@ -132,7 +130,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="size-7 text-[var(--fg-faint)] opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                      className="size-7 text-fg-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
                       onClick={() => onRemove(id)}
                     >
                       <X className="size-3.5" />

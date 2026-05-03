@@ -268,7 +268,7 @@ export function MainContent({
           className="flex min-h-0 flex-1 flex-col gap-y-0"
         >
           {/* Tab bar */}
-          <div className="flex shrink-0 items-center justify-between px-4">
+          <div className="flex shrink-0 items-center justify-between px-3 py-1">
             <TabsList variant={'line'} className="">
               {tabDefs.map((t) => (
                 <TabsTrigger className={'after:opacity-0!'} key={t.key} value={t.key}>
