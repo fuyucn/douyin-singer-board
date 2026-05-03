@@ -239,7 +239,7 @@ export function KugouDebugModal({ onClose }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[90vw] sm:max-w-[90vw] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[90vw] sm:max-w-[90vw] max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
@@ -287,6 +287,7 @@ export function KugouDebugModal({ onClose }: Props) {
             <Label>Cookie</Label>
             <Textarea
               rows={3}
+              className="break-all"
               placeholder="扫码登录后自动持久化到 SQLite。手动编辑可改 token / userid / dfid"
               value={cookie}
               onChange={(e) => setCookie(e.target.value)}
