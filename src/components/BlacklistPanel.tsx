@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InputGroup } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { X, ShieldOff, Plus } from 'lucide-react';
 
@@ -44,24 +45,25 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
   };
 
   const addBar = (
-    <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2">
-      <Input
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="输入歌手名…"
-        className="h-7 flex-1 text-xs"
-      />
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 shrink-0 gap-1 text-xs"
-        disabled={!input.trim()}
-        onClick={handleAdd}
-      >
-        <Plus className="size-3" />
-        添加歌手
-      </Button>
+    <div className="flex shrink-0 items-center border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2">
+      <InputGroup className="h-7 flex-1">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="输入歌手名…"
+          className="h-full flex-1 border-0 bg-transparent px-2 text-xs shadow-none focus-visible:ring-0"
+        />
+        <Button
+          size="sm"
+          className="h-full shrink-0 rounded-none rounded-r-[7px] px-3 text-xs"
+          disabled={!input.trim()}
+          onClick={handleAdd}
+        >
+          <Plus className="size-3" />
+          添加
+        </Button>
+      </InputGroup>
     </div>
   );
 
