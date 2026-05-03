@@ -18,6 +18,10 @@ const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api
 static PORT: OnceCell<u16> = OnceCell::const_new();
 static PID: OnceCell<u32> = OnceCell::const_new();
 
+pub fn get_pid() -> Option<u32> {
+    PID.get().copied()
+}
+
 pub struct KugouApiHandle;
 
 impl KugouApiHandle {

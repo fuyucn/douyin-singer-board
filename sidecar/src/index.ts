@@ -17,6 +17,7 @@ import type { Config, SidecarCmd, SidecarEvent } from './types.js';
 let DouYinDanmaClient: any = null;
 let listener: any = null;
 let matcher: Matcher | null = null;
+let companionPid: number | null = null;
 
 function emit(ev: SidecarEvent): void {
   process.stdout.write(JSON.stringify(ev) + '\n');
@@ -182,6 +183,10 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
         if (matcher) matcher.reload(cmd.config);
         else log('warn', 'reload_config before start, ignored');
         break;
+      case 'set_companion_pid':
+        companionPid = cmd.pid;
+        log('info', `companion pid set: ${cmd.pid}`);
+        break;
     }
   } catch (e) {
     emit({ event: 'error', msg: String((e as Error)?.message ?? e) });
@@ -203,7 +208,7 @@ process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
 process.on('SIGINT', () => void stop().then(() => process.exit(0)));
 
 // Parent process watchdog — exit if the Tauri parent disappears.
-// Covers crashes and force-kills where Destroyed event never fires.
+// Also kills the companion kugou-api process if one was registered.
 // Only exit on ESRCH (process not found); ignore EPERM/other errors
 // so we don't false-positive on Windows permission checks.
 const parentPid = process.ppid;
@@ -213,6 +218,17 @@ setInterval(() => {
   } catch (e: any) {
     if (e?.code === 'ESRCH') {
       log('info', 'parent process gone, exiting');
+      if (companionPid !== null) {
+        try {
+          if (process.platform === 'win32') {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { execSync } = require('node:child_process') as typeof import('node:child_process');
+            execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
+          } else {
+            process.kill(companionPid, 'SIGTERM');
+          }
+        } catch {}
+      }
       void stop().then(() => process.exit(0));
     }
   }

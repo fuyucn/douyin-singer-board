@@ -20,7 +20,8 @@ export interface DanmuInfo {
 export type SidecarCmd =
   | { cmd: 'start'; config: Config }
   | { cmd: 'stop' }
-  | { cmd: 'reload_config'; config: Config };
+  | { cmd: 'reload_config'; config: Config }
+  | { cmd: 'set_companion_pid'; pid: number };
 
 export type SidecarEvent =
   | { event: 'status'; connected: boolean; message?: string }

@@ -98,9 +98,18 @@ pub fn run() {
 
             let app_handle_kg = app.handle().clone();
             let kugou_spawn = kugou_api_handle.clone();
+            let handle_notify = handle.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = kugou_spawn.spawn(app_handle_kg.clone()).await {
                     eprintln!("[tauri] kugou-api spawn failed: {}", e);
+                    return;
+                }
+                // Tell sidecar the kugou-api pid so it can kill it on watchdog exit.
+                if let Some(pid) = kugou_api::get_pid() {
+                    let cmd = serde_json::json!({ "cmd": "set_companion_pid", "pid": pid });
+                    if let Err(e) = handle_notify.send(cmd).await {
+                        eprintln!("[tauri] set_companion_pid failed: {e}");
+                    }
                 }
             });
 
