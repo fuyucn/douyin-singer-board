@@ -7,36 +7,17 @@ export async function getDb(): Promise<Database> {
   if (_db) return _db;
   _db = await Database.load('sqlite:sususongboard.db');
 
-  // Migrate/create blacklist table (frontend-managed, not in Tauri migrations)
-  const tables = await _db.select<{ name: string }[]>(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='blacklist'",
-  );
-
-  if (tables.length === 0) {
-    // Fresh install — create new schema
-    await _db.execute(
-      `CREATE TABLE blacklist (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
-        song_name TEXT NOT NULL DEFAULT '',
-        singer_name TEXT NOT NULL DEFAULT '',
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
-      )`,
-    );
-    await _db.execute(
-      "CREATE UNIQUE INDEX idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
-    );
-    await _db.execute(
-      "CREATE UNIQUE INDEX idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
-    );
-  } else {
-    // Check if migration needed (old table lacks entry_type column)
-    const cols = await _db.select<{ name: string }[]>(
-      'PRAGMA table_info(blacklist)',
-    );
-    const hasEntryType = cols.some((c) => c.name === 'entry_type');
-    if (!hasEntryType) {
-      // Migrate: create new table, copy data, swap
+  // Migrate/create blacklist table (frontend-managed, not in Tauri migrations).
+  // Use try/catch probing instead of sqlite_master queries — more robust across
+  // tauri-plugin-sql versions that may not expose system tables via select().
+  try {
+    // Probe: does the new schema already exist?
+    await _db.execute("SELECT entry_type FROM blacklist LIMIT 0");
+  } catch {
+    // New schema not found — check if the OLD schema exists
+    try {
+      await _db.execute("SELECT song_name FROM blacklist LIMIT 0");
+      // Old schema exists → migrate
       await _db.execute(
         `CREATE TABLE blacklist_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,10 +33,27 @@ export async function getDb(): Promise<Database> {
       await _db.execute('DROP TABLE blacklist');
       await _db.execute('ALTER TABLE blacklist_new RENAME TO blacklist');
       await _db.execute(
-        "CREATE UNIQUE INDEX idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
       );
       await _db.execute(
-        "CREATE UNIQUE INDEX idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
+      );
+    } catch {
+      // Neither schema exists → fresh install
+      await _db.execute(
+        `CREATE TABLE blacklist (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
+          song_name TEXT NOT NULL DEFAULT '',
+          singer_name TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`,
+      );
+      await _db.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
+      );
+      await _db.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
       );
     }
   }
