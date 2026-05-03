@@ -140,8 +140,9 @@ impl KugouApiHandle {
         let mut wrap = CommandWrap::from(cmd);
         #[cfg(windows)]
         {
+            use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
             const CREATE_NO_WINDOW: u32 = 0x08000000;
-            wrap.wrap(CreationFlags(CREATE_NO_WINDOW.into()));
+            wrap.wrap(CreationFlags(PROCESS_CREATION_FLAGS(CREATE_NO_WINDOW)));
             wrap.wrap(JobObject);
         }
         #[cfg(unix)]
