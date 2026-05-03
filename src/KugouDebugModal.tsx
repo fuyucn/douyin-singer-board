@@ -244,7 +244,8 @@ export function KugouDebugModal({ onClose }: Props) {
           <DialogTitle>KuGou API 调试面板</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+    
+        <div className="space-y-4 w-full h-full flex flex-col">
           {/* QR Login */}
           <div className="flex gap-2 flex-wrap">
             <Button
@@ -282,7 +283,7 @@ export function KugouDebugModal({ onClose }: Props) {
           )}
 
           {/* Cookie */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 w-full">
             <Label>Cookie</Label>
             <Textarea
               rows={3}
@@ -306,7 +307,7 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {/* Session actions */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap w-full">
             <Button size="sm" variant="outline" onClick={onRefreshToken} disabled={!cookie || busy !== null}>
               {busy === 'login/token' && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
               刷新 Token
@@ -329,7 +330,7 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {/* Prefer cumulative */}
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 w-full">
             <Switch
               id="prefer-cumulative"
               checked={preferCumulative}
@@ -345,14 +346,14 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {/* Search */}
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center w-full">
             <Label className="shrink-0">关键词</Label>
             <Input className="min-w-0" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
             <Button size="sm" className="shrink-0" onClick={onSearch} disabled={!cookie || busy !== null}>搜索</Button>
           </div>
 
           {/* Add track */}
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             <div className="flex gap-2 items-center">
               <Label className="shrink-0 w-12">listid</Label>
               <Input className="min-w-0" value={listid} onChange={(e) => setListid(e.target.value)} placeholder="从「列我的歌单」结果里挑一个 listid" />
