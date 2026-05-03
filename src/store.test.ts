@@ -162,7 +162,9 @@ describe('useAppStore', () => {
   });
 
   describe('blacklist', () => {
-    const songEntry = (over?: Partial<{ id: number; songName: string; singerName: string; createdAt: number }>) => ({
+    const songEntry = (
+      over?: Partial<{ id: number; songName: string; singerName: string; createdAt: number }>,
+    ) => ({
       id: over?.id ?? 1,
       entryType: 'song' as const,
       songName: over?.songName ?? 'bad song',
@@ -170,7 +172,9 @@ describe('useAppStore', () => {
       createdAt: over?.createdAt ?? 123,
     });
 
-    const singerEntry = (over?: Partial<{ id: number; singerName: string; createdAt: number }>) => ({
+    const singerEntry = (
+      over?: Partial<{ id: number; singerName: string; createdAt: number }>,
+    ) => ({
       id: over?.id ?? 1,
       entryType: 'singer' as const,
       songName: '',
@@ -195,8 +199,12 @@ describe('useAppStore', () => {
     });
 
     it('removeFromBlacklist removes by id and rebuilds sets', () => {
-      useAppStore.getState().addSongToBlacklist(songEntry({ id: 1, songName: 'a', singerName: 'SA' }));
-      useAppStore.getState().addSongToBlacklist(songEntry({ id: 2, songName: 'b', singerName: 'SB' }));
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 1, songName: 'a', singerName: 'SA' }));
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 2, songName: 'b', singerName: 'SB' }));
       useAppStore.getState().removeFromBlacklist(1);
       expect(useAppStore.getState().blacklist).toHaveLength(1);
       expect(useAppStore.getState().blacklist[0].id).toBe(2);
@@ -217,11 +225,15 @@ describe('useAppStore', () => {
     });
 
     it('blockedSongKeys is independent per add (no mutation of previous)', () => {
-      useAppStore.getState().hydrateBlacklist([
-        { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
-      ]);
+      useAppStore
+        .getState()
+        .hydrateBlacklist([
+          { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
+        ]);
       const first = useAppStore.getState().blockedSongKeys;
-      useAppStore.getState().addSongToBlacklist(songEntry({ id: 2, songName: 'y', singerName: 'SY' }));
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 2, songName: 'y', singerName: 'SY' }));
       expect(first.has('y|SY')).toBe(false);
     });
   });

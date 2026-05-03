@@ -11,10 +11,10 @@ export async function getDb(): Promise<Database> {
   // Use try/catch probing — db.execute() may throw for non-schema reasons on
   // SELECT, so all CREATE paths are guarded with IF NOT EXISTS for idempotency.
   try {
-    await _db.execute("SELECT entry_type FROM blacklist LIMIT 0");
+    await _db.execute('SELECT entry_type FROM blacklist LIMIT 0');
   } catch {
     try {
-      await _db.execute("SELECT song_name FROM blacklist LIMIT 0");
+      await _db.execute('SELECT song_name FROM blacklist LIMIT 0');
       // Old schema found → migrate
       await _db.execute(
         `CREATE TABLE IF NOT EXISTS blacklist_new (

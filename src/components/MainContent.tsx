@@ -325,7 +325,11 @@ export function MainContent({
           </TabsContent>
 
           <TabsContent value="blacklist" className="m-0 min-h-0 flex-1 overflow-hidden">
-            <BlacklistPanel items={blacklistItems} onRemove={onRemoveBlacklist} onAddSinger={onAddSingerBlacklist} />
+            <BlacklistPanel
+              items={blacklistItems}
+              onRemove={onRemoveBlacklist}
+              onAddSinger={onAddSingerBlacklist}
+            />
           </TabsContent>
         </Tabs>
       </div>
