@@ -537,6 +537,9 @@ export default function App() {
                 removeBlacklist(id);
                 toast('已移出黑名单');
               }}
+              onAddSingerBlacklist={(singerName) => {
+                addBlacklistSinger(singerName);
+              }}
             />
           </div>
         ) : (
@@ -573,6 +576,9 @@ export default function App() {
               onRemoveBlacklist={(id) => {
                 removeBlacklist(id);
                 toast('已移出黑名单');
+              }}
+              onAddSingerBlacklist={(singerName) => {
+                addBlacklistSinger(singerName);
               }}
             />
           </div>

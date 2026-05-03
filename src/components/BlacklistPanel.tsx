@@ -1,8 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { X, ShieldOff } from 'lucide-react';
+import { X, ShieldOff, Plus } from 'lucide-react';
 
 export interface BlacklistItemUI {
   id: number;
@@ -15,12 +15,14 @@ export interface BlacklistItemUI {
 interface Props {
   items: BlacklistItemUI[];
   onRemove: (id: number) => void;
+  onAddSinger: (singerName: string) => void;
 }
 
 const ROW_HEIGHT = 40;
 
-export function BlacklistPanel({ items, onRemove }: Props) {
+export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState('');
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -29,18 +31,57 @@ export function BlacklistPanel({ items, onRemove }: Props) {
     overscan: 8,
   });
 
+  const handleAdd = () => {
+    const name = input.trim();
+    if (!name) return;
+    onAddSinger(name);
+    setInput('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleAdd();
+  };
+
+  const addBar = (
+    <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2">
+      <input
+        type="text"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="输入歌手名…"
+        className="h-7 flex-1 rounded border border-[var(--border-soft)] bg-[var(--bg-base)] px-2 text-xs text-[var(--fg-base)] outline-none placeholder:text-[var(--fg-faint)] focus:border-[var(--accent)]"
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 shrink-0 gap-1 text-xs"
+        disabled={!input.trim()}
+        onClick={handleAdd}
+      >
+        <Plus className="size-3" />
+        添加歌手
+      </Button>
+    </div>
+  );
+
   if (items.length === 0) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--fg-faint)]">
-        <ShieldOff className="size-8 opacity-30" />
-        <p className="text-sm">黑名单为空</p>
-        <p className="text-xs">右键点歌列表可添加</p>
+      <div className="flex min-h-0 flex-1 flex-col">
+        {addBar}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-[var(--fg-faint)]">
+          <ShieldOff className="size-8 opacity-30" />
+          <p className="text-sm">黑名单为空</p>
+          <p className="text-xs">右键点歌列表可添加歌曲/歌手</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {addBar}
+
       {/* Header */}
       <div className="flex shrink-0 border-b border-[var(--border-soft)] bg-[var(--bg-soft)] px-4 py-2 text-xs font-medium text-[var(--fg-muted)]">
         <div className="w-12">类型</div>

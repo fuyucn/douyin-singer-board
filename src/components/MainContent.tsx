@@ -27,6 +27,7 @@ interface Props {
   renderSongActions: (s: DanmuInfo) => React.ReactNode;
   renderPlayedActions: (s: DanmuInfo) => React.ReactNode;
   onRemoveBlacklist: (id: number) => void;
+  onAddSingerBlacklist: (singerName: string) => void;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -214,6 +215,7 @@ export function MainContent({
   renderSongActions,
   renderPlayedActions,
   onRemoveBlacklist,
+  onAddSingerBlacklist,
 }: Props) {
   const songsColumns = useSongsColumns();
   const playedColumns = usePlayedColumns();
@@ -323,7 +325,7 @@ export function MainContent({
           </TabsContent>
 
           <TabsContent value="blacklist" className="m-0 min-h-0 flex-1 overflow-hidden">
-            <BlacklistPanel items={blacklistItems} onRemove={onRemoveBlacklist} />
+            <BlacklistPanel items={blacklistItems} onRemove={onRemoveBlacklist} onAddSinger={onAddSingerBlacklist} />
           </TabsContent>
         </Tabs>
       </div>
