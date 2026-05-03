@@ -93,25 +93,31 @@ pub fn run() {
                 }
             });
 
-            // Kill sidecar when the main window is destroyed (covers Alt+F4,
-            // taskbar close, and OS shutdown on Windows where kill_on_drop
-            // is unreliable).
-            let win = app.get_webview_window("main").unwrap();
-            let handle_exit = handle.clone();
-            win.on_window_event(move |event| {
-                if let tauri::WindowEvent::Destroyed = event {
-                    let h = handle_exit.clone();
-                    tauri::async_runtime::spawn(async move { h.kill().await });
-                }
-            });
-
             let kugou_api_handle = Arc::new(kugou_api::KugouApiHandle::new());
             app.manage(kugou_api_handle.clone());
 
             let app_handle_kg = app.handle().clone();
+            let kugou_spawn = kugou_api_handle.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = kugou_api_handle.spawn(app_handle_kg.clone()).await {
+                if let Err(e) = kugou_spawn.spawn(app_handle_kg.clone()).await {
                     eprintln!("[tauri] kugou-api spawn failed: {}", e);
+                }
+            });
+
+            // Kill all child processes when the main window is destroyed.
+            // Covers Alt+F4, taskbar close, OS shutdown on Windows where
+            // kill_on_drop is unreliable.
+            let win = app.get_webview_window("main").unwrap();
+            let handle_exit = handle.clone();
+            let kugou_exit = kugou_api_handle.clone();
+            win.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    let h = handle_exit.clone();
+                    let k = kugou_exit.clone();
+                    tauri::async_runtime::spawn(async move {
+                        h.kill().await;
+                        k.kill().await;
+                    });
                 }
             });
 

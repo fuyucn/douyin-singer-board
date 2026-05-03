@@ -16,12 +16,30 @@ use tokio::sync::OnceCell;
 const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api.bin"));
 
 static PORT: OnceCell<u16> = OnceCell::const_new();
+static PID: OnceCell<u32> = OnceCell::const_new();
 
 pub struct KugouApiHandle;
 
 impl KugouApiHandle {
     pub fn new() -> Self {
         Self
+    }
+
+    pub async fn kill(&self) {
+        if let Some(&pid) = PID.get() {
+            #[cfg(windows)]
+            {
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .output();
+            }
+            #[cfg(unix)]
+            {
+                let _ = std::process::Command::new("kill")
+                    .args(["-TERM", &pid.to_string()])
+                    .output();
+            }
+        }
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
@@ -127,6 +145,9 @@ impl KugouApiHandle {
         let mut child = cmd
             .spawn()
             .map_err(|e| format!("spawn {}: {e}", path.display()))?;
+        if let Some(pid) = child.id() {
+            let _ = PID.set(pid);
+        }
         let stdout = child.stdout.take().ok_or("no stdout")?;
         let stderr = child.stderr.take().ok_or("no stderr")?;
 
