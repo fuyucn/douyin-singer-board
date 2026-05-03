@@ -121,10 +121,15 @@ pub fn run() {
             let handle_exit = handle.clone();
             let kugou_exit = kugou_api_handle.clone();
             let win_clone = win.clone();
+            // Prevent re-entering cleanup when w.close() fires a second CloseRequested.
+            let closing = Arc::new(AtomicBool::new(false));
             win.on_window_event(move |event| {
                 match event {
                     tauri::WindowEvent::CloseRequested { api, .. } => {
-                        // Intercept close: do graceful cleanup first.
+                        // Second CloseRequested comes from our own w.close() — let it through.
+                        if closing.swap(true, Ordering::SeqCst) {
+                            return;
+                        }
                         api.prevent_close();
                         let h = handle_exit.clone();
                         let k = kugou_exit.clone();
@@ -142,8 +147,7 @@ pub fn run() {
                         });
                     }
                     tauri::WindowEvent::Destroyed => {
-                        // Fallback: if window is destroyed without CloseRequested
-                        // (e.g. OS force-kill, crash), still kill child processes.
+                        // Fallback: OS force-kill or crash — still kill child processes.
                         let h = handle_exit.clone();
                         let k = kugou_exit.clone();
                         tauri::async_runtime::spawn(async move {
