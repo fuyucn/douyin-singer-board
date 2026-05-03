@@ -16,7 +16,8 @@
         "width": 900,
         "height": 700,
         "resizable": true,
-        "titleBarStyle": "Transparent"
+        "titleBarStyle": "Transparent",
+        "visible": false
       }
     ],
     "security": {
