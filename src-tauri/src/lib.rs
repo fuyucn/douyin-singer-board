@@ -65,6 +65,14 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 4,
+            description: "config: cooldown_seconds (song dedup window)",
+            sql: "
+                ALTER TABLE config ADD COLUMN cooldown_seconds INTEGER NOT NULL DEFAULT 1800;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

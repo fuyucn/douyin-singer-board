@@ -10,6 +10,7 @@ interface Props {
   kugouLoggedIn: boolean;
   onSynced: (track: KuGouTrack, song: DanmuInfo) => void;
   pushLog: (line: string) => void;
+  checkCooldown: (songName: string) => boolean;
 }
 
 /** Process songs in display order, auto-adding found ones with 3-5s random delay.
@@ -24,15 +25,18 @@ export function useAutoSync({
   kugouLoggedIn,
   onSynced,
   pushLog,
+  checkCooldown,
 }: Props) {
   const timerRef = useRef<number | null>(null);
   const processingRef = useRef(false);
   const songsRef = useRef(songs);
   const cacheRef = useRef(kugouCache);
   const lastSkippedRef = useRef<Set<string>>(new Set());
+  const checkCooldownRef = useRef(checkCooldown);
 
   songsRef.current = songs;
   cacheRef.current = kugouCache;
+  checkCooldownRef.current = checkCooldown;
 
   useEffect(() => {
     if (!autoSync || !kugouLoggedIn || !targetPlaylistId) {
@@ -67,7 +71,16 @@ export function useAutoSync({
         if (found) {
           const entry = currentCache[found.song_name.trim()];
           if (entry?.status === 'found') {
+            // Cooldown guard — skip if same song_name was added within cooldown window
+            if (checkCooldownRef.current(found.song_name)) {
+              if (!lastSkippedRef.current.has(`cooldown:${found.song_name}`)) {
+                pushLog(`[auto-sync] cooldown skip: ${found.song_name}`);
+                lastSkippedRef.current.add(`cooldown:${found.song_name}`);
+              }
+              return;
+            }
             await addTrackToPlaylist(entry.track, targetPlaylistId);
+            lastSkippedRef.current.delete(`cooldown:${found.song_name}`);
             onSynced(entry.track, found);
             pushLog(`[auto-sync] ${found.song_name} → playlist`);
           }

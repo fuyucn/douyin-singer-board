@@ -13,9 +13,10 @@ export interface SongsSlice {
   addPlayed: (song: DanmuInfo) => void;
   removePlayed: (msgId: string) => void;
   clearPlayed: () => void;
+  isInCooldown: (songName: string) => boolean;
 }
 
-export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set) => ({
+export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set, get) => ({
   songs: [],
   addSong: (s) => set((state) => ({ songs: [s, ...state.songs] })),
   cancelByUid: (uid) =>
@@ -54,4 +55,11 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
     }),
   removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
   clearPlayed: () => set({ played: [] }),
+  isInCooldown: (songName) => {
+    const now = Math.floor(Date.now() / 1000);
+    const window = get().config.cooldown_seconds;
+    return get().played.some(
+      (p) => p.song_name === songName && (p.played_at ?? 0) > now - window,
+    );
+  },
 });

@@ -15,6 +15,7 @@ export const createConfigSlice: StateCreator<AppStore, [], [], ConfigSlice> = (s
     sing_prefix: DEFAULT_SING_PREFIX,
     fans_level: 0,
     sing_cd: 60,
+    cooldown_seconds: 1800,
     target_playlist_name: '',
     target_playlist_id: 0,
   },
