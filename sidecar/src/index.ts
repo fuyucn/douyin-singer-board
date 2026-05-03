@@ -202,4 +202,16 @@ rl.on('line', (line) => {
 process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
 process.on('SIGINT', () => void stop().then(() => process.exit(0)));
 
+// Parent process watchdog — exit if the Tauri parent disappears.
+// Covers crashes and force-kills where Destroyed event never fires.
+const parentPid = process.ppid;
+setInterval(() => {
+  try {
+    process.kill(parentPid, 0); // signal 0 = existence check, no actual signal
+  } catch {
+    log('info', 'parent process gone, exiting');
+    void stop().then(() => process.exit(0));
+  }
+}, 2000);
+
 log('info', 'sidecar ready');
