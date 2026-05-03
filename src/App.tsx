@@ -95,6 +95,11 @@ export default function App() {
     if (kugouLoggedIn) setStartupStep('kugou', 'done');
   }, [kugouLoggedIn, setStartupStep]);
 
+  // Show window after React mounts — avoids black-screen flash on macOS.
+  useEffect(() => {
+    invoke('show_window').catch(() => {});
+  }, []);
+
   // Remove splash screen after first render.
   useEffect(() => {
     const splash = document.getElementById('splash');

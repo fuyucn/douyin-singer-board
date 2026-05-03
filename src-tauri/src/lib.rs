@@ -67,6 +67,11 @@ fn migrations() -> Vec<Migration> {
     ]
 }
 
+#[tauri::command]
+fn show_window(window: tauri::WebviewWindow) {
+    let _ = window.show();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -103,6 +108,7 @@ pub fn run() {
             sidecar::sidecar_send,
             kugou::kugou_search,
             kugou_api::kugou_api_request,
+            show_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
