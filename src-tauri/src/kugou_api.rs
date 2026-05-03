@@ -12,6 +12,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::OnceCell;
+use process_wrap::tokio::*;
 
 const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api.bin"));
 
@@ -135,7 +136,6 @@ impl KugouApiHandle {
         cmd.stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
@@ -146,14 +146,24 @@ impl KugouApiHandle {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let mut child = cmd
+        // Use process-wrap to bind the entire process tree to a Job Object on
+        // Windows (or a process group on Unix). This ensures all grandchild
+        // processes are killed when the Tauri app exits, even on crash.
+        let mut wrap = CommandWrap::from(cmd);
+        #[cfg(windows)]
+        wrap.wrap(JobObject);
+        #[cfg(unix)]
+        wrap.wrap(ProcessGroup::leader());
+
+        let mut child = wrap
             .spawn()
             .map_err(|e| format!("spawn {}: {e}", path.display()))?;
+
         if let Some(pid) = child.id() {
             let _ = PID.set(pid);
         }
-        let stdout = child.stdout.take().ok_or("no stdout")?;
-        let stderr = child.stderr.take().ok_or("no stderr")?;
+        let stdout = child.stdout().take().ok_or("no stdout")?;
+        let stderr = child.stderr().take().ok_or("no stderr")?;
 
         // Forward stdout/stderr to the UI log panel so failures surface.
         let app_out = app.clone();

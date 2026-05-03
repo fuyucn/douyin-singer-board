@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use process_wrap::tokio::*;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
@@ -102,26 +103,29 @@ impl SidecarHandle {
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            // Silence Node's DeprecationWarnings/process warnings from transitive deps
-            // (e.g. legacy Buffer() usage in protobufjs). Keeps the UI log clean.
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
-        // Windows: pkg-compiled Node binaries are console-subsystem .exe files.
-        // Without CREATE_NO_WINDOW the OS opens a cmd window for them, which the
-        // user can close, killing the child and producing "pipe is being closed".
         #[cfg(windows)]
         {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let mut child = cmd
+        // Bind entire process tree via Job Object (Windows) / process group (Unix)
+        // so grandchild processes are killed when the Tauri app exits.
+        let mut wrap = CommandWrap::from(cmd);
+        #[cfg(windows)]
+        wrap.wrap(JobObject);
+        #[cfg(unix)]
+        wrap.wrap(ProcessGroup::leader());
+
+        let mut child = wrap
             .spawn()
             .map_err(|e| format!("spawn {}: {}", path.display(), e))?;
-        let stdout = child.stdout.take().ok_or("no stdout")?;
-        let stderr = child.stderr.take().ok_or("no stderr")?;
-        let stdin = child.stdin.take().ok_or("no stdin")?;
+
+        let stdout = child.stdout().take().ok_or("no stdout")?;
+        let stderr = child.stderr().take().ok_or("no stderr")?;
+        let stdin = child.stdin().take().ok_or("no stdin")?;
 
         *self.stdin.lock().await = Some(stdin);
         *self.pid.lock().await = child.id();
