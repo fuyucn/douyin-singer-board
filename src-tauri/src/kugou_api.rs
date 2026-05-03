@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::OnceCell;
+use tokio::sync::{Mutex, OnceCell};
 use process_wrap::tokio::*;
 
 const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api.bin"));
@@ -23,28 +23,19 @@ pub fn get_pid() -> Option<u32> {
     PID.get().copied()
 }
 
-pub struct KugouApiHandle;
+pub struct KugouApiHandle {
+    child: Mutex<Option<Box<dyn ChildWrapper>>>,
+}
 
 impl KugouApiHandle {
     pub fn new() -> Self {
-        Self
+        Self { child: Mutex::new(None) }
     }
 
+    /// Drop the child handle — the Job Object / process group is released,
+    /// which causes the OS to kill the entire process tree on Windows/Unix.
     pub async fn kill(&self) {
-        if let Some(&pid) = PID.get() {
-            #[cfg(windows)]
-            {
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .output();
-            }
-            #[cfg(unix)]
-            {
-                let _ = std::process::Command::new("kill")
-                    .args(["-TERM", &pid.to_string()])
-                    .output();
-            }
-        }
+        let _ = self.child.lock().await.take();
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
@@ -181,18 +172,9 @@ impl KugouApiHandle {
             }
         });
 
-        // Surface non-zero exit (the child should normally outlive the app).
-        let app_wait = app.clone();
-        tauri::async_runtime::spawn(async move {
-            match child.wait().await {
-                Ok(status) => log_to_ui(
-                    &app_wait,
-                    "error",
-                    &format!("[kugou-api] process exited (code={:?})", status.code()),
-                ),
-                Err(e) => log_to_ui(&app_wait, "error", &format!("[kugou-api] wait: {e}")),
-            }
-        });
+        // Store child so the Job Object / process group handle stays alive
+        // until kill() is called (which drops it, releasing the OS binding).
+        *self.child.lock().await = Some(child);
 
         // Poll until the Express server accepts a connection. Retry briefly
         // because Node startup + module loading takes a couple seconds.

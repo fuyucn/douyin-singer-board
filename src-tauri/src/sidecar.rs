@@ -25,31 +25,17 @@ const SIDECAR_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sidecar.bin
 
 pub struct SidecarHandle {
     stdin: Mutex<Option<ChildStdin>>,
-    pid: Mutex<Option<u32>>,
+    child: Mutex<Option<Box<dyn ChildWrapper>>>,
 }
 
 impl SidecarHandle {
     pub fn new() -> Self {
-        Self { stdin: Mutex::new(None), pid: Mutex::new(None) }
+        Self { stdin: Mutex::new(None), child: Mutex::new(None) }
     }
 
+    /// Drop child handle — releases Job Object / process group, OS kills tree.
     pub async fn kill(&self) {
-        if let Some(pid) = *self.pid.lock().await {
-            #[cfg(windows)]
-            {
-                // taskkill /F /T kills the whole process tree, including any
-                // child Node processes spawned by the sidecar.
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .output();
-            }
-            #[cfg(unix)]
-            {
-                let _ = std::process::Command::new("kill")
-                    .args(["-TERM", &pid.to_string()])
-                    .output();
-            }
-        }
+        let _ = self.child.lock().await.take();
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
@@ -128,7 +114,6 @@ impl SidecarHandle {
         let stdin = child.stdin().take().ok_or("no stdin")?;
 
         *self.stdin.lock().await = Some(stdin);
-        *self.pid.lock().await = child.id();
 
         // stdout: parse JSON, forward as sidecar-event.
         let app_out = app.clone();
@@ -150,22 +135,8 @@ impl SidecarHandle {
             }
         });
 
-        // Wait task: when the child exits, surface the exit code in the UI log
-        // so 'broken pipe' is preceded by a clear cause line.
-        let app_wait = app.clone();
-        tauri::async_runtime::spawn(async move {
-            match child.wait().await {
-                Ok(status) => {
-                    let code = status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into());
-                    log_to_ui(
-                        &app_wait,
-                        "error",
-                        &format!("[sidecar] process exited (code={})", code),
-                    );
-                }
-                Err(e) => log_to_ui(&app_wait, "error", &format!("[sidecar] wait failed: {}", e)),
-            }
-        });
+        // Store child to keep Job Object / process group handle alive.
+        *self.child.lock().await = Some(child);
 
         Ok(())
     }
