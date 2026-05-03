@@ -1,19 +1,21 @@
 import { useEffect, useRef } from 'react';
-import { addTrackToPlaylist, type KuGouTrack, type KuGouEntry } from '../kugouSession';
+import { addTrackToPlaylist, type KuGouTrack, type EnrichedEntry } from '../kugouSession';
 import type { DanmuInfo } from '../types';
 
 interface Props {
   autoSync: boolean;
   songs: DanmuInfo[];
-  kugouCache: Record<string, KuGouEntry>;
+  kugouCache: Record<string, EnrichedEntry>;
   targetPlaylistId: number;
   kugouLoggedIn: boolean;
   onSynced: (track: KuGouTrack, song: DanmuInfo) => void;
+  onBlocked: (track: KuGouTrack, song: DanmuInfo, reason: string) => void;
   pushLog: (line: string) => void;
 }
 
 /** Process songs in display order, auto-adding found ones with 3-5s random delay.
- *  Only songs already found by the eager search are eligible; never retries. */
+ *  Only songs already found by the eager search are eligible; never retries.
+ *  Blacklisted entries are skipped and cleaned up via onBlocked. */
 export function useAutoSync({
   autoSync,
   songs,
@@ -21,15 +23,18 @@ export function useAutoSync({
   targetPlaylistId,
   kugouLoggedIn,
   onSynced,
+  onBlocked,
   pushLog,
 }: Props) {
   const timerRef = useRef<number | null>(null);
   const processingRef = useRef(false);
   const songsRef = useRef(songs);
   const cacheRef = useRef(kugouCache);
+  const onBlockedRef = useRef(onBlocked);
 
   songsRef.current = songs;
   cacheRef.current = kugouCache;
+  onBlockedRef.current = onBlocked;
 
   useEffect(() => {
     if (!autoSync || !kugouLoggedIn || !targetPlaylistId) {
@@ -64,6 +69,15 @@ export function useAutoSync({
         if (found) {
           const entry = currentCache[found.song_name.trim()];
           if (entry?.status === 'found') {
+            // Check blacklist before adding
+            if (entry.blockedReason) {
+              pushLog(`[auto-sync] blocked (${entry.blockedReason}): ${found.song_name}`);
+              onBlockedRef.current(entry.track, found, entry.blockedReason);
+              processingRef.current = false;
+              schedule();
+              return;
+            }
+
             await addTrackToPlaylist(entry.track, targetPlaylistId);
             onSynced(entry.track, found);
             pushLog(`[auto-sync] ${found.song_name} → playlist`);

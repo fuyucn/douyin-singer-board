@@ -88,7 +88,9 @@ describe('useAppStore', () => {
     useAppStore.setState({
       songs: [],
       played: [],
-      blacklist: new Map<string, number>(),
+      blacklist: [],
+      blockedSongKeys: new Set<string>(),
+      blockedSingers: new Set<string>(),
       autoSync: false,
     });
   });
@@ -160,32 +162,67 @@ describe('useAppStore', () => {
   });
 
   describe('blacklist', () => {
-    it('addToBlacklist adds a name to the set', () => {
-      useAppStore.getState().addToBlacklist('bad song');
-      expect(useAppStore.getState().blacklist.has('bad song')).toBe(true);
+    const songEntry = (over?: Partial<{ id: number; songName: string; singerName: string; createdAt: number }>) => ({
+      id: over?.id ?? 1,
+      entryType: 'song' as const,
+      songName: over?.songName ?? 'bad song',
+      singerName: over?.singerName ?? 'Test Singer',
+      createdAt: over?.createdAt ?? 123,
     });
 
-    it('removeFromBlacklist removes a name', () => {
-      useAppStore.getState().addToBlacklist('bad song');
-      useAppStore.getState().removeFromBlacklist('bad song');
-      expect(useAppStore.getState().blacklist.has('bad song')).toBe(false);
+    const singerEntry = (over?: Partial<{ id: number; singerName: string; createdAt: number }>) => ({
+      id: over?.id ?? 1,
+      entryType: 'singer' as const,
+      songName: '',
+      singerName: over?.singerName ?? 'Blocked Singer',
+      createdAt: over?.createdAt ?? 123,
     });
 
-    it('hydrateBlacklist replaces the set', () => {
+    it('addSongToBlacklist prepends item and updates blockedSongKeys', () => {
+      const item = songEntry({ songName: 'bad', singerName: 'S' });
+      useAppStore.getState().addSongToBlacklist(item);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].songName).toBe('bad');
+      expect(useAppStore.getState().blockedSongKeys.has('bad|S')).toBe(true);
+    });
+
+    it('addSingerToBlacklist prepends item and updates blockedSingers', () => {
+      const item = singerEntry({ singerName: 'Blocked' });
+      useAppStore.getState().addSingerToBlacklist(item);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].entryType).toBe('singer');
+      expect(useAppStore.getState().blockedSingers.has('Blocked')).toBe(true);
+    });
+
+    it('removeFromBlacklist removes by id and rebuilds sets', () => {
+      useAppStore.getState().addSongToBlacklist(songEntry({ id: 1, songName: 'a', singerName: 'SA' }));
+      useAppStore.getState().addSongToBlacklist(songEntry({ id: 2, songName: 'b', singerName: 'SB' }));
+      useAppStore.getState().removeFromBlacklist(1);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].id).toBe(2);
+      expect(useAppStore.getState().blockedSongKeys.has('a|SA')).toBe(false);
+      expect(useAppStore.getState().blockedSongKeys.has('b|SB')).toBe(true);
+    });
+
+    it('hydrateBlacklist builds array and both sets', () => {
       useAppStore.getState().hydrateBlacklist([
-        { song_name: 'a', created_at: 123 },
-        { song_name: 'b', created_at: 123 },
-        { song_name: 'c', created_at: 123 },
+        { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
+        { id: 2, entry_type: 'singer', song_name: '', singer_name: 'SY', created_at: 2 },
       ]);
-      expect(useAppStore.getState().blacklist.size).toBe(3);
-      expect(useAppStore.getState().blacklist.has('a')).toBe(true);
+      expect(useAppStore.getState().blacklist).toHaveLength(2);
+      expect(useAppStore.getState().blacklist[0].entryType).toBe('song');
+      expect(useAppStore.getState().blacklist[1].entryType).toBe('singer');
+      expect(useAppStore.getState().blockedSongKeys.has('x|SX')).toBe(true);
+      expect(useAppStore.getState().blockedSingers.has('SY')).toBe(true);
     });
 
-    it('blacklist set is independent per add (no mutation of previous)', () => {
-      useAppStore.getState().hydrateBlacklist([{ song_name: 'x', created_at: 123 }]);
-      const first = useAppStore.getState().blacklist;
-      useAppStore.getState().addToBlacklist('y');
-      expect(first.has('y')).toBe(false);
+    it('blockedSongKeys is independent per add (no mutation of previous)', () => {
+      useAppStore.getState().hydrateBlacklist([
+        { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
+      ]);
+      const first = useAppStore.getState().blockedSongKeys;
+      useAppStore.getState().addSongToBlacklist(songEntry({ id: 2, songName: 'y', singerName: 'SY' }));
+      expect(first.has('y|SY')).toBe(false);
     });
   });
 
@@ -207,49 +244,6 @@ describe('useAppStore', () => {
       useAppStore.getState().pushLog('b');
       useAppStore.getState().clearLogs();
       expect(useAppStore.getState().logs).toEqual([]);
-    });
-  });
-
-  describe('blacklist values', () => {
-    it('addToBlacklist with provided createdAt stores the value', () => {
-      useAppStore.getState().addToBlacklist('song1', 1234567890);
-      expect(useAppStore.getState().blacklist.get('song1')).toBe(1234567890);
-    });
-
-    it('addToBlacklist defaults createdAt to now when not provided', () => {
-      const before = Math.floor(Date.now() / 1000);
-      useAppStore.getState().addToBlacklist('song2');
-      const after = Math.floor(Date.now() / 1000);
-      const val = useAppStore.getState().blacklist.get('song2')!;
-      expect(val).toBeGreaterThanOrEqual(before);
-      expect(val).toBeLessThanOrEqual(after);
-    });
-
-    it('addToBlacklist with same name overwrites createdAt', () => {
-      useAppStore.getState().addToBlacklist('song1', 100);
-      useAppStore.getState().addToBlacklist('song1', 200);
-      expect(useAppStore.getState().blacklist.get('song1')).toBe(200);
-    });
-
-    it('hydrateBlacklist builds correct song_name → created_at mapping', () => {
-      useAppStore.getState().hydrateBlacklist([
-        { song_name: 'a', created_at: 1 },
-        { song_name: 'b', created_at: 2 },
-      ]);
-      expect(useAppStore.getState().blacklist.get('a')).toBe(1);
-      expect(useAppStore.getState().blacklist.get('b')).toBe(2);
-      expect(useAppStore.getState().blacklist.size).toBe(2);
-    });
-
-    it('removeFromBlacklist leaves other entries intact', () => {
-      useAppStore.getState().hydrateBlacklist([
-        { song_name: 'a', created_at: 1 },
-        { song_name: 'b', created_at: 2 },
-      ]);
-      useAppStore.getState().removeFromBlacklist('a');
-      expect(useAppStore.getState().blacklist.has('a')).toBe(false);
-      expect(useAppStore.getState().blacklist.has('b')).toBe(true);
-      expect(useAppStore.getState().blacklist.get('b')).toBe(2);
     });
   });
 

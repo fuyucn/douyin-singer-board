@@ -148,6 +148,7 @@ export interface KuGouTrack {
   hash: string;
   album_id: string;
   mixsongid: string;
+  singer_name: string;
   plays?: number;
 }
 
@@ -157,6 +158,9 @@ export type KuGouEntry =
   | { status: 'found'; track: KuGouTrack }
   | { status: 'not_found' }
   | { status: 'error'; msg: string };
+
+/** KuGouEntry enriched with blacklist status (computed in App.tsx). */
+export type EnrichedEntry = KuGouEntry & { blockedReason?: 'song' | 'singer' | null };
 
 /**
  * Authenticated top-1 search — kept as a fallback. Production callers should
@@ -178,6 +182,7 @@ export async function searchKuGouTopHit(keyword: string): Promise<KuGouTrack | n
     hash,
     album_id: String(top.AlbumID ?? ''),
     mixsongid: String(top.MixSongID ?? ''),
+    singer_name: String(top.SingerName ?? ''),
   };
 }
 
@@ -263,6 +268,7 @@ export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTra
       hash,
       album_id: String(item.AlbumID ?? ''),
       mixsongid: String(item.MixSongID ?? ''),
+      singer_name: String(item.SingerName ?? ''),
       plays: playMap.get(hash) ?? 0,
       ownerCount: Number(item.OwnerCount ?? 0),
       rank,
@@ -289,6 +295,7 @@ export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTra
       hash: best.hash,
       album_id: best.album_id,
       mixsongid: best.mixsongid,
+      singer_name: best.singer_name,
     };
   }
 
@@ -305,6 +312,7 @@ export async function searchKuGouPreferredHit(keyword: string): Promise<KuGouTra
     hash: best.hash,
     album_id: best.album_id,
     mixsongid: best.mixsongid,
+    singer_name: best.singer_name,
   };
 }
 

@@ -4,15 +4,12 @@ import { insertHistory } from '../db';
 import type { SidecarEvent } from '../types';
 import { useAppStore } from '../store';
 
-interface Options {
-  blacklist: Map<string, number>;
-}
-
 /**
  * Listens to sidecar events and dispatches to the store.
  * Also advances the startup checklist as each stage completes.
- */
-export function useSidecarEvents({ blacklist }: Options) {
+ * Blacklist enforcement happens in auto-sync / manual-add (post-KuGou-search),
+ * so there is no frontend-side guard here. */
+export function useSidecarEvents() {
   const addSong = useAppStore((s) => s.addSong);
   const cancelByUid = useAppStore((s) => s.cancelByUid);
   const setStatus = useAppStore((s) => s.setStatus);
@@ -27,7 +24,6 @@ export function useSidecarEvents({ blacklist }: Options) {
 
       switch (ev.event) {
         case 'danmu':
-          if (blacklist.has(ev.data.song_name)) break;
           addSong(ev.data);
           if (sessionId) insertHistory(ev.data, sessionId).catch((err) => pushLog(`db: ${err}`));
           break;
@@ -49,5 +45,5 @@ export function useSidecarEvents({ blacklist }: Options) {
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, blacklist, setStartupStep, running]);
+  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, setStartupStep, running]);
 }

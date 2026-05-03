@@ -4,18 +4,19 @@ import { Trash2, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SongTable, songColumnHelper } from './SongTable';
-import { BlacklistPanel } from './BlacklistPanel';
+import { BlacklistPanel, type BlacklistItemUI } from './BlacklistPanel';
 import { LogPanel } from './LogPanel';
 import type { DanmuInfo } from '../types';
-import type { KuGouEntry } from '../kugouSession';
+import type { EnrichedEntry } from '../kugouSession';
+import type { BlacklistItem } from '../store/logs';
 
 interface Props {
   songs: DanmuInfo[];
   played: DanmuInfo[];
-  blacklist: Map<string, number>;
+  blacklist: BlacklistItem[];
   running: boolean;
   kugouLoggedIn: boolean;
-  kugouCache: Record<string, KuGouEntry>;
+  kugouCache: Record<string, EnrichedEntry>;
   logs: string[];
   activeTab: 'songs' | 'played' | 'blacklist';
   onTabChange: (tab: 'songs' | 'played' | 'blacklist') => void;
@@ -25,19 +26,19 @@ interface Props {
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
   renderSongActions: (s: DanmuInfo) => React.ReactNode;
   renderPlayedActions: (s: DanmuInfo) => React.ReactNode;
-  onRemoveBlacklist: (name: string) => void;
+  onRemoveBlacklist: (id: number) => void;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
 type SongsMeta = {
-  kugouCache: Record<string, KuGouEntry>;
+  kugouCache: Record<string, EnrichedEntry>;
   renderActions: (s: DanmuInfo) => React.ReactNode;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
 };
 
 type PlayedMeta = {
-  kugouCache: Record<string, KuGouEntry>;
+  kugouCache: Record<string, EnrichedEntry>;
   renderActions: (s: DanmuInfo) => React.ReactNode;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
 };
@@ -73,7 +74,18 @@ function useSongsColumns() {
             >
               <div className="text-fg-base truncate text-[13px] font-medium">{song.song_name}</div>
               {entry?.status === 'found' ? (
-                <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                entry.blockedReason ? (
+                  <>
+                    <div className="truncate text-[11px] text-red-500">{entry.track.filename}</div>
+                    <div className="truncate text-[11px] text-red-400">
+                      {entry.blockedReason === 'singer'
+                        ? `黑名单歌手: ${entry.track.singer_name}`
+                        : '黑名单歌曲'}
+                    </div>
+                  </>
+                ) : (
+                  <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                )
               ) : entry?.status === 'pending' ? (
                 <div className="text-fg-faint text-[11px]">⋯ 搜索中</div>
               ) : entry?.status === 'not_found' ? (
@@ -229,8 +241,20 @@ export function MainContent({
   const tabDefs = [
     { key: 'songs' as const, label: `点歌列表 (${songs.length})` },
     { key: 'played' as const, label: `已点歌单 (${played.length})` },
-    { key: 'blacklist' as const, label: `黑名单 (${blacklist.size})` },
+    { key: 'blacklist' as const, label: `黑名单 (${blacklist.length})` },
   ];
+
+  const blacklistItems: BlacklistItemUI[] = useMemo(
+    () =>
+      blacklist.map((item) => ({
+        id: item.id,
+        entryType: item.entryType,
+        songName: item.songName,
+        singerName: item.singerName,
+        createdAt: item.createdAt,
+      })),
+    [blacklist],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -299,13 +323,7 @@ export function MainContent({
           </TabsContent>
 
           <TabsContent value="blacklist" className="m-0 min-h-0 flex-1 overflow-hidden">
-            <BlacklistPanel
-              items={Array.from(blacklist.entries()).map(([name, createdAt]) => ({
-                name,
-                createdAt,
-              }))}
-              onRemove={onRemoveBlacklist}
-            />
+            <BlacklistPanel items={blacklistItems} onRemove={onRemoveBlacklist} />
           </TabsContent>
         </Tabs>
       </div>

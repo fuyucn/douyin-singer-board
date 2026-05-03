@@ -19,7 +19,7 @@ import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
 import { applyTheme, loadTheme, type Theme } from './theme';
-import { addTrackToPlaylist, type KuGouTrack, type KuGouEntry } from './kugouSession';
+import { addTrackToPlaylist, type KuGouTrack, type EnrichedEntry } from './kugouSession';
 import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
@@ -98,9 +98,10 @@ export default function App() {
 
   const {
     blacklist,
-    add: addBlacklist,
+    checkTrack,
+    addSong: addBlacklistSong,
+    addSinger: addBlacklistSinger,
     remove: removeBlacklist,
-    getNames: getBlacklistNames,
   } = useBlacklist();
   const { ctxMenu, open: openCtxMenu, close: closeCtxMenu } = useContextMenu();
 
@@ -144,7 +145,21 @@ export default function App() {
     preferCumulative,
   });
 
-  useSidecarEvents({ blacklist });
+  // Enrich cache with blacklist status — single source of truth consumed by
+  // both UI (red text) and auto-sync (skip decision).
+  const enrichedCache = useMemo<Record<string, EnrichedEntry>>(() => {
+    const result: Record<string, EnrichedEntry> = {};
+    for (const [name, entry] of Object.entries(kugouCache)) {
+      if (entry.status === 'found') {
+        result[name] = { ...entry, blockedReason: checkTrack(entry.track) };
+      } else {
+        result[name] = entry;
+      }
+    }
+    return result;
+  }, [kugouCache, checkTrack]);
+
+  useSidecarEvents();
 
   useEffect(() => {
     applyTheme(theme);
@@ -183,7 +198,9 @@ export default function App() {
       clearSongs();
       clearPlayed();
       await clearSessionHistory(sid).catch(() => {});
-      const blNames = await getBlacklistNames();
+      const blNames = blacklist
+        .filter((e) => e.entryType === 'song' && e.songName)
+        .map((e) => e.songName);
       await invoke('sidecar_send', {
         cmd: { cmd: 'start', config: { ...config, blacklist: blNames } },
       });
@@ -243,6 +260,15 @@ export default function App() {
       toast.error('请先在"Kugou歌单"里保存一个歌单');
       return;
     }
+    const reason = checkTrack(track);
+    if (reason) {
+      toast.error(
+        reason === 'singer'
+          ? `已黑名单该歌手: ${track.singer_name}`
+          : `已黑名单: ${track.filename} - ${track.singer_name}`,
+      );
+      return;
+    }
     try {
       await addTrackToPlaylist(track, config.target_playlist_id);
       removeByMsgId(song.msg_id);
@@ -261,20 +287,27 @@ export default function App() {
     toast(`[自动] 已加入歌单: ${track.filename}`);
   };
 
+  const onAutoBlocked = (_track: KuGouTrack, song: DanmuInfo, reason: string) => {
+    removeByMsgId(song.msg_id);
+    deleteHistoryByMsgId(song.msg_id).catch(() => {});
+    pushLog(`[auto-sync] skipped: ${song.song_name} (${reason})`);
+  };
+
   useAutoSync({
     autoSync,
     songs: display,
-    kugouCache,
+    kugouCache: enrichedCache,
     targetPlaylistId: config.target_playlist_id,
     kugouLoggedIn,
     onSynced: onAutoSynced,
+    onBlocked: onAutoBlocked,
     pushLog,
   });
 
   // ─── Render helpers ───────────────────────────────────────────
 
   const renderSongActions = (s: DanmuInfo) => {
-    const entry: KuGouEntry = kugouCache[s.song_name.trim()] ?? { status: 'pending' };
+    const entry: EnrichedEntry = enrichedCache[s.song_name.trim()] ?? { status: 'pending' };
     const hasTarget = config.target_playlist_id > 0;
     let title = '';
     let enabled = entry.status === 'found' && hasTarget;
@@ -369,7 +402,7 @@ export default function App() {
   );
 
   const ctxSong = ctxMenu?.song;
-  const kgEntry = ctxSong ? kugouCache[ctxSong.song_name.trim()] : undefined;
+  const kgEntry = ctxSong ? enrichedCache[ctxSong.song_name.trim()] : undefined;
   const kgFound = kgEntry?.status === 'found' && kgEntry.track;
 
   const ctxActions = ctxMenu
@@ -390,13 +423,34 @@ export default function App() {
             }
           },
         },
-        {
-          label: '加入黑名单',
-          onClick: () => {
-            addBlacklist(ctxSong!.song_name, ctxSong!.msg_id);
-            toast(`已加入黑名单: ${ctxSong!.song_name}`);
-          },
-        },
+        ...(kgFound
+          ? [
+              {
+                label: `黑名单这首歌: ${kgFound.filename} - ${kgFound.singer_name}`,
+                onClick: () => {
+                  addBlacklistSong(kgFound.filename, kgFound.singer_name, ctxSong!.msg_id);
+                  toast(`已加入黑名单: ${kgFound.filename}`);
+                },
+              },
+              ...(kgFound.singer_name
+                ? [
+                    {
+                      label: `黑名单该歌手: ${kgFound.singer_name}`,
+                      onClick: () => {
+                        addBlacklistSinger(kgFound.singer_name);
+                        toast(`已加入黑名单歌手: ${kgFound.singer_name}`);
+                      },
+                    },
+                  ]
+                : []),
+            ]
+          : [
+              {
+                label: '加入黑名单 (搜索中…)',
+                disabled: true,
+                onClick: () => {},
+              },
+            ]),
       ]
     : [];
 
@@ -476,7 +530,7 @@ export default function App() {
               blacklist={blacklist}
               running={running}
               kugouLoggedIn={kugouLoggedIn}
-              kugouCache={kugouCache}
+              kugouCache={enrichedCache}
               logs={logs}
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -486,9 +540,9 @@ export default function App() {
               onContextMenu={openCtxMenu}
               renderSongActions={renderSongActions}
               renderPlayedActions={renderPlayedActions}
-              onRemoveBlacklist={(name) => {
-                removeBlacklist(name);
-                toast(`已移出黑名单: ${name}`);
+              onRemoveBlacklist={(id) => {
+                removeBlacklist(id);
+                toast('已移出黑名单');
               }}
             />
           </div>
@@ -513,7 +567,7 @@ export default function App() {
               blacklist={blacklist}
               running={running}
               kugouLoggedIn={kugouLoggedIn}
-              kugouCache={kugouCache}
+              kugouCache={enrichedCache}
               logs={logs}
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -523,9 +577,9 @@ export default function App() {
               onContextMenu={openCtxMenu}
               renderSongActions={renderSongActions}
               renderPlayedActions={renderPlayedActions}
-              onRemoveBlacklist={(name) => {
-                removeBlacklist(name);
-                toast(`已移出黑名单: ${name}`);
+              onRemoveBlacklist={(id) => {
+                removeBlacklist(id);
+                toast('已移出黑名单');
               }}
             />
           </div>

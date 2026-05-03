@@ -6,10 +6,60 @@ let _db: Database | null = null;
 export async function getDb(): Promise<Database> {
   if (_db) return _db;
   _db = await Database.load('sqlite:sususongboard.db');
-  // Ensure blacklist table exists (no migration system, so we do it here)
-  await _db.execute(
-    "CREATE TABLE IF NOT EXISTS blacklist (id INTEGER PRIMARY KEY AUTOINCREMENT, song_name TEXT UNIQUE NOT NULL, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))",
+
+  // Migrate/create blacklist table (frontend-managed, not in Tauri migrations)
+  const tables = await _db.select<{ name: string }[]>(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='blacklist'",
   );
+
+  if (tables.length === 0) {
+    // Fresh install — create new schema
+    await _db.execute(
+      `CREATE TABLE blacklist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
+        song_name TEXT NOT NULL DEFAULT '',
+        singer_name TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+      )`,
+    );
+    await _db.execute(
+      "CREATE UNIQUE INDEX idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
+    );
+    await _db.execute(
+      "CREATE UNIQUE INDEX idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
+    );
+  } else {
+    // Check if migration needed (old table lacks entry_type column)
+    const cols = await _db.select<{ name: string }[]>(
+      'PRAGMA table_info(blacklist)',
+    );
+    const hasEntryType = cols.some((c) => c.name === 'entry_type');
+    if (!hasEntryType) {
+      // Migrate: create new table, copy data, swap
+      await _db.execute(
+        `CREATE TABLE blacklist_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_type TEXT NOT NULL CHECK (entry_type IN ('song', 'singer')),
+          song_name TEXT NOT NULL DEFAULT '',
+          singer_name TEXT NOT NULL DEFAULT '',
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+        )`,
+      );
+      await _db.execute(
+        "INSERT INTO blacklist_new (id, entry_type, song_name, singer_name, created_at) SELECT id, 'song', song_name, '', created_at FROM blacklist",
+      );
+      await _db.execute('DROP TABLE blacklist');
+      await _db.execute('ALTER TABLE blacklist_new RENAME TO blacklist');
+      await _db.execute(
+        "CREATE UNIQUE INDEX idx_bl_song_unique ON blacklist(song_name, singer_name) WHERE entry_type = 'song'",
+      );
+      await _db.execute(
+        "CREATE UNIQUE INDEX idx_bl_singer_unique ON blacklist(singer_name) WHERE entry_type = 'singer'",
+      );
+    }
+  }
+
   return _db;
 }
 
@@ -148,24 +198,38 @@ export function sessionToCookie(s: KugouSession): string {
 // ─── Blacklist ────────────────────────────────────────────────────────────────
 
 export interface BlacklistEntry {
+  id: number;
+  entry_type: 'song' | 'singer';
   song_name: string;
+  singer_name: string;
   created_at: number;
 }
 
 export async function loadBlacklist(): Promise<BlacklistEntry[]> {
   const db = await getDb();
   const rows = await db.select<BlacklistEntry[]>(
-    'SELECT song_name, created_at FROM blacklist ORDER BY created_at DESC',
+    'SELECT id, entry_type, song_name, singer_name, created_at FROM blacklist ORDER BY created_at DESC',
   );
   return rows;
 }
 
-export async function addToBlacklist(songName: string): Promise<void> {
+export async function addSongToBlacklist(songName: string, singerName: string): Promise<void> {
   const db = await getDb();
-  await db.execute('INSERT OR IGNORE INTO blacklist (song_name) VALUES ($1)', [songName]);
+  await db.execute(
+    "INSERT INTO blacklist (entry_type, song_name, singer_name) VALUES ('song', $1, $2)",
+    [songName, singerName],
+  );
 }
 
-export async function removeFromBlacklist(songName: string): Promise<void> {
+export async function addSingerToBlacklist(singerName: string): Promise<void> {
   const db = await getDb();
-  await db.execute('DELETE FROM blacklist WHERE song_name = $1', [songName]);
+  await db.execute(
+    "INSERT INTO blacklist (entry_type, song_name, singer_name) VALUES ('singer', '', $1)",
+    [singerName],
+  );
+}
+
+export async function removeFromBlacklist(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute('DELETE FROM blacklist WHERE id = $1', [id]);
 }
