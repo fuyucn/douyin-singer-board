@@ -8,6 +8,28 @@
   </head>
   <body class="select-none" style="-webkit-user-select:none">
     <div id="root"></div>
+    <div id="splash" style="
+      position:fixed;inset:0;z-index:9999;
+      display:flex;align-items:center;justify-content:center;
+      background:oklch(0.9610 0.0029 264.5419);
+      transition:opacity 0.2s ease;
+    ">
+      <style>
+        @media(prefers-color-scheme:dark){
+          #splash{background:oklch(0.1579 0.0017 196.9874) !important;}
+          #splash-dot{background:#666 !important;}
+        }
+        @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+        .sd{width:8px;height:8px;border-radius:50%;background:#aaa;animation:pulse 1.2s ease-in-out infinite}
+        .sd:nth-child(2){animation-delay:.2s}
+        .sd:nth-child(3){animation-delay:.4s}
+      </style>
+      <div style="display:flex;gap:8px">
+        <div class="sd"></div>
+        <div class="sd"></div>
+        <div class="sd"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

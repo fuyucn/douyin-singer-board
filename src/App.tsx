@@ -95,6 +95,14 @@ export default function App() {
     if (kugouLoggedIn) setStartupStep('kugou', 'done');
   }, [kugouLoggedIn, setStartupStep]);
 
+  // Remove splash screen after first render.
+  useEffect(() => {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    splash.style.opacity = '0';
+    setTimeout(() => splash.remove(), 200);
+  }, []);
+
 
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
