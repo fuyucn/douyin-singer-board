@@ -2,8 +2,6 @@ import type { StateCreator } from 'zustand';
 import type { AppStore } from './index';
 import type { DanmuInfo } from '../types';
 
-const COOLDOWN_SECONDS = 1800;
-
 export interface SongsSlice {
   songs: DanmuInfo[];
   addSong: (s: DanmuInfo) => void;
@@ -59,8 +57,9 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
   clearPlayed: () => set({ played: [] }),
   isInCooldown: (songName) => {
     const now = Math.floor(Date.now() / 1000);
+    const window = get().config.cooldown_seconds;
     return get().played.some(
-      (p) => p.song_name === songName && (p.played_at ?? 0) > now - COOLDOWN_SECONDS,
+      (p) => p.song_name === songName && (p.played_at ?? 0) > now - window,
     );
   },
 });

@@ -69,7 +69,7 @@ export async function getDb(): Promise<Database> {
 export async function loadConfig(): Promise<Config> {
   const db = await getDb();
   const rows = await db.select<Config[]>(
-    `SELECT room_id, sing_prefix, fans_level, sing_cd,
+    `SELECT room_id, sing_prefix, fans_level, sing_cd, cooldown_seconds,
             target_playlist_name, target_playlist_id
      FROM config WHERE id = 1`,
   );
@@ -81,6 +81,7 @@ export async function loadConfig(): Promise<Config> {
       sing_prefix: '点歌[space][song]',
       fans_level: 0,
       sing_cd: 60,
+      cooldown_seconds: 1800,
       target_playlist_name: '',
       target_playlist_id: 0,
     };
@@ -92,13 +93,14 @@ export async function saveConfig(cfg: Config): Promise<void> {
   const db = await getDb();
   await db.execute(
     `UPDATE config SET room_id = $1, sing_prefix = $2, fans_level = $3, sing_cd = $4,
-                       target_playlist_name = $5, target_playlist_id = $6
+                       cooldown_seconds = $5, target_playlist_name = $6, target_playlist_id = $7
      WHERE id = 1`,
     [
       cfg.room_id,
       cfg.sing_prefix,
       cfg.fans_level,
       cfg.sing_cd ?? 60,
+      cfg.cooldown_seconds ?? 1800,
       cfg.target_playlist_name ?? '',
       cfg.target_playlist_id ?? 0,
     ],

@@ -171,6 +171,22 @@ export function LeftPanel({
             />
           </div>
         </div>
+        <div className="mt-3 space-y-1.5">
+          <Label className="text-xs text-[var(--fg-muted)]">重复点歌冷却 (秒)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={config.cooldown_seconds}
+            disabled={running}
+            onChange={(e) =>
+              onConfigChange({ cooldown_seconds: Math.max(0, Number(e.target.value) || 0) })
+            }
+            className="h-8 bg-[var(--bg-base)] text-sm"
+          />
+          <p className="text-[11px] text-[var(--fg-faint)]">
+            同一首歌在冷却时间内不会重复加入歌单
+          </p>
+        </div>
       </div>
 
       {/* Kugou歌单 — 仅登录后显示 */}
