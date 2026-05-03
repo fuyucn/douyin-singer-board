@@ -63,6 +63,7 @@ export default function App() {
     addPlayed,
     removePlayed,
     clearPlayed,
+    isInCooldown,
     startupSteps,
     setStartupStep,
     resetStartupSteps,
@@ -90,6 +91,7 @@ export default function App() {
       addPlayed: s.addPlayed,
       removePlayed: s.removePlayed,
       clearPlayed: s.clearPlayed,
+      isInCooldown: s.isInCooldown,
       startupSteps: s.startupSteps,
       setStartupStep: s.setStartupStep,
       resetStartupSteps: s.resetStartupSteps,
@@ -269,6 +271,10 @@ export default function App() {
       );
       return;
     }
+    if (isInCooldown(song.song_name)) {
+      toast(`${song.song_name} 已在30分钟内添加过，跳过`);
+      return;
+    }
     try {
       await addTrackToPlaylist(track, config.target_playlist_id);
       removeByMsgId(song.msg_id);
@@ -295,6 +301,7 @@ export default function App() {
     kugouLoggedIn,
     onSynced: onAutoSynced,
     pushLog,
+    checkCooldown: isInCooldown,
   });
 
   // ─── Render helpers ───────────────────────────────────────────

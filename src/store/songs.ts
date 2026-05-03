@@ -2,6 +2,8 @@ import type { StateCreator } from 'zustand';
 import type { AppStore } from './index';
 import type { DanmuInfo } from '../types';
 
+const COOLDOWN_SECONDS = 1800;
+
 export interface SongsSlice {
   songs: DanmuInfo[];
   addSong: (s: DanmuInfo) => void;
@@ -13,9 +15,10 @@ export interface SongsSlice {
   addPlayed: (song: DanmuInfo) => void;
   removePlayed: (msgId: string) => void;
   clearPlayed: () => void;
+  isInCooldown: (songName: string) => boolean;
 }
 
-export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set) => ({
+export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set, get) => ({
   songs: [],
   addSong: (s) => set((state) => ({ songs: [s, ...state.songs] })),
   cancelByUid: (uid) =>
@@ -54,4 +57,10 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
     }),
   removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
   clearPlayed: () => set({ played: [] }),
+  isInCooldown: (songName) => {
+    const now = Math.floor(Date.now() / 1000);
+    return get().played.some(
+      (p) => p.song_name === songName && (p.played_at ?? 0) > now - COOLDOWN_SECONDS,
+    );
+  },
 });
