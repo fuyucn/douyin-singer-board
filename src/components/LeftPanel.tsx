@@ -183,9 +183,7 @@ export function LeftPanel({
             }
             className="h-8 bg-[var(--bg-base)] text-sm"
           />
-          <p className="text-[11px] text-[var(--fg-faint)]">
-            同一首歌在冷却时间内不会重复加入歌单
-          </p>
+          <p className="text-[11px] text-[var(--fg-faint)]">同一首歌在冷却时间内不会重复加入歌单</p>
         </div>
       </div>
 

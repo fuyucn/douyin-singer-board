@@ -58,8 +58,6 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
   isInCooldown: (songName) => {
     const now = Math.floor(Date.now() / 1000);
     const window = get().config.cooldown_seconds;
-    return get().played.some(
-      (p) => p.song_name === songName && (p.played_at ?? 0) > now - window,
-    );
+    return get().played.some((p) => p.song_name === songName && (p.played_at ?? 0) > now - window);
   },
 });

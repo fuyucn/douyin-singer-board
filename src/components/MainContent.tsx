@@ -324,7 +324,10 @@ export function MainContent({
             />
           </TabsContent>
 
-          <TabsContent value="blacklist" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+          <TabsContent
+            value="blacklist"
+            className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+          >
             <BlacklistPanel
               items={blacklistItems}
               onRemove={onRemoveBlacklist}
