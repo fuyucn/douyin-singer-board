@@ -28,6 +28,7 @@ interface Props {
   renderPlayedActions: (s: DanmuInfo) => React.ReactNode;
   onRemoveBlacklist: (id: number) => void;
   onAddSingerBlacklist: (singerName: string) => void;
+  cooldownRemaining: (songName: string) => number;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ type SongsMeta = {
   kugouCache: Record<string, EnrichedEntry>;
   renderActions: (s: DanmuInfo) => React.ReactNode;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
+  cooldownRemaining: (songName: string) => number;
 };
 
 type PlayedMeta = {
@@ -85,7 +87,19 @@ function useSongsColumns() {
                     </div>
                   </>
                 ) : (
-                  <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                  <>
+                    <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                    {(() => {
+                      const secs = meta?.cooldownRemaining(song.song_name);
+                      if (!secs) return null;
+                      const mins = Math.ceil(secs / 60);
+                      return (
+                        <div className="text-fg-faint text-[11px]">
+                          冷却中 ({mins} 分钟后可再点)
+                        </div>
+                      );
+                    })()}
+                  </>
                 )
               ) : entry?.status === 'pending' ? (
                 <div className="text-fg-faint text-[11px]">⋯ 搜索中</div>
@@ -216,13 +230,14 @@ export function MainContent({
   renderPlayedActions,
   onRemoveBlacklist,
   onAddSingerBlacklist,
+  cooldownRemaining,
 }: Props) {
   const songsColumns = useSongsColumns();
   const playedColumns = usePlayedColumns();
 
   const songsMeta: SongsMeta = useMemo(
-    () => ({ kugouCache, renderActions: renderSongActions, onContextMenu }),
-    [kugouCache, renderSongActions, onContextMenu],
+    () => ({ kugouCache, renderActions: renderSongActions, onContextMenu, cooldownRemaining }),
+    [kugouCache, renderSongActions, onContextMenu, cooldownRemaining],
   );
 
   const playedMeta: PlayedMeta = useMemo(

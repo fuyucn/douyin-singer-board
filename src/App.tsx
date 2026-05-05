@@ -64,6 +64,7 @@ export default function App() {
     removePlayed,
     clearPlayed,
     isInCooldown,
+    cooldownRemainingSeconds,
     startupSteps,
     setStartupStep,
     resetStartupSteps,
@@ -92,6 +93,7 @@ export default function App() {
       removePlayed: s.removePlayed,
       clearPlayed: s.clearPlayed,
       isInCooldown: s.isInCooldown,
+      cooldownRemainingSeconds: s.cooldownRemainingSeconds,
       startupSteps: s.startupSteps,
       setStartupStep: s.setStartupStep,
       resetStartupSteps: s.resetStartupSteps,
@@ -543,6 +545,7 @@ export default function App() {
               onAddSingerBlacklist={(singerName) => {
                 addBlacklistSinger(singerName);
               }}
+              cooldownRemaining={cooldownRemainingSeconds}
             />
           </div>
         ) : (
@@ -583,6 +586,7 @@ export default function App() {
               onAddSingerBlacklist={(singerName) => {
                 addBlacklistSinger(singerName);
               }}
+              cooldownRemaining={cooldownRemainingSeconds}
             />
           </div>
         )}
