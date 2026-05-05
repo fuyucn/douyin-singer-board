@@ -466,7 +466,7 @@ export default function App() {
           }}
           onShowKgLogin={() => setShowKgLogin(true)}
           onShowAbout={() => setShowAbout(true)}
-          onShowKgDebug={import.meta.env.DEV ? () => setShowKgDebug(true) : undefined}
+          onShowKgDebug={import.meta.env.DEV || import.meta.env.VITE_DEBUG ? () => setShowKgDebug(true) : undefined}
           onStart={onStart}
           onStop={onStop}
         />
