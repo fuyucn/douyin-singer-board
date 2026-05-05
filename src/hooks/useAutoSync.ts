@@ -62,30 +62,32 @@ export function useAutoSync({
         const currentSongs = songsRef.current;
         const currentCache = cacheRef.current;
 
-        // Find first 'found' AND non-blocked song (skip blacklisted, leave in queue)
-        const found = currentSongs.find((s) => {
+        // Find first 'found', non-blocked, non-cooldown song
+        let found: DanmuInfo | undefined;
+        for (const s of currentSongs) {
           const entry = currentCache[s.song_name.trim()];
-          return entry?.status === 'found' && !entry.blockedReason;
-        });
+          if (!entry || entry.status !== 'found' || entry.blockedReason) continue;
+          if (checkCooldownRef.current(s.song_name)) {
+            if (!lastSkippedRef.current.has(`cooldown:${s.song_name}`)) {
+              pushLog(`[auto-sync] cooldown skip: ${s.song_name}`);
+              lastSkippedRef.current.add(`cooldown:${s.song_name}`);
+            }
+            continue; // skip, try next song
+          }
+          found = s;
+          break;
+        }
 
         if (found) {
           const entry = currentCache[found.song_name.trim()];
           if (entry?.status === 'found') {
-            // Cooldown guard — skip if same song_name was added within cooldown window
-            if (checkCooldownRef.current(found.song_name)) {
-              if (!lastSkippedRef.current.has(`cooldown:${found.song_name}`)) {
-                pushLog(`[auto-sync] cooldown skip: ${found.song_name}`);
-                lastSkippedRef.current.add(`cooldown:${found.song_name}`);
-              }
-              return;
-            }
             await addTrackToPlaylist(entry.track, targetPlaylistId);
             lastSkippedRef.current.delete(`cooldown:${found.song_name}`);
             onSynced(entry.track, found);
             pushLog(`[auto-sync] ${found.song_name} → playlist`);
           }
         } else {
-          // Log once per blacklisted song to avoid spam
+          // Log once per blocked/cooldown song to avoid spam
           for (const s of currentSongs) {
             const entry = currentCache[s.song_name.trim()];
             if (entry?.status === 'found' && entry.blockedReason) {

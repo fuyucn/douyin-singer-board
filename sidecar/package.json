@@ -1,7 +1,7 @@
 {
   "name": "sidecar",
   "private": true,
-  "version": "0.0.39-24",
+  "version": "0.0.39-25",
   "type": "module",
   "main": "build/index.cjs",
   "scripts": {
