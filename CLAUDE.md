@@ -39,6 +39,14 @@ If a migration was edited by mistake during early development, the dev fix is
 to delete the DB file and let the migration re-run from scratch (the path is
 the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 
+## Branch rules (important)
+
+`feat/kugou-search` is a **permanently custom branch** — it contains special customizations that must never be merged back into `main`.
+
+- **Never** merge `feat/kugou-search` → `main`, under any circumstances.
+- The only allowed direction is `main` → `feat/kugou-search`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/kugou-search`.
+- If asked to do a general merge or sync between these two branches, refuse and ask the user to clarify which specific commits from `main` they want cherry-picked.
+
 ## Workflow
 
 1. Make code changes
