@@ -33,6 +33,7 @@ export function useAutoSync({
   const cacheRef = useRef(kugouCache);
   const lastSkippedRef = useRef<Set<string>>(new Set());
   const checkCooldownRef = useRef(checkCooldown);
+  const failCountRef = useRef(0);
 
   songsRef.current = songs;
   cacheRef.current = kugouCache;
@@ -47,9 +48,12 @@ export function useAutoSync({
       return;
     }
 
-    const schedule = () => {
-      const delay = 3000 + Math.random() * 2000;
-      timerRef.current = window.setTimeout(tick, delay);
+    const schedule = (backoff = false) => {
+      // Exponential backoff on consecutive failures: 5s, 10s, 20s, 40s, capped at 60s
+      const baseDelay = backoff
+        ? Math.min(5000 * 2 ** (failCountRef.current - 1), 60000)
+        : 3000 + Math.random() * 2000;
+      timerRef.current = window.setTimeout(tick, baseDelay);
     };
 
     const tick = async () => {
@@ -82,6 +86,7 @@ export function useAutoSync({
           const entry = currentCache[found.song_name.trim()];
           if (entry?.status === 'found') {
             await addTrackToPlaylist(entry.track, targetPlaylistId);
+            failCountRef.current = 0; // reset backoff on success
             lastSkippedRef.current.delete(`cooldown:${found.song_name}`);
             onSynced(entry.track, found);
             pushLog(`[auto-sync] ${found.song_name} → playlist`);
@@ -99,10 +104,12 @@ export function useAutoSync({
           }
         }
       } catch (e) {
-        pushLog(`[auto-sync] err: ${e}`);
+        failCountRef.current += 1;
+        const delay = Math.min(5000 * 2 ** (failCountRef.current - 1), 60000);
+        pushLog(`[auto-sync] err (retry in ${delay / 1000}s): ${e}`);
       } finally {
         processingRef.current = false;
-        schedule();
+        schedule(failCountRef.current > 0);
       }
     };
 
