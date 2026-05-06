@@ -105,6 +105,8 @@ function useSongsColumns() {
                 <div className="text-fg-faint text-[11px]">⋯ 搜索中</div>
               ) : entry?.status === 'not_found' ? (
                 <div className="text-fg-faint text-[11px]">未找到</div>
+              ) : entry?.status === 'error' ? (
+                <div className="text-[11px] text-orange-400">搜索失败</div>
               ) : null}
             </div>
           );

@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.39-36",
+  "version": "0.0.39-37",
   "type": "module",
   "scripts": {
     "dev": "vite",
