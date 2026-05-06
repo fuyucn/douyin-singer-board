@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore, dedupedSongs } from './store';
 import { useShallow } from 'zustand/react/shallow';
@@ -106,6 +106,7 @@ export default function App() {
     addSong: addBlacklistSong,
     addSinger: addBlacklistSinger,
     remove: removeBlacklist,
+    syncSidecar: syncBlacklist,
   } = useBlacklist();
   const { ctxMenu, open: openCtxMenu, close: closeCtxMenu } = useContextMenu();
 
@@ -163,7 +164,7 @@ export default function App() {
     return result;
   }, [kugouCache, checkTrack]);
 
-  useSidecarEvents();
+  useSidecarEvents({ onReconnect: syncBlacklist });
 
   useEffect(() => {
     applyTheme(theme);
@@ -295,12 +296,12 @@ export default function App() {
     }
   };
 
-  const onAutoSynced = (track: KuGouTrack, song: DanmuInfo) => {
+  const onAutoSynced = useCallback((track: KuGouTrack, song: DanmuInfo) => {
     removeByMsgId(song.msg_id);
     addPlayed(song);
     deleteHistoryByMsgId(song.msg_id).catch(() => {});
     toast(`[自动] 已加入歌单: ${track.filename}`);
-  };
+  }, [removeByMsgId, addPlayed]);
 
   useAutoSync({
     autoSync,

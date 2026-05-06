@@ -91,5 +91,5 @@ export function useBlacklist() {
     await syncSidecar();
   };
 
-  return { blacklist, checkTrack, addSong, addSinger, remove };
+  return { blacklist, checkTrack, addSong, addSinger, remove, syncSidecar };
 }
