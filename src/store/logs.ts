@@ -40,7 +40,12 @@ function buildSets(items: BlacklistItem[]) {
 
 export const createLogSlice: StateCreator<AppStore, [], [], LogSlice> = (set) => ({
   logs: [],
-  pushLog: (line) => set((s) => ({ logs: [...s.logs.slice(-499), line] })),
+  pushLog: (line) =>
+    set((s) => {
+      const logs = s.logs;
+      const next = logs.length >= 500 ? [...logs.slice(-499), line] : [...logs, line];
+      return { logs: next };
+    }),
   clearLogs: () => set({ logs: [] }),
 
   blacklist: [],

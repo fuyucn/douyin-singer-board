@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../store';
 import {
@@ -19,6 +19,10 @@ export function useBlacklist() {
   const removeByMsgId = useAppStore((s) => s.removeByMsgId);
   const config = useAppStore((s) => s.config);
   const pushLog = useAppStore((s) => s.pushLog);
+  const blacklistRef = useRef(blacklist);
+  blacklistRef.current = blacklist;
+  const configRef = useRef(config);
+  configRef.current = config;
 
   useEffect(() => {
     loadBlacklist()
@@ -38,15 +42,14 @@ export function useBlacklist() {
     [blockedSongKeys, blockedSingers],
   );
 
-  const syncSidecar = async () => {
-    const entries = await loadBlacklist();
-    const names = entries
-      .filter((e) => e.entry_type === 'song' && e.song_name)
-      .map((e) => e.song_name);
+  const syncSidecar = useCallback(() => {
+    const names = blacklistRef.current
+      .filter((e) => e.entryType === 'song' && e.songName)
+      .map((e) => e.songName);
     invoke('sidecar_send', {
-      cmd: { cmd: 'reload_config', config: { ...config, blacklist: names } },
+      cmd: { cmd: 'reload_config', config: { ...configRef.current, blacklist: names } },
     }).catch(() => {});
-  };
+  }, []);
 
   const addSong = async (songName: string, singerName: string, msgId?: string) => {
     if (!singerName) {
@@ -66,7 +69,7 @@ export function useBlacklist() {
       removeByMsgId(msgId);
       await deleteHistoryByMsgId(msgId).catch(() => {});
     }
-    await syncSidecar();
+    syncSidecar();
   };
 
   const addSinger = async (singerName: string) => {
@@ -82,13 +85,13 @@ export function useBlacklist() {
     }
     const entries = await loadBlacklist();
     hydrateBlacklist(entries);
-    await syncSidecar();
+    syncSidecar();
   };
 
   const remove = async (id: number) => {
     await dbRemove(id);
     removeFromStore(id);
-    await syncSidecar();
+    syncSidecar();
   };
 
   return { blacklist, checkTrack, addSong, addSinger, remove, syncSidecar };

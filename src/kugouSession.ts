@@ -191,7 +191,7 @@ export async function searchKuGouTopHit(keyword: string): Promise<KuGouTrack | n
 // `searchKuGouPreferredHit` to bias version selection toward what the
 // streamer has actually played.
 let listenHistoryCache: { map: Map<string, number>; fetched_at: number } | null = null;
-const LISTEN_TTL_SECONDS = 60 * 60;
+const LISTEN_TTL_SECONDS = 15 * 60; // 15 min — short enough to catch songs played during stream
 
 function extractListenEntries(body: any): Array<{ hash: string; count: number }> {
   // /user/listen?type=1 nests the array at data.lists with `hash` (upper)
