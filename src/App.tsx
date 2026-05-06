@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore, dedupedSongs } from './store';
 import { useShallow } from 'zustand/react/shallow';
@@ -170,15 +170,26 @@ export default function App() {
   }, [theme]);
 
   // Startup: load config
+  const configHydratedRef = useRef(false);
   useEffect(() => {
     (async () => {
       try {
         hydrateConfig(await loadConfig());
+        configHydratedRef.current = true;
       } catch (e) {
         setBootError(`加载配置失败: ${e}`);
       }
     })();
   }, [hydrateConfig]);
+
+  // Auto-save config 500ms after any change (skip before initial hydration)
+  useEffect(() => {
+    if (!configHydratedRef.current) return;
+    const timer = window.setTimeout(() => {
+      saveConfig(config).catch((e) => console.error('[config] auto-save failed:', e));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [config]);
 
   // Startup: update check
   useEffect(() => {
