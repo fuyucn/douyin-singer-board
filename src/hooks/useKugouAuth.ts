@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadKugouSession } from '../db';
-import { listenHistoryMap, refreshTokenIfStale } from '../kugouSession';
+import { listenHistoryMap, refreshTokenIfStale, clearListenHistoryCache } from '../kugouSession';
 import { useAppStore } from '../store';
 
 interface Options {
@@ -31,7 +31,10 @@ export function useKugouAuth({ watchTokens }: Options) {
   // Auto-disable auto-sync on logout (login → false transition only)
   const prevLoggedIn = useRef(kugouLoggedIn);
   useEffect(() => {
-    if (!kugouLoggedIn && prevLoggedIn.current) setAutoSync(false);
+    if (!kugouLoggedIn && prevLoggedIn.current) {
+      setAutoSync(false);
+      clearListenHistoryCache();
+    }
     prevLoggedIn.current = kugouLoggedIn;
   }, [kugouLoggedIn, setAutoSync]);
 

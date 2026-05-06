@@ -34,14 +34,31 @@ function log(level: 'debug' | 'info' | 'warn' | 'error', msg: string): void {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} (${url})`);
+    return res;
+  } catch (e: any) {
+    if (e?.name === 'AbortError') throw new Error(`request timed out after ${FETCH_TIMEOUT_MS / 1000}s (${url})`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getTtwid(): Promise<string> {
-  const res = await fetch('https://live.douyin.com/', {
+  const res = await fetchWithTimeout('https://live.douyin.com/', {
     method: 'GET',
     headers: { 'User-Agent': UA },
   });
   const setCookie = res.headers.get('set-cookie') ?? '';
   const m = setCookie.match(/ttwid=([^;,\s]+)/);
-  if (!m) throw new Error('no ttwid in response');
+  if (!m) throw new Error('no ttwid in response — Douyin may have changed their cookie format');
   return m[1];
 }
 
@@ -51,18 +68,18 @@ async function resolveIdStr(input: string): Promise<string> {
 
   log('info', `resolving web_rid ${input} -> id_str ...`);
   const ttwid = await getTtwid();
-  const html = await fetch(`https://live.douyin.com/${encodeURIComponent(input)}`, {
+  const res = await fetchWithTimeout(`https://live.douyin.com/${encodeURIComponent(input)}`, {
     headers: {
       'User-Agent': UA,
       Cookie: `ttwid=${ttwid}; __ac_nonce=0123407cc00a9e438deb4`,
       'Accept-Encoding': 'gzip, deflate',
     },
-  }).then((r) => r.text());
+  });
+  const html = await res.text();
 
   const m = html.match(/roomId\\":\\"(\d+)\\"/);
   if (!m) {
-    log('warn', `no roomId match in HTML, use input ${input} as-is`);
-    return input;
+    throw new Error(`room not found or page structure changed for web_rid: ${input} — check that the room ID is correct and the room is live`);
   }
   log('info', `id_str = ${m[1]}`);
   return m[1];

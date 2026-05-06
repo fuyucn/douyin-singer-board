@@ -66,6 +66,13 @@ export function useAutoSync({
         const currentSongs = songsRef.current;
         const currentCache = cacheRef.current;
 
+        // Prune skip-log entries for songs that are no longer blocked
+        for (const key of lastSkippedRef.current) {
+          if (key.startsWith('cooldown:')) continue;
+          const entry = currentCache[key.trim()];
+          if (!entry?.blockedReason) lastSkippedRef.current.delete(key);
+        }
+
         // Find first 'found', non-blocked, non-cooldown song
         let found: DanmuInfo | undefined;
         for (const s of currentSongs) {
