@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
+import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DouyinRoomInfo {
@@ -46,37 +46,23 @@ export function LeftPanel({
   onAutoSyncToggle,
   appVersion,
 }: Props) {
-  // Live room metadata preview (debounced when room_id changes)
+  // Live room metadata preview (debounced when room_id changes).
+  // Only shows nickname on successful fetch; silent on loading/error/empty.
   const [roomInfo, setRoomInfo] = useState<DouyinRoomInfo | null>(null);
-  const [roomLoading, setRoomLoading] = useState(false);
-  const [roomError, setRoomError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = config.room_id.trim();
-    if (!id || !/^\d+$/.test(id)) {
-      setRoomInfo(null);
-      setRoomError(null);
-      setRoomLoading(false);
-      return;
-    }
-    setRoomLoading(true);
-    setRoomError(null);
+    setRoomInfo(null);
+    if (!id || !/^\d+$/.test(id)) return;
     const timer = window.setTimeout(async () => {
       try {
         const info = await invoke<DouyinRoomInfo | null>('douyin_room_info', { webRid: id });
         setRoomInfo(info);
-        if (!info) setRoomError('未找到');
-      } catch (e) {
-        setRoomError(String(e).slice(0, 60));
-        setRoomInfo(null);
-      } finally {
-        setRoomLoading(false);
+      } catch {
+        /* silent — no UI for errors */
       }
     }, 600);
-    return () => {
-      window.clearTimeout(timer);
-      setRoomLoading(false);
-    };
+    return () => window.clearTimeout(timer);
   }, [config.room_id]);
 
   const handleSavePlaylist = async () => {
@@ -115,13 +101,7 @@ export function LeftPanel({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs text-[var(--fg-muted)]">抖音直播间 ID</Label>
-              {roomLoading && (
-                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--fg-faint)]">
-                  <Loader2 className="size-3 animate-spin" />
-                  查询中
-                </span>
-              )}
-              {!roomLoading && roomInfo?.nickname && (
+              {roomInfo?.nickname && (
                 <span
                   className="inline-flex max-w-[60%] items-center gap-1 truncate text-[11px]"
                   title={roomInfo.title}
@@ -134,9 +114,6 @@ export function LeftPanel({
                   />
                   <span className="truncate text-[var(--fg-base)]">{roomInfo.nickname}</span>
                 </span>
-              )}
-              {!roomLoading && roomError && (
-                <span className="text-[11px] text-amber-500">{roomError}</span>
               )}
             </div>
             <Input
