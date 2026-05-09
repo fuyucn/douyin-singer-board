@@ -1,7 +1,8 @@
 import { useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 
 const levelDot: Record<string, string> = {
   success: 'bg-green-500',
@@ -63,6 +64,15 @@ export function LogPanel({ logs, onClear }: Props) {
     overscan: 8,
   });
 
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(logs.join('\n'));
+      toast.success(`已复制 ${logs.length} 条日志`);
+    } catch (e) {
+      toast.error(`复制失败: ${e}`);
+    }
+  };
+
   if (logs.length === 0) return null;
 
   return (
@@ -71,6 +81,19 @@ export function LogPanel({ logs, onClear }: Props) {
         <span className="font-medium">日志</span>
         <div className="flex items-center gap-2">
           <span className="text-fg-faint">{logs.length} 条</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-fg-faint hover:text-fg-base h-6 gap-1 px-1 text-xs"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCopy();
+            }}
+          >
+            <Copy className="size-3" />
+            复制
+          </Button>
           {onClear && (
             <Button
               variant="ghost"
