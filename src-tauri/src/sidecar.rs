@@ -105,6 +105,8 @@ impl SidecarHandle {
         // Bind entire process tree via Job Object (Windows) / process group (Unix).
         // CreationFlags MUST come before JobObject so our CREATE_NO_WINDOW is
         // merged into JobObject's CREATE_SUSPENDED in pre_spawn.
+        // KillOnDrop ensures the child is killed (whole group on Unix) when the
+        // wrapper is dropped — without it, orphaned sidecar processes pile up.
         let mut wrap = CommandWrap::from(cmd);
         #[cfg(windows)]
         {
@@ -115,6 +117,7 @@ impl SidecarHandle {
         }
         #[cfg(unix)]
         wrap.wrap(ProcessGroup::leader());
+        wrap.wrap(KillOnDrop);
 
         let mut child = wrap.spawn().map_err(|e| format!("spawn: {}", e))?;
 

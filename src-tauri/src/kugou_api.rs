@@ -132,8 +132,9 @@ impl KugouApiHandle {
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
         // Use process-wrap to bind the entire process tree to a Job Object on
-        // Windows (or a process group on Unix). This ensures all grandchild
-        // processes are killed when the Tauri app exits, even on crash.
+        // Windows (or a process group on Unix), and KillOnDrop to ensure the
+        // child is killed when the wrapper is dropped. Without KillOnDrop the
+        // group leader stays alive on macOS after Tauri exits.
         //
         // On Windows: CreationFlags MUST come before JobObject so JobObject's
         // pre_spawn merges our CREATE_NO_WINDOW into its CREATE_SUSPENDED flag.
@@ -147,6 +148,7 @@ impl KugouApiHandle {
         }
         #[cfg(unix)]
         wrap.wrap(ProcessGroup::leader());
+        wrap.wrap(KillOnDrop);
 
         let mut child = wrap
             .spawn()
