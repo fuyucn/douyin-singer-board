@@ -73,6 +73,27 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "telemetry: opt-in event tracking (default off)",
+            sql: "
+                CREATE TABLE telemetry_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts INTEGER NOT NULL,
+                    event TEXT NOT NULL,
+                    props_json TEXT NOT NULL DEFAULT '{}'
+                );
+                CREATE INDEX idx_tel_ts ON telemetry_events(ts);
+
+                CREATE TABLE telemetry_config (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    opt_in INTEGER NOT NULL DEFAULT 0,
+                    device_id TEXT NOT NULL DEFAULT ''
+                );
+                INSERT OR IGNORE INTO telemetry_config (id) VALUES (1);
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

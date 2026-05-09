@@ -1,14 +1,17 @@
-export interface DanmuInfo {
-  msg_id: string;
-  uid: string;
-  uname: string;
-  song_name: string;
-  raw_msg: string;
-  medal_level: number;
-  medal_name: string;
-  send_time: number;
-  played_at?: number;
-}
+import { z } from 'zod';
+
+export const DanmuInfoSchema = z.object({
+  msg_id: z.string(),
+  uid: z.string(),
+  uname: z.string(),
+  song_name: z.string(),
+  raw_msg: z.string(),
+  medal_level: z.number(),
+  medal_name: z.string(),
+  send_time: z.number(),
+  played_at: z.number().optional(),
+});
+export type DanmuInfo = z.infer<typeof DanmuInfoSchema>;
 
 export interface Config {
   room_id: string;
@@ -20,13 +23,19 @@ export interface Config {
   target_playlist_id: number;
 }
 
-export type SidecarEvent =
-  | { event: 'status'; connected: boolean; message?: string }
-  | { event: 'danmu'; data: DanmuInfo }
-  | { event: 'cancel'; uid: string }
-  | { event: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; msg: string }
-  | { event: 'error'; msg: string }
-  | { event: 'crashed' };
+export const SidecarEventSchema = z.discriminatedUnion('event', [
+  z.object({ event: z.literal('status'), connected: z.boolean(), message: z.string().optional() }),
+  z.object({ event: z.literal('danmu'), data: DanmuInfoSchema }),
+  z.object({ event: z.literal('cancel'), uid: z.string() }),
+  z.object({
+    event: z.literal('log'),
+    level: z.enum(['debug', 'info', 'warn', 'error']),
+    msg: z.string(),
+  }),
+  z.object({ event: z.literal('error'), msg: z.string() }),
+  z.object({ event: z.literal('crashed') }),
+]);
+export type SidecarEvent = z.infer<typeof SidecarEventSchema>;
 
 // Human-friendly template, not a regex.
 // Placeholders: [space] = whitespace, [song] = song-name capture.

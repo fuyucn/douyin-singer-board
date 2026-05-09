@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { insertHistory } from '../db';
-import type { SidecarEvent } from '../types';
+import { SidecarEventSchema } from '../types';
 import { useAppStore } from '../store';
 
 /**
@@ -22,8 +22,13 @@ export function useSidecarEvents({ onReconnect }: { onReconnect?: () => void } =
   const wasConnectedRef = useRef(false);
 
   useEffect(() => {
-    const unlisten = listen<SidecarEvent>('sidecar-event', (e) => {
-      const ev = e.payload;
+    const unlisten = listen<unknown>('sidecar-event', (e) => {
+      const result = SidecarEventSchema.safeParse(e.payload);
+      if (!result.success) {
+        pushLog(`[sidecar] schema violation: ${result.error.message}`);
+        return;
+      }
+      const ev = result.data;
 
       switch (ev.event) {
         case 'danmu':

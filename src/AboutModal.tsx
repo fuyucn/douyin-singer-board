@@ -9,6 +9,13 @@ import {
   getSkippedVersion,
 } from './updater';
 import { Button } from './components/ui/button';
+import {
+  isTelemetryOptedIn,
+  setTelemetryOptIn,
+  exportTelemetry,
+  clearTelemetry,
+} from './telemetry';
+import { Switch } from './components/ui/switch';
 
 interface Props {
   onClose: () => void;
@@ -17,14 +24,37 @@ interface Props {
 export function AboutModal({ onClose }: Props) {
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
+  const [telemetryOn, setTelemetryOn] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
+    isTelemetryOptedIn().then(setTelemetryOn);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const onToggleTelemetry = async (next: boolean) => {
+    await setTelemetryOptIn(next);
+    setTelemetryOn(next);
+    toast.success(next ? '已启用匿名诊断数据' : '已关闭');
+  };
+
+  const onExportTelemetry = async () => {
+    try {
+      const jsonl = await exportTelemetry(CURRENT_VERSION);
+      await navigator.clipboard.writeText(jsonl);
+      toast.success('诊断数据已复制到剪贴板');
+    } catch (e) {
+      toast.error(`导出失败: ${e}`);
+    }
+  };
+
+  const onClearTelemetry = async () => {
+    await clearTelemetry();
+    toast.success('诊断数据已清空');
+  };
 
   const onCheck = async () => {
     if (checking) return;
@@ -97,6 +127,29 @@ export function AboutModal({ onClose }: Props) {
             >
               {checking ? '检查中…' : '检查更新'}
             </Button>
+          </div>
+
+          {/* Telemetry section */}
+          <div className="border-border-soft mt-5 border-t pt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="text-fg-base text-sm font-medium">匿名诊断数据</div>
+                <div className="text-fg-muted text-[11px] leading-snug">
+                  本地记录崩溃和事件以便调试，从不上传。
+                </div>
+              </div>
+              <Switch checked={telemetryOn} onCheckedChange={onToggleTelemetry} />
+            </div>
+            {telemetryOn && (
+              <div className="mt-2 flex gap-2">
+                <Button variant="outline" size="sm" onClick={onExportTelemetry}>
+                  复制诊断数据
+                </Button>
+                <Button variant="ghost" size="sm" onClick={onClearTelemetry}>
+                  清空
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>

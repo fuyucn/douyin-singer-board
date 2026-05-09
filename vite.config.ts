@@ -19,4 +19,29 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('@tauri-apps')) return 'tauri';
+          if (id.includes('@tanstack')) return 'tanstack';
+          if (
+            id.includes('@base-ui') ||
+            id.includes('@radix-ui') ||
+            id.includes('lucide-react') ||
+            id.includes('sonner') ||
+            id.includes('next-themes')
+          )
+            return 'ui';
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('scheduler')
+          )
+            return 'react';
+        },
+      },
+    },
+  },
 });

@@ -29,6 +29,7 @@ import { useKugouAuth } from './hooks/useKugouAuth';
 import { useKugouSearch } from './hooks/useKugouSearch';
 import { useSidecarEvents } from './hooks/useSidecarEvents';
 import { useSidecarRecovery } from './hooks/useSidecarRecovery';
+import { track as track_, pruneOldEvents } from './telemetry';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { ContextMenu } from './components/ContextMenu';
@@ -203,6 +204,7 @@ export default function App() {
         setSongs([...songs].reverse());
         setSessionId(recent.sessionId);
         pushLog(`[recovery] 恢复 ${songs.length} 首待处理点歌（来自上次直播）`);
+        track_('session_recovered', { count: songs.length });
       } catch (e) {
         pushLog(`[recovery] 恢复失败: ${e}`);
       }
@@ -223,6 +225,14 @@ export default function App() {
     checkForUpdate().then((info) => {
       if (info) setUpdate(info);
     });
+  }, []);
+
+  // Telemetry: app_launched + prune old events
+  useEffect(() => {
+    track_('app_launched', {
+      version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0',
+    });
+    pruneOldEvents();
   }, []);
 
   const onStart = async () => {
@@ -324,16 +334,19 @@ export default function App() {
       addPlayed(song);
       await deleteHistoryByMsgId(song.msg_id).catch(() => {});
       toast(`已加入歌单: ${track.filename}`);
+      track_('song_added_manual', { song_name: song.song_name });
     } catch (e) {
       toast.error(`加入歌单失败: ${e}`);
+      track_('add_playlist_error', { msg: String(e).slice(0, 200) });
     }
   };
 
-  const onAutoSynced = useCallback((track: KuGouTrack, song: DanmuInfo) => {
+  const onAutoSynced = useCallback((kgTrack: KuGouTrack, song: DanmuInfo) => {
     removeByMsgId(song.msg_id);
     addPlayed(song);
     deleteHistoryByMsgId(song.msg_id).catch(() => {});
-    toast(`[自动] 已加入歌单: ${track.filename}`);
+    toast(`[自动] 已加入歌单: ${kgTrack.filename}`);
+    track_('song_added_auto', { song_name: song.song_name });
   }, [removeByMsgId, addPlayed]);
 
   useAutoSync({

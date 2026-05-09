@@ -12,7 +12,7 @@
 
 import readline from 'node:readline';
 import { Matcher } from './matcher.js';
-import type { Config, SidecarCmd, SidecarEvent } from './types.js';
+import { SidecarCmdSchema, type Config, type SidecarCmd, type SidecarEvent } from './types.js';
 
 let DouYinDanmaClient: any = null;
 let listener: any = null;
@@ -213,12 +213,19 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
 const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', (line) => {
   if (!line.trim()) return;
+  let parsed: unknown;
   try {
-    const cmd = JSON.parse(line) as SidecarCmd;
-    void handleCmd(cmd);
-  } catch {
-    emit({ event: 'error', msg: `invalid cmd: ${line}` });
+    parsed = JSON.parse(line);
+  } catch (e) {
+    emit({ event: 'error', msg: `invalid JSON cmd: ${(e as Error).message}` });
+    return;
   }
+  const result = SidecarCmdSchema.safeParse(parsed);
+  if (!result.success) {
+    emit({ event: 'error', msg: `cmd schema violation: ${result.error.message}` });
+    return;
+  }
+  void handleCmd(result.data);
 });
 
 process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
