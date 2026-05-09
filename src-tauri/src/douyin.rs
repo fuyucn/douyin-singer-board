@@ -17,13 +17,28 @@ const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
 
 /// Extract a value from escaped-JSON HTML payload, e.g.
 /// `roomId\":\"7300000000000000000\"` → `7300000000000000000`.
+/// Returns the FIRST non-placeholder occurrence — Next.js streaming SSR
+/// fills some fields with `$undefined` initially and the real value
+/// later in the same chunk.
 fn extract_field(html: &str, key: &str) -> Option<String> {
-    // Pattern: key\":\"value\"
     let needle = format!("{key}\\\":\\\"");
-    let start = html.find(&needle)? + needle.len();
-    let rest = &html[start..];
-    let end = rest.find("\\\"")?;
-    Some(rest[..end].to_string())
+    let mut search_start = 0;
+    while let Some(rel) = html[search_start..].find(&needle) {
+        let value_start = search_start + rel + needle.len();
+        let rest = &html[value_start..];
+        if let Some(end) = rest.find("\\\"") {
+            let value = &rest[..end];
+            // Skip Next.js streaming placeholders ($undefined, $L1, etc.)
+            // and any empty match.
+            if !value.is_empty() && !value.starts_with('$') {
+                return Some(value.to_string());
+            }
+            search_start = value_start + end;
+        } else {
+            return None;
+        }
+    }
+    None
 }
 
 fn extract_status(html: &str) -> Option<u32> {
