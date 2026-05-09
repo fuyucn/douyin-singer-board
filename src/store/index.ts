@@ -38,16 +38,17 @@ const isManual = (d: DanmuInfo): boolean => d.uid === 'manual';
 export function dedupedSongs(songs: DanmuInfo[]): DanmuInfo[] {
   const seen = new Map<string, DanmuInfo>();
   for (const s of songs) {
-    const existing = seen.get(s.song_name);
+    const key = s.song_name.trim();
+    const existing = seen.get(key);
     if (!existing) {
-      seen.set(s.song_name, s);
+      seen.set(key, s);
     } else if (isManual(s) && !isManual(existing)) {
-      seen.set(s.song_name, s); // upgrade to manual
+      seen.set(key, s); // upgrade to manual
     } else if (!isManual(s) && isManual(existing)) {
       // keep existing manual
     } else if (s.send_time < existing.send_time) {
       // both same kind: keep earliest
-      seen.set(s.song_name, s);
+      seen.set(key, s);
     }
   }
 

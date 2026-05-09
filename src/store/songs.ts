@@ -35,12 +35,13 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
   clearSongs: () => set({ songs: [] }),
   manualAdd: (name) => {
     const now = Math.floor(Date.now() / 1000);
+    const trimmed = name.trim();
     const item: DanmuInfo = {
       msg_id: `manual_${now}_${Math.random().toString(36).slice(2, 6)}`,
       uid: 'manual',
       uname: 'Host',
-      song_name: name,
-      raw_msg: name,
+      song_name: trimmed,
+      raw_msg: trimmed,
       medal_level: 0,
       medal_name: '',
       send_time: now,
@@ -61,13 +62,17 @@ export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set
   isInCooldown: (songName) => {
     const now = Math.floor(Date.now() / 1000);
     const window = get().config.cooldown_seconds;
-    return get().played.some((p) => p.song_name === songName && (p.played_at ?? 0) > now - window);
+    const target = songName.trim();
+    return get().played.some(
+      (p) => p.song_name.trim() === target && (p.played_at ?? 0) > now - window,
+    );
   },
   cooldownRemainingSeconds: (songName) => {
     const now = Math.floor(Date.now() / 1000);
     const window = get().config.cooldown_seconds;
+    const target = songName.trim();
     const match = get().played.find(
-      (p) => p.song_name === songName && (p.played_at ?? 0) > now - window,
+      (p) => p.song_name.trim() === target && (p.played_at ?? 0) > now - window,
     );
     if (!match) return 0;
     return (match.played_at ?? 0) + window - now;
