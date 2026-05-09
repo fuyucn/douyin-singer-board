@@ -1,3 +1,4 @@
+mod douyin;
 mod kugou;
 mod kugou_api;
 mod sidecar;
@@ -195,6 +196,7 @@ pub fn run() {
             sidecar::sidecar_respawn,
             kugou::kugou_search,
             kugou_api::kugou_api_request,
+            douyin::douyin_room_info,
             show_window,
         ])
         .run(tauri::generate_context!())

@@ -1,6 +1,6 @@
 [package]
 name = "sususongboard"
-version = "0.0.39-43"
+version = "0.0.39-44"
 description = "SUSUSongBoard - 抖音直播点歌助手"
 edition = "2021"
 
@@ -19,7 +19,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 dirs = "5"
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "cookies"] }
 process-wrap = { version = "9.1.0", features = ["tokio1"] }
 
 [target.'cfg(windows)'.dependencies]

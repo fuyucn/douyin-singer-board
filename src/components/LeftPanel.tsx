@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { Config } from '../types';
 import { resolvePlaylistByName } from '../kugouSession';
 import { toast } from 'sonner';
@@ -7,8 +9,15 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle } from 'lucide-react';
+import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface DouyinRoomInfo {
+  id_str: string;
+  nickname: string;
+  title: string;
+  status: number;
+}
 
 interface Props {
   config: Config;
@@ -37,6 +46,39 @@ export function LeftPanel({
   onAutoSyncToggle,
   appVersion,
 }: Props) {
+  // Live room metadata preview (debounced when room_id changes)
+  const [roomInfo, setRoomInfo] = useState<DouyinRoomInfo | null>(null);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [roomError, setRoomError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = config.room_id.trim();
+    if (!id || !/^\d+$/.test(id)) {
+      setRoomInfo(null);
+      setRoomError(null);
+      setRoomLoading(false);
+      return;
+    }
+    setRoomLoading(true);
+    setRoomError(null);
+    const timer = window.setTimeout(async () => {
+      try {
+        const info = await invoke<DouyinRoomInfo | null>('douyin_room_info', { webRid: id });
+        setRoomInfo(info);
+        if (!info) setRoomError('未找到');
+      } catch (e) {
+        setRoomError(String(e).slice(0, 60));
+        setRoomInfo(null);
+      } finally {
+        setRoomLoading(false);
+      }
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      setRoomLoading(false);
+    };
+  }, [config.room_id]);
+
   const handleSavePlaylist = async () => {
     const name = config.target_playlist_name.trim();
     if (!name) {
@@ -71,7 +113,32 @@ export function LeftPanel({
         </div>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-[var(--fg-muted)]">抖音直播间 ID</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs text-[var(--fg-muted)]">抖音直播间 ID</Label>
+              {roomLoading && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-[var(--fg-faint)]">
+                  <Loader2 className="size-3 animate-spin" />
+                  查询中
+                </span>
+              )}
+              {!roomLoading && roomInfo?.nickname && (
+                <span
+                  className="inline-flex max-w-[60%] items-center gap-1 truncate text-[11px]"
+                  title={roomInfo.title}
+                >
+                  <span
+                    className={cn(
+                      'inline-block size-1.5 shrink-0 rounded-full',
+                      roomInfo.status === 2 ? 'bg-emerald-500' : 'bg-zinc-400',
+                    )}
+                  />
+                  <span className="truncate text-[var(--fg-base)]">{roomInfo.nickname}</span>
+                </span>
+              )}
+              {!roomLoading && roomError && (
+                <span className="text-[11px] text-amber-500">{roomError}</span>
+              )}
+            </div>
             <Input
               value={config.room_id}
               disabled={running}
