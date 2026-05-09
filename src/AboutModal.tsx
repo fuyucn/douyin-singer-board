@@ -16,6 +16,7 @@ import {
   clearTelemetry,
 } from './telemetry';
 import { Switch } from './components/ui/switch';
+import { useShowLogs } from './hooks/useShowLogs';
 
 interface Props {
   onClose: () => void;
@@ -25,6 +26,7 @@ export function AboutModal({ onClose }: Props) {
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
   const [telemetryOn, setTelemetryOn] = useState(false);
+  const [showLogs, setShowLogs] = useShowLogs();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -150,6 +152,19 @@ export function AboutModal({ onClose }: Props) {
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Show logs panel toggle */}
+          <div className="border-border-soft mt-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-fg-base text-sm font-medium">显示日志面板</div>
+                <div className="text-fg-muted text-[11px] leading-snug">
+                  在主界面底部显示日志面板，便于排查问题。
+                </div>
+              </div>
+              <Switch checked={showLogs} onCheckedChange={setShowLogs} />
+            </div>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SongTable, songColumnHelper } from './SongTable';
 import { BlacklistPanel, type BlacklistItemUI } from './BlacklistPanel';
 import { LogPanel } from './LogPanel';
+import { useShowLogs } from '../hooks/useShowLogs';
 import type { DanmuInfo } from '../types';
 import type { EnrichedEntry } from '../kugouSession';
 import type { BlacklistItem } from '../store/blacklist';
@@ -238,6 +239,7 @@ export function MainContent({
   const songsColumns = useSongsColumns();
   const playedColumns = usePlayedColumns();
   const [playedQuery, setPlayedQuery] = useState('');
+  const [showLogs] = useShowLogs();
 
   const filteredPlayed = useMemo(() => {
     const q = playedQuery.trim().toLowerCase();
@@ -387,10 +389,12 @@ export function MainContent({
         </Tabs>
       </div>
 
-      {/* Log panel */}
-      <div className="mx-3 mb-2 shrink-0">
-        <LogPanel logs={logs} onClear={onClearLogs} />
-      </div>
+      {/* Log panel — gated by user preference */}
+      {showLogs && (
+        <div className="mx-3 mb-2 shrink-0">
+          <LogPanel logs={logs} onClear={onClearLogs} />
+        </div>
+      )}
     </div>
   );
 }
