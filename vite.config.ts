@@ -24,6 +24,13 @@ export default defineConfig({
       output: {
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return;
+          // Match react/react-dom/scheduler FIRST, with node_modules prefix
+          // to avoid matching @base-ui/react etc. which would create cycles.
+          if (
+            /node_modules\/(react|react-dom|scheduler)\//.test(id) ||
+            /node_modules\/(react|react-dom|scheduler)$/.test(id)
+          )
+            return 'react';
           if (id.includes('@tauri-apps')) return 'tauri';
           if (id.includes('@tanstack')) return 'tanstack';
           if (
@@ -34,12 +41,6 @@ export default defineConfig({
             id.includes('next-themes')
           )
             return 'ui';
-          if (
-            id.includes('/react/') ||
-            id.includes('/react-dom/') ||
-            id.includes('scheduler')
-          )
-            return 'react';
         },
       },
     },
