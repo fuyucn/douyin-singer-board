@@ -242,6 +242,23 @@ process.on('unhandledRejection', (reason) => {
   log('warn', `unhandledRejection: ${(reason as Error)?.message ?? String(reason)}`);
 });
 
+// Dev hot-reload: when esbuild --watch rewrites our own bundled file,
+// exit so the Tauri-side recovery hook respawns us with the new code.
+if (process.env.SIDECAR_DEV) {
+  void (async () => {
+    try {
+      const { watch } = await import('node:fs');
+      const watcher = watch(__filename, { persistent: false }, () => {
+        log('info', '[dev] source rebuilt — exiting for restart');
+        watcher.close();
+        setTimeout(() => process.exit(0), 200);
+      });
+    } catch {
+      /* fs.watch may be unavailable on some platforms */
+    }
+  })();
+}
+
 // Parent process watchdog — exit if the Tauri parent disappears.
 // Also kills the companion kugou-api process if one was registered.
 // Only exit on ESRCH (process not found); ignore EPERM/other errors

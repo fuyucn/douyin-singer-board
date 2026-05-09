@@ -82,10 +82,21 @@ impl SidecarHandle {
             return Ok(());
         }
 
-        let path = Self::extract_to_temp(&app)?;
-        log_to_ui(&app, "info", &format!("spawning sidecar: {}", path.display()));
-
-        let mut cmd = Command::new(&path);
+        // Dev hot-reload: if SIDECAR_DEV_PATH is set, spawn `node <path>`
+        // directly instead of extracting the embedded binary. The script
+        // self-restarts when esbuild --watch rebuilds it (see sidecar/index.ts).
+        let dev_path = std::env::var("SIDECAR_DEV_PATH").ok();
+        let mut cmd = if let Some(ref dev) = dev_path {
+            log_to_ui(&app, "info", &format!("dev: spawning node {}", dev));
+            let mut c = Command::new("node");
+            c.arg(dev);
+            c.env("SIDECAR_DEV", "1");
+            c
+        } else {
+            let path = Self::extract_to_temp(&app)?;
+            log_to_ui(&app, "info", &format!("spawning sidecar: {}", path.display()));
+            Command::new(&path)
+        };
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -105,9 +116,7 @@ impl SidecarHandle {
         #[cfg(unix)]
         wrap.wrap(ProcessGroup::leader());
 
-        let mut child = wrap
-            .spawn()
-            .map_err(|e| format!("spawn {}: {}", path.display(), e))?;
+        let mut child = wrap.spawn().map_err(|e| format!("spawn: {}", e))?;
 
         let stdout = child.stdout().take().ok_or("no stdout")?;
         let stderr = child.stderr().take().ok_or("no stderr")?;

@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useWindowWidth } from '@/hooks/useWindowWidth';
-import { Trash2, Music } from 'lucide-react';
+import { Trash2, Music, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { SongTable, songColumnHelper } from './SongTable';
 import { BlacklistPanel, type BlacklistItemUI } from './BlacklistPanel';
@@ -236,6 +237,17 @@ export function MainContent({
 }: Props) {
   const songsColumns = useSongsColumns();
   const playedColumns = usePlayedColumns();
+  const [playedQuery, setPlayedQuery] = useState('');
+
+  const filteredPlayed = useMemo(() => {
+    const q = playedQuery.trim().toLowerCase();
+    if (!q) return played;
+    return played.filter(
+      (s) =>
+        s.song_name.toLowerCase().includes(q) ||
+        s.uname.toLowerCase().includes(q),
+    );
+  }, [played, playedQuery]);
 
   const songsMeta: SongsMeta = useMemo(
     () => ({ kugouCache, renderActions: renderSongActions, onContextMenu, cooldownRemaining }),
@@ -332,9 +344,30 @@ export function MainContent({
           </TabsContent>
 
           <TabsContent value="played" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+            {played.length > 0 && (
+              <div className="border-border-soft relative shrink-0 border-b px-3 py-1.5">
+                <Search className="text-fg-faint pointer-events-none absolute top-1/2 left-5 size-3.5 -translate-y-1/2" />
+                <Input
+                  value={playedQuery}
+                  onChange={(e) => setPlayedQuery(e.target.value)}
+                  placeholder="搜索歌曲名或用户…"
+                  className="h-7 bg-transparent pr-8 pl-7 text-xs"
+                />
+                {playedQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPlayedQuery('')}
+                    className="text-fg-faint hover:text-fg-base absolute top-1/2 right-5 -translate-y-1/2"
+                    aria-label="清除"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
             <SongTable
-              songs={played}
-              emptyText="暂无已点歌曲"
+              songs={filteredPlayed}
+              emptyText={playedQuery ? '没有匹配的歌曲' : '暂无已点歌曲'}
               columns={playedColumns}
               meta={playedMeta}
               columnVisibility={narrowVisibility}

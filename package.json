@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.39-49",
+  "version": "0.0.39-50",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,7 @@
     "sidecar:build:bin": "pnpm -F sidecar build:bin",
     "kugou-api:build:bin": "node scripts/build-kugou-api-bin.mjs",
     "tauri": "tauri",
-    "tauri:dev": "pnpm sidecar:build && tauri dev",
+    "tauri:dev": "pnpm sidecar:build && node scripts/dev.mjs",
     "tauri:build": "pnpm sidecar:build:bin && pnpm kugou-api:build:bin && tauri build",
     "tauri:build:dev": "pnpm sidecar:build:bin && pnpm kugou-api:build:bin && VITE_DEBUG=true tauri build",
     "bump": "node scripts/bump-patch.mjs",
