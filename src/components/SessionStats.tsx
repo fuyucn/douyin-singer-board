@@ -1,11 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { DanmuInfo } from '../types';
+
+interface Step {
+  key: string;
+  label: string;
+  status: 'pending' | 'done';
+}
 
 interface Props {
   songs: DanmuInfo[];
   played: DanmuInfo[];
   running: boolean;
+  steps: Step[];
 }
+
+const STEPS_FADE_DELAY = 1500;
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.floor(seconds)}秒`;
@@ -21,7 +31,7 @@ function formatShort(seconds: number): string {
   return `${mins}分${Math.round(seconds % 60)}秒`;
 }
 
-export function SessionStats({ songs, played, running }: Props) {
+export function SessionStats({ songs, played, running, steps }: Props) {
   // Tick every second for elapsed time
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
@@ -30,10 +40,25 @@ export function SessionStats({ songs, played, running }: Props) {
     return () => window.clearInterval(t);
   }, [running]);
 
-  const total = songs.length + played.length;
-  if (total === 0 && !running) return null;
+  // Steps visibility: show while any pending; keep visible briefly after all-done, then hide.
+  const doneAll = steps.every((s) => s.status === 'done');
+  const [stepsVisible, setStepsVisible] = useState(!doneAll);
+  const prevDoneAll = useRef(doneAll);
+  useEffect(() => {
+    if (doneAll && !prevDoneAll.current) {
+      setStepsVisible(true);
+      const t = window.setTimeout(() => setStepsVisible(false), STEPS_FADE_DELAY);
+      return () => window.clearTimeout(t);
+    } else if (!doneAll) {
+      setStepsVisible(true);
+    }
+    prevDoneAll.current = doneAll;
+  }, [doneAll]);
 
-  // Earliest song to compute session elapsed
+  const total = songs.length + played.length;
+  const showStats = total > 0 || running;
+  if (!showStats && !stepsVisible) return null;
+
   const allSongs = [...songs, ...played];
   const earliest = allSongs.reduce(
     (min, s) => Math.min(min, s.send_time),
@@ -41,7 +66,6 @@ export function SessionStats({ songs, played, running }: Props) {
   );
   const elapsed = earliest === Number.MAX_SAFE_INTEGER ? 0 : Math.max(0, now - earliest);
 
-  // Average processing time: from request → added to playlist
   const avgProcessing =
     played.length === 0
       ? 0
@@ -50,13 +74,40 @@ export function SessionStats({ songs, played, running }: Props) {
 
   return (
     <div className="border-border-soft text-fg-muted flex items-center gap-4 border-t px-5 py-1.5 text-xs">
-      <Stat label="队列" value={String(songs.length)} />
-      <Stat label="已播" value={String(played.length)} />
-      <Stat label="总数" value={String(total)} />
-      {avgProcessing > 0 && (
-        <Stat label="平均处理" value={formatShort(avgProcessing)} />
+      {/* Startup checklist (left side) — visible while pending or briefly after all done */}
+      {stepsVisible &&
+        steps.map((s) => (
+          <span
+            key={s.key}
+            className={cn(
+              'inline-flex items-center gap-1',
+              s.status === 'done' ? 'text-success' : 'text-fg-faint',
+            )}
+          >
+            {s.status === 'done' ? (
+              <span className="text-[11px]">✓</span>
+            ) : (
+              <span className="inline-block size-2 animate-pulse rounded-full bg-amber-400" />
+            )}
+            {s.label}
+          </span>
+        ))}
+
+      {/* Divider when both sections present */}
+      {stepsVisible && showStats && (
+        <span className="bg-border-soft mx-1 h-3 w-px" aria-hidden />
       )}
-      {elapsed > 0 && <Stat label="时长" value={formatDuration(elapsed)} />}
+
+      {/* Live session stats (right side) */}
+      {showStats && (
+        <>
+          <Stat label="队列" value={String(songs.length)} />
+          <Stat label="已播" value={String(played.length)} />
+          <Stat label="总数" value={String(total)} />
+          {avgProcessing > 0 && <Stat label="平均处理" value={formatShort(avgProcessing)} />}
+          {elapsed > 0 && <Stat label="时长" value={formatDuration(elapsed)} />}
+        </>
+      )}
     </div>
   );
 }

@@ -31,7 +31,6 @@ import { track as track_, pruneOldEvents } from './telemetry';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { ContextMenu } from './components/ContextMenu';
-import { StatusLine } from './components/StatusLine';
 import { SessionStats } from './components/SessionStats';
 import { AppHeader } from './components/AppHeader';
 import { LeftPanel } from './components/LeftPanel';
@@ -629,11 +628,13 @@ export default function App() {
           />
         )}
 
-        {/* Status line */}
-        <StatusLine steps={startupSteps} />
-
-        {/* Live stats footer */}
-        <SessionStats songs={songs} played={played} running={running} />
+        {/* Combined footer: startup checklist + live session stats */}
+        <SessionStats
+          songs={songs}
+          played={played}
+          running={running}
+          steps={startupSteps}
+        />
 
         <Toaster position="bottom-right" richColors />
 
