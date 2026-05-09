@@ -159,18 +159,24 @@ impl KugouApiHandle {
         let stderr = child.stderr().take().ok_or("no stderr")?;
 
         // Forward stdout/stderr to the UI log panel so failures surface.
+        // Cookies/tokens are redacted before logging so users can safely share
+        // logs for diagnosis.
         let app_out = app.clone();
         tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                log_to_ui(&app_out, "info", &format!("[kugou-api] {line}"));
+                log_to_ui(&app_out, "info", &format!("[kugou-api] {}", redact_cookie(&line)));
             }
         });
         let app_err = app.clone();
         tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                log_to_ui(&app_err, "error", &format!("[kugou-api stderr] {line}"));
+                log_to_ui(
+                    &app_err,
+                    "error",
+                    &format!("[kugou-api stderr] {}", redact_cookie(&line)),
+                );
             }
         });
 
@@ -216,6 +222,56 @@ pub fn kugou_api_url(path: &str) -> Result<String, String> {
 fn log_to_ui(app: &AppHandle, level: &str, msg: &str) {
     let ev = serde_json::json!({ "event": "log", "level": level, "msg": msg });
     let _ = app.emit("sidecar-event", ev);
+}
+
+/// Redact sensitive cookie/token data from log lines before surfacing to UI.
+/// Matches `cookie=`, `token=`, `userid=`, `dfid=` (case-insensitive) followed
+/// by their values up to the next `&` or end of string.
+fn redact_cookie(line: &str) -> String {
+    // Quick check: skip work if no sensitive patterns present.
+    let lower = line.to_ascii_lowercase();
+    if !lower.contains("cookie=")
+        && !lower.contains("token=")
+        && !lower.contains("userid=")
+        && !lower.contains("dfid=")
+    {
+        return line.to_string();
+    }
+    let mut out = String::with_capacity(line.len());
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let rest = &line[i..];
+        let lrest = &lower[i..];
+        let (matched_len, redact_to_end) = if lrest.starts_with("cookie=") {
+            (7, true) // cookie=... value extends to end (often whole tail)
+        } else if lrest.starts_with("token=") {
+            (6, false)
+        } else if lrest.starts_with("userid=") {
+            (7, false)
+        } else if lrest.starts_with("dfid=") {
+            (5, false)
+        } else {
+            out.push(rest.chars().next().unwrap());
+            i += rest.chars().next().unwrap().len_utf8();
+            continue;
+        };
+        out.push_str(&line[i..i + matched_len]);
+        let after = &line[i + matched_len..];
+        // Determine end of value: '&' separator, or for cookie=, end-of-string
+        // unless next pattern is found
+        let end = if redact_to_end {
+            // cookie=... can contain ; for sub-cookies — redact whole tail
+            after.len()
+        } else {
+            after.find('&').unwrap_or(after.len())
+        };
+        if end > 0 {
+            out.push_str("***");
+        }
+        i += matched_len + end;
+    }
+    out
 }
 
 #[allow(dead_code)]

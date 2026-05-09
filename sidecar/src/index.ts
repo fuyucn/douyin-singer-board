@@ -231,6 +231,17 @@ rl.on('line', (line) => {
 process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
 process.on('SIGINT', () => void stop().then(() => process.exit(0)));
 
+// Survive late events from douyin-danma-listener after close()
+// (e.g. queued WS frames decoded after the listener is null'd).
+// Without these, an unhandled 'error' or rejection crashes the process and
+// the Tauri side sees a stderr stack and process exit.
+process.on('uncaughtException', (err) => {
+  log('warn', `uncaughtException: ${(err as Error)?.message ?? err}`);
+});
+process.on('unhandledRejection', (reason) => {
+  log('warn', `unhandledRejection: ${(reason as Error)?.message ?? String(reason)}`);
+});
+
 // Parent process watchdog — exit if the Tauri parent disappears.
 // Also kills the companion kugou-api process if one was registered.
 // Only exit on ESRCH (process not found); ignore EPERM/other errors
