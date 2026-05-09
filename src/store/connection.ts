@@ -6,6 +6,7 @@ export interface ConnectionSlice {
   setRunning: (r: boolean) => void;
   sessionId: string;
   newSession: () => string;
+  setSessionId: (id: string) => void;
   status: { connected: boolean; message: string };
   setStatus: (s: { connected: boolean; message?: string }) => void;
   startupSteps: { key: string; label: string; status: 'pending' | 'done' }[];
@@ -22,6 +23,7 @@ export const createConnectionSlice: StateCreator<AppStore, [], [], ConnectionSli
     set({ sessionId: id });
     return id;
   },
+  setSessionId: (id) => set({ sessionId: id }),
 
   status: { connected: false, message: '未连接' },
   setStatus: (s) =>

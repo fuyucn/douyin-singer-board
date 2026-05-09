@@ -4,6 +4,7 @@ import type { DanmuInfo } from '../types';
 
 export interface SongsSlice {
   songs: DanmuInfo[];
+  setSongs: (songs: DanmuInfo[]) => void;
   addSong: (s: DanmuInfo) => void;
   cancelByUid: (uid: string) => void;
   removeByMsgId: (msgId: string) => void;
@@ -19,6 +20,7 @@ export interface SongsSlice {
 
 export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set, get) => ({
   songs: [],
+  setSongs: (songs) => set({ songs }),
   addSong: (s) => set((state) => ({ songs: [s, ...state.songs] })),
   cancelByUid: (uid) =>
     set((state) => {

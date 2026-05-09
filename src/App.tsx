@@ -8,6 +8,8 @@ import {
   insertHistory,
   deleteHistoryByMsgId,
   clearSessionHistory,
+  findRecentSession,
+  loadSessionHistory,
 } from './db';
 import type { DanmuInfo } from './types';
 import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
@@ -49,8 +51,10 @@ export default function App() {
     setRunning,
     sessionId,
     newSession,
+    setSessionId,
     setStatus,
     songs,
+    setSongs,
     removeByMsgId,
     clearSongs,
     manualAdd,
@@ -78,8 +82,10 @@ export default function App() {
       setRunning: s.setRunning,
       sessionId: s.sessionId,
       newSession: s.newSession,
+      setSessionId: s.setSessionId,
       setStatus: s.setStatus,
       songs: s.songs,
+      setSongs: s.setSongs,
       removeByMsgId: s.removeByMsgId,
       clearSongs: s.clearSongs,
       manualAdd: s.manualAdd,
@@ -185,6 +191,24 @@ export default function App() {
     })();
   }, [hydrateConfig]);
 
+  // Startup: restore previous session if recent (within 30 min) — crash recovery
+  useEffect(() => {
+    (async () => {
+      try {
+        const recent = await findRecentSession(1800);
+        if (!recent) return;
+        const songs = await loadSessionHistory(recent.sessionId);
+        if (songs.length === 0) return;
+        // Newest first to match addSong's prepend order
+        setSongs([...songs].reverse());
+        setSessionId(recent.sessionId);
+        pushLog(`[recovery] 恢复 ${songs.length} 首待处理点歌（来自上次直播）`);
+      } catch (e) {
+        pushLog(`[recovery] 恢复失败: ${e}`);
+      }
+    })();
+  }, [setSongs, setSessionId, pushLog]);
+
   // Auto-save config 500ms after any change (skip before initial hydration)
   useEffect(() => {
     if (!configHydratedRef.current) return;
@@ -212,10 +236,17 @@ export default function App() {
     setRunning(true);
     try {
       await saveConfig(config);
-      const sid = newSession();
-      clearSongs();
-      clearPlayed();
-      await clearSessionHistory(sid).catch(() => {});
+      // Preserve recovered session (sessionId already set + songs already loaded).
+      // Otherwise create a fresh session.
+      let sid = sessionId;
+      if (!sid) {
+        sid = newSession();
+        clearSongs();
+        clearPlayed();
+        await clearSessionHistory(sid).catch(() => {});
+      } else {
+        pushLog(`[app] continuing recovered session (${songs.length} pending)`);
+      }
       const blNames = blacklist
         .filter((e) => e.entryType === 'song' && e.songName)
         .map((e) => e.songName);

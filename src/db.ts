@@ -141,6 +141,26 @@ export async function deleteHistoryByMsgId(msgId: string): Promise<void> {
   await db.execute('DELETE FROM history WHERE msg_id = $1', [msgId]);
 }
 
+/** Find the most recent session that has songs within the last `withinSeconds`.
+ *  Returns null if no recent activity. Used for crash-recovery resume on startup. */
+export async function findRecentSession(
+  withinSeconds: number,
+): Promise<{ sessionId: string; latestAt: number; count: number } | null> {
+  const db = await getDb();
+  const cutoff = Math.floor(Date.now() / 1000) - withinSeconds;
+  const rows = await db.select<Array<{ session_id: string; latest: number; cnt: number }>>(
+    `SELECT session_id, MAX(send_time) AS latest, COUNT(*) AS cnt
+     FROM history
+     GROUP BY session_id
+     HAVING latest >= $1
+     ORDER BY latest DESC
+     LIMIT 1`,
+    [cutoff],
+  );
+  if (rows.length === 0) return null;
+  return { sessionId: rows[0].session_id, latestAt: rows[0].latest, count: rows[0].cnt };
+}
+
 export async function clearSessionHistory(sessionId: string): Promise<void> {
   const db = await getDb();
   await db.execute('DELETE FROM history WHERE session_id = $1', [sessionId]);
