@@ -116,6 +116,7 @@ impl SidecarHandle {
         *self.stdin.lock().await = Some(stdin);
 
         // stdout: parse JSON, forward as sidecar-event.
+        // On EOF (process exit), reset state and emit crash event for frontend recovery.
         let app_out = app.clone();
         tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -124,6 +125,13 @@ impl SidecarHandle {
                     let _ = app_out.emit("sidecar-event", v);
                 }
             }
+            // EOF: sidecar process exited
+            log_to_ui(&app_out, "warn", "[sidecar] process exited (stdout EOF)");
+            if let Some(state) = app_out.try_state::<SidecarState>() {
+                *state.stdin.lock().await = None;
+                *state.child.lock().await = None;
+            }
+            let _ = app_out.emit("sidecar-event", json!({ "event": "crashed" }));
         });
 
         // stderr: each line surfaces in the UI log panel.
@@ -168,4 +176,12 @@ pub async fn sidecar_send(
     cmd: Value,
 ) -> Result<(), String> {
     state.send(cmd).await
+}
+
+#[tauri::command]
+pub async fn sidecar_respawn(
+    state: tauri::State<'_, SidecarState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    state.spawn(app).await
 }

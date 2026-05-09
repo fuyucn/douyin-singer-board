@@ -171,6 +171,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             sidecar::sidecar_send,
+            sidecar::sidecar_respawn,
             kugou::kugou_search,
             kugou_api::kugou_api_request,
             show_window,

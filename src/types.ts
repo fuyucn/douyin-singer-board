@@ -25,7 +25,8 @@ export type SidecarEvent =
   | { event: 'danmu'; data: DanmuInfo }
   | { event: 'cancel'; uid: string }
   | { event: 'log'; level: 'debug' | 'info' | 'warn' | 'error'; msg: string }
-  | { event: 'error'; msg: string };
+  | { event: 'error'; msg: string }
+  | { event: 'crashed' };
 
 // Human-friendly template, not a regex.
 // Placeholders: [space] = whitespace, [song] = song-name capture.

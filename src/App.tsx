@@ -26,6 +26,7 @@ import { useContextMenu } from './hooks/useContextMenu';
 import { useKugouAuth } from './hooks/useKugouAuth';
 import { useKugouSearch } from './hooks/useKugouSearch';
 import { useSidecarEvents } from './hooks/useSidecarEvents';
+import { useSidecarRecovery } from './hooks/useSidecarRecovery';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { ContextMenu } from './components/ContextMenu';
@@ -165,6 +166,7 @@ export default function App() {
   }, [kugouCache, checkTrack]);
 
   useSidecarEvents({ onReconnect: syncBlacklist });
+  useSidecarRecovery({ syncBlacklist });
 
   useEffect(() => {
     applyTheme(theme);
