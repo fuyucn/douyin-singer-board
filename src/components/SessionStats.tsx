@@ -74,31 +74,7 @@ export function SessionStats({ songs, played, running, steps }: Props) {
 
   return (
     <div className="border-border-soft text-fg-muted flex items-center gap-4 border-t px-5 py-1.5 text-xs">
-      {/* Startup checklist (left side) — visible while pending or briefly after all done */}
-      {stepsVisible &&
-        steps.map((s) => (
-          <span
-            key={s.key}
-            className={cn(
-              'inline-flex items-center gap-1',
-              s.status === 'done' ? 'text-success' : 'text-fg-faint',
-            )}
-          >
-            {s.status === 'done' ? (
-              <span className="text-[11px]">✓</span>
-            ) : (
-              <span className="inline-block size-2 animate-pulse rounded-full bg-amber-400" />
-            )}
-            {s.label}
-          </span>
-        ))}
-
-      {/* Divider when both sections present */}
-      {stepsVisible && showStats && (
-        <span className="bg-border-soft mx-1 h-3 w-px" aria-hidden />
-      )}
-
-      {/* Live session stats (right side) */}
+      {/* Live session stats (left side) */}
       {showStats && (
         <>
           <Stat label="队列" value={String(songs.length)} />
@@ -107,6 +83,28 @@ export function SessionStats({ songs, played, running, steps }: Props) {
           {avgProcessing > 0 && <Stat label="平均处理" value={formatShort(avgProcessing)} />}
           {elapsed > 0 && <Stat label="时长" value={formatDuration(elapsed)} />}
         </>
+      )}
+
+      {/* Startup checklist (right side) — visible while pending or briefly after all done */}
+      {stepsVisible && (
+        <div className="ml-auto flex items-center gap-4">
+          {steps.map((s) => (
+            <span
+              key={s.key}
+              className={cn(
+                'inline-flex items-center gap-1',
+                s.status === 'done' ? 'text-success' : 'text-fg-faint',
+              )}
+            >
+              {s.status === 'done' ? (
+                <span className="text-[11px]">✓</span>
+              ) : (
+                <span className="inline-block size-2 animate-pulse rounded-full bg-amber-400" />
+              )}
+              {s.label}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );
