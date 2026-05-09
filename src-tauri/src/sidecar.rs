@@ -33,9 +33,20 @@ impl SidecarHandle {
         Self { stdin: Mutex::new(None), child: Mutex::new(None) }
     }
 
-    /// Drop child handle — releases Job Object / process group, OS kills tree.
+    /// Explicitly kill the child process, then drop the wrapper.
+    /// On Windows the Job Object cleanup fires; on Unix KillOnDrop sends SIGKILL.
+    /// We also briefly wait so the child is reaped before we return.
     pub async fn kill(&self) {
-        let _ = self.child.lock().await.take();
+        let mut child_opt = self.child.lock().await;
+        if let Some(mut child) = child_opt.take() {
+            let _ = child.start_kill();
+            // Best-effort wait so the OS reaps the child before we return.
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                child.wait(),
+            )
+            .await;
+        }
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {

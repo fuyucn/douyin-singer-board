@@ -32,10 +32,19 @@ impl KugouApiHandle {
         Self { child: Mutex::new(None) }
     }
 
-    /// Drop the child handle — the Job Object / process group is released,
-    /// which causes the OS to kill the entire process tree on Windows/Unix.
+    /// Explicitly kill the child process, then drop the wrapper.
+    /// On Windows the Job Object terminates the whole tree; on Unix
+    /// start_kill + KillOnDrop ensure the leader (and group) dies.
     pub async fn kill(&self) {
-        let _ = self.child.lock().await.take();
+        let mut child_opt = self.child.lock().await;
+        if let Some(mut child) = child_opt.take() {
+            let _ = child.start_kill();
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                child.wait(),
+            )
+            .await;
+        }
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
