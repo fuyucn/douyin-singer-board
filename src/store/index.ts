@@ -5,13 +5,20 @@ import type { ConnectionSlice } from './connection';
 import type { SongsSlice } from './songs';
 import type { KugouSlice } from './kugou';
 import type { LogSlice } from './logs';
+import type { BlacklistSlice } from './blacklist';
 import { createConfigSlice } from './config';
 import { createConnectionSlice } from './connection';
 import { createSongsSlice } from './songs';
 import { createKugouSlice } from './kugou';
 import { createLogSlice } from './logs';
+import { createBlacklistSlice } from './blacklist';
 
-export type AppStore = ConfigSlice & ConnectionSlice & SongsSlice & KugouSlice & LogSlice;
+export type AppStore = ConfigSlice &
+  ConnectionSlice &
+  SongsSlice &
+  KugouSlice &
+  LogSlice &
+  BlacklistSlice;
 
 export const useAppStore = create<AppStore>()((...a) => ({
   ...createConfigSlice(...a),
@@ -19,6 +26,7 @@ export const useAppStore = create<AppStore>()((...a) => ({
   ...createSongsSlice(...a),
   ...createKugouSlice(...a),
   ...createLogSlice(...a),
+  ...createBlacklistSlice(...a),
 }));
 
 // Dedup by song name. Display order:

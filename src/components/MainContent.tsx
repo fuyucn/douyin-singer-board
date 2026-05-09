@@ -8,7 +8,7 @@ import { BlacklistPanel, type BlacklistItemUI } from './BlacklistPanel';
 import { LogPanel } from './LogPanel';
 import type { DanmuInfo } from '../types';
 import type { EnrichedEntry } from '../kugouSession';
-import type { BlacklistItem } from '../store/logs';
+import type { BlacklistItem } from '../store/blacklist';
 
 interface Props {
   songs: DanmuInfo[];
