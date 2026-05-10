@@ -38,7 +38,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           toast: 'cn-toast',
           // Move close button to top-right (default is top-left in sonner)
           closeButton:
-            '!left-auto !right-0 !translate-x-1/2 !-translate-y-1/2 !top-0 !bottom-auto',
+            '!left-auto !right-1 !top-1 !bottom-auto !translate-x-0 !translate-y-0',
         },
       }}
       {...props}
