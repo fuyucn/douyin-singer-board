@@ -31,11 +31,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--normal-text': 'var(--popover-foreground)',
           '--normal-border': 'var(--border)',
           '--border-radius': 'var(--radius)',
+          '--width': 'auto',
         } as React.CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: 'cn-toast',
+          // Shrink toast to fit content (close button gets ~32px reserved space)
+          toast: 'cn-toast !w-fit !min-w-[200px] !max-w-[420px] !pr-10',
           // Move close button to right side, vertically centered (default is top-left)
           closeButton:
             '!left-auto !right-2 !top-1/2 !bottom-auto !translate-x-0 !-translate-y-1/2',
