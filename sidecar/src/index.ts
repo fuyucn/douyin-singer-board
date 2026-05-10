@@ -261,28 +261,39 @@ if (process.env.SIDECAR_DEV) {
 
 // Parent process watchdog — exit if the Tauri parent disappears.
 // Also kills the companion kugou-api process if one was registered.
-// Only exit on ESRCH (process not found); ignore EPERM/other errors
-// so we don't false-positive on Windows permission checks.
-const parentPid = process.ppid;
+//
+// We use TWO checks to be robust against macOS PID reuse:
+//  1. process.ppid changed (becomes 1 / launchd when reparented to init).
+//     On Unix, an orphan is reparented; ppid reflects the new parent.
+//  2. process.kill(originalPpid, 0) → ESRCH. Belt-and-suspenders for
+//     systems where ppid doesn't update reliably.
+const originalParentPid = process.ppid;
 setInterval(() => {
-  try {
-    process.kill(parentPid, 0);
-  } catch (e: any) {
-    if (e?.code === 'ESRCH') {
-      log('info', 'parent process gone, exiting');
-      if (companionPid !== null) {
-        try {
-          if (process.platform === 'win32') {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const { execSync } = require('node:child_process') as typeof import('node:child_process');
-            execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
-          } else {
-            process.kill(companionPid, 'SIGTERM');
-          }
-        } catch {}
-      }
-      void stop().then(() => process.exit(0));
+  const currentPpid = process.ppid;
+  let parentGone = false;
+  if (currentPpid !== originalParentPid) {
+    parentGone = true;
+  } else {
+    try {
+      process.kill(originalParentPid, 0);
+    } catch (e: any) {
+      if (e?.code === 'ESRCH') parentGone = true;
     }
+  }
+  if (parentGone) {
+    log('info', `parent process gone (ppid was ${originalParentPid}, now ${currentPpid}), exiting`);
+    if (companionPid !== null) {
+      try {
+        if (process.platform === 'win32') {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { execSync } = require('node:child_process') as typeof import('node:child_process');
+          execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
+        } else {
+          process.kill(companionPid, 'SIGKILL');
+        }
+      } catch {}
+    }
+    void stop().then(() => process.exit(0));
   }
 }, 2000);
 
