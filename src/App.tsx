@@ -636,7 +636,7 @@ export default function App() {
           steps={startupSteps}
         />
 
-        <Toaster position="bottom-right" richColors />
+        <Toaster position="bottom-right" richColors closeButton />
 
         {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
         {showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}

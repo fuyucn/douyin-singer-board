@@ -17,7 +17,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={isDark ? 'dark' : 'light'}
       className="toaster group"
-      closeButton
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -40,7 +39,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           toast: 'cn-toast !w-fit !min-w-[200px] !max-w-[420px] !pr-10',
           // Move close button to right side, vertically centered (default is top-left)
           closeButton:
-            '!left-auto !right-2 !top-1/2 !bottom-auto !translate-x-0 !-translate-y-1/2',
+            '!left-auto !-right-4 !top-2 !bottom-auto !translate-x-0 !-translate-y-1/2',
         },
       }}
       {...props}
