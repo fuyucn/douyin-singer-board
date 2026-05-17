@@ -1,9 +1,14 @@
-// Lightweight update checker. Hits GitHub Releases API on startup, compares
-// the latest tag with the current app version. Public repo, no auth.
+// Update utilities.
 //
-// Channel-aware: pre-release builds only see newer pre-releases;
-// stable builds only see newer stable releases.
+// checkForUpdate()  — channel-aware GitHub Releases API check (no side effects).
+//                    Pre-release builds see newer pre-releases; stable sees stable.
+// installAppUpdate() — downloads, verifies (Ed25519) and installs via
+//                      tauri-plugin-updater. Emits progress events during download.
+//                      Returns when installation is complete; caller prompts restart.
+// relaunchApp()     — restarts the process to apply the installed update.
 
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-shell';
 
 declare const __APP_VERSION__: string;
@@ -16,6 +21,11 @@ export interface UpdateInfo {
   htmlUrl: string;
   body: string;
   publishedAt: string;
+}
+
+export interface DownloadProgress {
+  downloaded: number;
+  total: number | null;
 }
 
 export const CURRENT_VERSION: string = __APP_VERSION__;
@@ -75,6 +85,39 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Download and install the update for the given release tag.
+ * The manifest is fetched from the release's `latest.json` asset on GitHub.
+ *
+ * Calls `onProgress` repeatedly during download with cumulative bytes and
+ * optional total size.  Returns when installation is complete — the caller
+ * should then show a "restart now" prompt and call `relaunchApp()`.
+ */
+export async function installAppUpdate(
+  tag: string,
+  onProgress?: (p: DownloadProgress) => void,
+): Promise<void> {
+  const manifestUrl = `https://github.com/${REPO}/releases/download/${tag}/latest.json`;
+
+  let unlisten: (() => void) | undefined;
+  if (onProgress) {
+    unlisten = await listen<DownloadProgress>('updater://progress', (event) => {
+      onProgress(event.payload);
+    });
+  }
+
+  try {
+    await invoke('install_app_update', { manifest_url: manifestUrl });
+  } finally {
+    unlisten?.();
+  }
+}
+
+/** Restart the application to apply an installed update. */
+export async function relaunchApp(): Promise<void> {
+  await invoke('relaunch_app');
 }
 
 export function skipVersion(tag: string): void {

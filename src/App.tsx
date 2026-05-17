@@ -10,7 +10,14 @@ import {
   clearSessionHistory,
 } from './db';
 import type { DanmuInfo } from './types';
-import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
+import {
+  checkForUpdate,
+  installAppUpdate,
+  relaunchApp,
+  skipVersion,
+  type DownloadProgress,
+  type UpdateInfo,
+} from './updater';
 import { Button } from '@/components/ui/button';
 
 import { Copy, Trash2, ListPlus, Loader2 } from 'lucide-react';
@@ -115,6 +122,8 @@ export default function App() {
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready'>('idle');
+  const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
@@ -201,6 +210,20 @@ export default function App() {
       if (info) setUpdate(info);
     });
   }, []);
+
+  // Download + install update, then prompt restart
+  const handleInstallUpdate = useCallback(async () => {
+    if (!update || updatePhase !== 'idle') return;
+    setUpdatePhase('downloading');
+    setDlProgress(null);
+    try {
+      await installAppUpdate(update.tag, (p) => setDlProgress(p));
+      setUpdatePhase('ready');
+    } catch (e) {
+      console.error('[updater] install failed:', e);
+      setUpdatePhase('idle');
+    }
+  }, [update, updatePhase]);
 
   // Telemetry: app_launched + prune old events
   useEffect(() => {
@@ -507,25 +530,48 @@ export default function App() {
         {/* Update banner */}
         {update && (
           <div className="border-accent-soft-border bg-accent-soft-bg text-accent-soft-fg flex items-center gap-3 border-b px-5 py-2 text-sm">
-            <span>新版本 {update.tag} 可用</span>
-            <Button
-              size="sm"
-              className="h-7 px-3 text-[13px]"
-              onClick={() => openInBrowser(update.htmlUrl)}
-            >
-              前往下载
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-auto text-lg"
-              onClick={() => {
-                skipVersion(update.tag);
-                setUpdate(null);
-              }}
-            >
-              跳过
-            </Button>
+            {updatePhase === 'idle' && (
+              <>
+                <span>新版本 {update.tag} 可用</span>
+                <Button size="sm" className="h-7 px-3 text-[13px]" onClick={handleInstallUpdate}>
+                  立即更新
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-7 px-2 text-[13px]"
+                  onClick={() => {
+                    skipVersion(update.tag);
+                    setUpdate(null);
+                  }}
+                >
+                  跳过
+                </Button>
+              </>
+            )}
+            {updatePhase === 'downloading' && (
+              <>
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                <span>
+                  下载更新中
+                  {dlProgress?.total
+                    ? ` ${Math.round((dlProgress.downloaded / dlProgress.total) * 100)}%`
+                    : '…'}
+                </span>
+              </>
+            )}
+            {updatePhase === 'ready' && (
+              <>
+                <span>更新已就绪，重启后生效</span>
+                <Button
+                  size="sm"
+                  className="h-7 px-3 text-[13px]"
+                  onClick={() => relaunchApp()}
+                >
+                  立即重启
+                </Button>
+              </>
+            )}
           </div>
         )}
 

@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.39-63",
+  "version": "0.0.39-64",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -31,6 +31,7 @@
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-shell": "^2.0.1",
     "@tauri-apps/plugin-sql": "^2.2.0",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",

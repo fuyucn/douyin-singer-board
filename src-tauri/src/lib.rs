@@ -5,8 +5,9 @@ mod sidecar;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_sql::{Migration, MigrationKind};
+use tauri_plugin_updater::UpdaterExt;
 
 const DB_NAME: &str = "sqlite:sususongboard.db";
 
@@ -103,9 +104,55 @@ fn show_window(window: tauri::WebviewWindow) {
     let _ = window.show();
 }
 
+/// Download and install the update described by `manifest_url` (a URL pointing
+/// to a Tauri `latest.json` manifest).  Emits `updater://progress` events
+/// during download, then returns when installation is complete (caller should
+/// then prompt the user to restart).
+#[tauri::command]
+async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Result<(), String> {
+    let url: url::Url = manifest_url.parse().map_err(|e: url::ParseError| e.to_string())?;
+
+    let updater = app
+        .updater_builder()
+        .endpoints(vec![url])
+        .map_err(|e| e.to_string())?
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let update = updater.check().await.map_err(|e| e.to_string())?;
+
+    if let Some(update) = update {
+        let app_progress = app.clone();
+        update
+            .download_and_install(
+                move |chunk_length, content_length| {
+                    let _ = app_progress.emit(
+                        "updater://progress",
+                        serde_json::json!({
+                            "downloaded": chunk_length,
+                            "total": content_length
+                        }),
+                    );
+                },
+                || {},
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Restart the application to apply a pending update.
+#[tauri::command]
+fn relaunch_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
@@ -198,6 +245,8 @@ pub fn run() {
             kugou_api::kugou_api_request,
             douyin::douyin_room_info,
             show_window,
+            install_app_update,
+            relaunch_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

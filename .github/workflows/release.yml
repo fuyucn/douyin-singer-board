@@ -98,6 +98,9 @@ jobs:
         run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
 
       - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm exec tauri build --target ${{ matrix.rust_target }}
 
       - name: Collect artifact (macOS)
@@ -113,6 +116,9 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" \
               "$OUT_DIR/SUSUSongBoard-macOS-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.zip"
           fi
+          # Updater artifacts (.app.tar.gz + .sig)
+          cp "$BUNDLE_DIR"/macos/*.app.tar.gz     "$OUT_DIR"/ 2>/dev/null || true
+          cp "$BUNDLE_DIR"/macos/*.app.tar.gz.sig "$OUT_DIR"/ 2>/dev/null || true
 
       - name: Collect artifact (Windows)
         if: runner.os == 'Windows'
@@ -127,6 +133,11 @@ jobs:
           # Also keep MSI / NSIS installers if the bundler produced them, for users who prefer them.
           if (Test-Path "$target/bundle/msi") { Copy-Item "$target/bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
           if (Test-Path "$target/bundle/nsis") { Copy-Item "$target/bundle/nsis/*-setup.exe" $out -ErrorAction SilentlyContinue }
+          # Updater artifacts (NSIS zip + sig)
+          if (Test-Path "$target/bundle/nsis") {
+            Get-ChildItem "$target/bundle/nsis" -Filter "*.nsis.zip"     | Copy-Item -Destination $out -ErrorAction SilentlyContinue
+            Get-ChildItem "$target/bundle/nsis" -Filter "*.nsis.zip.sig" | Copy-Item -Destination $out -ErrorAction SilentlyContinue
+          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -150,16 +161,69 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' -o -name '*.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
           ls -lh release/
+
+      - name: Generate latest.json update manifest
+        run: |
+          VERSION="${{ needs.read-version.outputs.version }}"
+          TAG="v${VERSION}"
+          BASE="https://github.com/fuyucn/douyin-singer-board/releases/download/${TAG}"
+          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # macOS aarch64
+          MAC_TAR=$(find release -maxdepth 1 -name "*.app.tar.gz" | head -1)
+          MAC_SIG_FILE="${MAC_TAR}.sig"
+          MAC_SIG=""
+          if [ -f "$MAC_SIG_FILE" ]; then MAC_SIG=$(cat "$MAC_SIG_FILE"); fi
+
+          # Windows x64
+          WIN_ZIP=$(find release -maxdepth 1 -name "*.nsis.zip" | head -1)
+          WIN_SIG_FILE="${WIN_ZIP}.sig"
+          WIN_SIG=""
+          if [ -f "$WIN_SIG_FILE" ]; then WIN_SIG=$(cat "$WIN_SIG_FILE"); fi
+
+          # Build JSON with jq — only include platforms that have artifacts
+          PLATFORMS="{}"
+          if [ -n "$MAC_SIG" ] && [ -n "$MAC_TAR" ]; then
+            MAC_NAME=$(basename "$MAC_TAR")
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg url "${BASE}/${MAC_NAME}" \
+              --arg sig "$MAC_SIG" \
+              '."darwin-aarch64" = {url: $url, signature: $sig}')
+          fi
+          if [ -n "$WIN_SIG" ] && [ -n "$WIN_ZIP" ]; then
+            WIN_NAME=$(basename "$WIN_ZIP")
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg url "${BASE}/${WIN_NAME}" \
+              --arg sig "$WIN_SIG" \
+              '."windows-x86_64" = {url: $url, signature: $sig}')
+          fi
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, notes: "", pub_date: $pub_date, platforms: $platforms}' \
+            > release/latest.json
+
+          echo "--- latest.json ---"
+          cat release/latest.json
 
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.read-version.outputs.version }}
           name: v${{ needs.read-version.outputs.version }}
-          files: release/*
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.msi
+            release/*.tar.gz
+            release/*.sig
+            release/latest.json
           draft: false
           prerelease: ${{ needs.read-version.outputs.prerelease == 'true' }}
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
