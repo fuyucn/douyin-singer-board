@@ -17,7 +17,6 @@ import {
   exitForUpdate,
   isWindows,
   skipVersion,
-  type DiagEntry,
   type DownloadProgress,
   type UpdateInfo,
 } from './updater';
@@ -127,7 +126,6 @@ export default function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
-  const [diagLog, setDiagLog] = useState<DiagEntry[]>([]);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
@@ -220,12 +218,11 @@ export default function App() {
     if (!update || updatePhase !== 'idle') return;
     setUpdatePhase('downloading');
     setDlProgress(null);
-    setDiagLog([]);
     try {
       await installAppUpdate(
         update.tag,
         (p) => setDlProgress(p),
-        (e) => setDiagLog((prev) => [...prev, e]),
+        (e) => pushLog(`[updater] ${e.ts} v${e.version}  ${e.msg}`),
       );
       setUpdatePhase('ready');
     } catch (e) {
@@ -586,18 +583,6 @@ export default function App() {
                 </>
               )}
             </div>
-            {/* Diagnostic log — visible during / after download attempt */}
-            {diagLog.length > 0 && (
-              <div className="border-accent-soft-border bg-black/10 dark:bg-white/5 border-t px-5 py-2 font-mono text-[11px] leading-relaxed opacity-80">
-                {diagLog.map((e, i) => (
-                  <div key={i}>
-                    <span className="opacity-50">{e.ts}</span>
-                    <span className="opacity-40 mx-1">v{e.version}</span>
-                    <span>{e.msg}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
