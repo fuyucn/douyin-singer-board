@@ -28,6 +28,18 @@ export interface DownloadProgress {
   total: number | null;
 }
 
+export interface DiagEntry {
+  ts: string;      // HH:mm:ss.ms
+  version: string; // running app version
+  msg: string;
+}
+
+function diagEntry(msg: string): DiagEntry {
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+  return { ts, version: CURRENT_VERSION, msg };
+}
+
 export const CURRENT_VERSION: string = __APP_VERSION__;
 
 const isPrerelease = (v: string): boolean => v.includes('-');
@@ -114,8 +126,19 @@ async function resolveManifestUrl(tag: string): Promise<string> {
 export async function installAppUpdate(
   tag: string,
   onProgress?: (p: DownloadProgress) => void,
+  onDiag?: (e: DiagEntry) => void,
 ): Promise<void> {
+  const log = (msg: string) => {
+    const e = diagEntry(msg);
+    console.log(`[updater] ${e.ts} v${e.version}  ${msg}`);
+    onDiag?.(e);
+  };
+
+  log(`开始更新  target=${tag}`);
+
+  log('正在解析 manifest 地址...');
   const manifestUrl = await resolveManifestUrl(tag);
+  log(`manifest URL: ${manifestUrl}`);
 
   let unlisten: (() => void) | undefined;
   if (onProgress) {
@@ -125,7 +148,12 @@ export async function installAppUpdate(
   }
 
   try {
+    log('调用 install_app_update...');
     await invoke('install_app_update', { manifest_url: manifestUrl });
+    log('install_app_update 返回成功');
+  } catch (e) {
+    log(`install_app_update 失败: ${String(e)}`);
+    throw e;
   } finally {
     unlisten?.();
   }
