@@ -208,9 +208,16 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
         );
         std::fs::write(&ps_path, script.as_bytes()).map_err(|e| e.to_string())?;
 
+        // CREATE_NO_WINDOW (0x08000000) suppresses the console window at the
+        // Win32 level — unlike -WindowStyle Hidden which only hides it after
+        // PowerShell has already created the window, causing a visible flash.
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
         std::process::Command::new("powershell")
-            .args(["-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"])
+            .args(["-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"])
             .arg(&ps_path)
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| e.to_string())?;
 
