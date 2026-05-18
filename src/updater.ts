@@ -149,7 +149,7 @@ export async function installAppUpdate(
 
   try {
     log('调用 install_app_update...');
-    await invoke('install_app_update', { manifest_url: manifestUrl });
+    await invoke('install_app_update', { manifestUrl });
     log('install_app_update 返回成功');
   } catch (e) {
     log(`install_app_update 失败: ${String(e)}`);
