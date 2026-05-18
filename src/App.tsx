@@ -572,7 +572,9 @@ export default function App() {
               {updatePhase === 'ready' && (
                 <>
                   {isPortable ? (
-                    <span>新版本已下载到当前目录（SUSUSongBoard_new.exe），请手动启动</span>
+                    <span>
+                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-{update.tag.replace(/^v/, '')}.exe），请手动启动
+                    </span>
                   ) : (
                     <>
                       <span>更新已就绪，重启后生效</span>

@@ -167,7 +167,14 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
         let dir = current_exe
             .parent()
             .ok_or_else(|| "cannot determine exe directory".to_string())?;
-        let new_exe = dir.join("SUSUSongBoard_new.exe");
+        // Use the filename from the URL (e.g. SUSUSongBoard-Windows-x64-0.0.39-85.exe)
+        // so the downloaded file is clearly identified by version.
+        let file_name = exe_url
+            .rsplit('/')
+            .next()
+            .filter(|s| s.ends_with(".exe"))
+            .unwrap_or("SUSUSongBoard_new.exe");
+        let new_exe = dir.join(file_name);
 
         // Stream-download directly into the same directory.
         let client = reqwest::Client::new();
