@@ -45,6 +45,9 @@
     "zod": "^4.4.3",
     "zustand": "^5.0.2"
   },
+  "pnpm": {
+    "ignoredBuiltDependencies": ["esbuild", "msw", "protobufjs"]
+  },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2.1.0",
