@@ -14,8 +14,6 @@ import {
   checkForUpdate,
   installAppUpdate,
   relaunchApp,
-  launchNsisInstallerAndExit,
-  isWindows,
   isPortableWindows,
   skipVersion,
   type DownloadProgress,
@@ -583,9 +581,7 @@ export default function App() {
                       <Button
                         size="sm"
                         className="h-7 px-3 text-[13px]"
-                        onClick={() =>
-                          isWindows() ? launchNsisInstallerAndExit() : relaunchApp()
-                        }
+                        onClick={() => relaunchApp()}
                       >
                         立即重启
                       </Button>
