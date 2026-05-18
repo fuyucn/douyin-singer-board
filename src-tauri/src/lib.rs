@@ -149,15 +149,8 @@ fn relaunch_app(app: tauri::AppHandle) {
 }
 
 /// Download the new portable exe into the same directory as the current exe,
-/// saved as `SUSUSongBoard_new.exe`.  Returns Ok with download complete;
-/// the caller then shows a restart button and calls `exit_for_update`.
-///
-/// On exit, `exit_for_update` does the atomic rename swap:
-///   current.exe  → current_old.exe   (renaming a running exe is allowed on Windows)
-///   _new.exe     → current.exe       (slot is now free)
-///   launch current.exe               (new version)
-///   exit                             (old process leaves)
-/// On next startup, `cleanup_old_portable_exe` deletes `_old.exe`.
+/// saved as `SUSUSongBoard_new.exe`.  Returns Ok when the download is complete.
+/// The user then manually launches the new exe from that folder.
 #[tauri::command]
 async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
@@ -225,59 +218,9 @@ fn is_portable() -> bool {
     }
 }
 
-/// Atomic portable self-update swap, then exit.
-///
-/// Windows allows renaming (not deleting) a running exe.  Steps:
-///   1. rename SUSUSongBoard.exe → SUSUSongBoard_old.exe
-///   2. rename SUSUSongBoard_new.exe → SUSUSongBoard.exe
-///   3. spawn new SUSUSongBoard.exe
-///   4. exit this process
-///
-/// Next launch: startup cleanup removes SUSUSongBoard_old.exe.
-#[tauri::command]
-fn exit_for_update(app: tauri::AppHandle) {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(current) = std::env::current_exe() {
-            if let Some(dir) = current.parent() {
-                let new_exe = dir.join("SUSUSongBoard_new.exe");
-                let old_exe = dir.join("SUSUSongBoard_old.exe");
-
-                if new_exe.exists() {
-                    // Step 1: park the running exe under a different name.
-                    let _ = std::fs::rename(&current, &old_exe);
-                    // Step 2: move new exe into the canonical slot.
-                    let _ = std::fs::rename(&new_exe, &current);
-                    // Step 3: launch the new version.
-                    let _ = std::process::Command::new(&current).spawn();
-                }
-            }
-        }
-    }
-    app.exit(0);
-}
-
-/// Delete leftover `SUSUSongBoard_old.exe` from a previous portable update.
-/// Called once at startup — the old exe can be deleted because it is no
-/// longer running.
-fn cleanup_old_portable_exe() {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(current) = std::env::current_exe() {
-            if let Some(dir) = current.parent() {
-                let old = dir.join("SUSUSongBoard_old.exe");
-                if old.exists() {
-                    let _ = std::fs::remove_file(old);
-                }
-            }
-        }
-    }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    cleanup_old_portable_exe();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -376,7 +319,6 @@ pub fn run() {
             is_portable,
             install_app_update,
             install_portable_update,
-            exit_for_update,
             relaunch_app,
         ])
         .run(tauri::generate_context!())

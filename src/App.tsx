@@ -14,7 +14,6 @@ import {
   checkForUpdate,
   installAppUpdate,
   relaunchApp,
-  exitForUpdate,
   isPortableWindows,
   skipVersion,
   type DownloadProgress,
@@ -572,16 +571,20 @@ export default function App() {
               )}
               {updatePhase === 'ready' && (
                 <>
-                  <span>
-                    {isPortable ? '更新已下载，退出后自动替换' : '更新已就绪，重启后生效'}
-                  </span>
-                  <Button
-                    size="sm"
-                    className="h-7 px-3 text-[13px]"
-                    onClick={() => (isPortable ? exitForUpdate() : relaunchApp())}
-                  >
-                    {isPortable ? '退出并更新' : '立即重启'}
-                  </Button>
+                  {isPortable ? (
+                    <span>新版本已下载到当前目录（SUSUSongBoard_new.exe），请手动启动</span>
+                  ) : (
+                    <>
+                      <span>更新已就绪，重启后生效</span>
+                      <Button
+                        size="sm"
+                        className="h-7 px-3 text-[13px]"
+                        onClick={() => relaunchApp()}
+                      >
+                        立即重启
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>

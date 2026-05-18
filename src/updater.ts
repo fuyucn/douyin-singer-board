@@ -215,14 +215,6 @@ export async function relaunchApp(): Promise<void> {
   await invoke('relaunch_app');
 }
 
-/**
- * Exit the process cleanly so that the PowerShell self-update script
- * (queued by install_portable_update) can copy the new exe and relaunch.
- * Windows portable only.
- */
-export async function exitForUpdate(): Promise<void> {
-  await invoke('exit_for_update');
-}
 
 export function skipVersion(tag: string): void {
   if (typeof localStorage === 'undefined' || !tag) return;
