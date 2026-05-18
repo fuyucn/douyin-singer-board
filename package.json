@@ -1,7 +1,7 @@
 {
   "name": "sususongboard",
   "private": true,
-  "version": "0.0.39-70",
+  "version": "0.0.39-71",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -46,7 +46,11 @@
     "zustand": "^5.0.2"
   },
   "pnpm": {
-    "ignoredBuiltDependencies": ["esbuild", "msw", "protobufjs"]
+    "ignoredBuiltDependencies": [
+      "esbuild",
+      "msw",
+      "protobufjs"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",
