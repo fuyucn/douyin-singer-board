@@ -14,6 +14,8 @@ import {
   checkForUpdate,
   installAppUpdate,
   relaunchApp,
+  exitForUpdate,
+  isWindows,
   skipVersion,
   type DiagEntry,
   type DownloadProgress,
@@ -571,13 +573,15 @@ export default function App() {
               )}
               {updatePhase === 'ready' && (
                 <>
-                  <span>更新已就绪，重启后生效</span>
+                  <span>
+                    {isWindows() ? '更新已下载，退出后自动替换' : '更新已就绪，重启后生效'}
+                  </span>
                   <Button
                     size="sm"
                     className="h-7 px-3 text-[13px]"
-                    onClick={() => relaunchApp()}
+                    onClick={() => (isWindows() ? exitForUpdate() : relaunchApp())}
                   >
-                    立即重启
+                    {isWindows() ? '退出并更新' : '立即重启'}
                   </Button>
                 </>
               )}

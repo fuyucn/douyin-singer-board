@@ -142,10 +142,87 @@ async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Resu
     Ok(())
 }
 
-/// Restart the application to apply a pending update.
+/// Restart the application to apply a pending update (macOS / NSIS-installed).
 #[tauri::command]
 fn relaunch_app(app: tauri::AppHandle) {
     app.restart();
+}
+
+/// Download the portable Windows exe and schedule a self-replace via PowerShell.
+/// The PS script waits for THIS process to exit, then copies the new exe over
+/// the current one and relaunches it.  Returns Ok once the download is done and
+/// the script is queued — the caller should then exit via `exit_for_update`.
+#[tauri::command]
+async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Result<(), String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, exe_url);
+        return Err("install_portable_update is only available on Windows".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use futures_util::StreamExt;
+
+        let temp_dir = std::env::temp_dir();
+        let new_exe = temp_dir.join("SUSUSongBoard_update.exe");
+        let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let my_pid = std::process::id();
+
+        // Stream-download the new exe with progress events.
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&exe_url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let total_size = response.content_length();
+        let mut downloaded: u64 = 0;
+        let mut buf: Vec<u8> = Vec::new();
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            downloaded += chunk.len() as u64;
+            buf.extend_from_slice(&chunk);
+            let _ = app.emit(
+                "updater://progress",
+                serde_json::json!({ "downloaded": downloaded, "total": total_size }),
+            );
+        }
+
+        std::fs::write(&new_exe, &buf).map_err(|e| e.to_string())?;
+
+        // PowerShell: wait for THIS PID to fully exit, then replace + relaunch.
+        let ps_path = temp_dir.join("susu_selfupdate.ps1");
+        let new_ps = new_exe.to_string_lossy().replace('\'', "''");
+        let cur_ps = current_exe.to_string_lossy().replace('\'', "''");
+        let script = format!(
+            // Wait for the launcher to exit before touching the file.
+            "Wait-Process -Id {my_pid} -Timeout 30 -ErrorAction SilentlyContinue\r\n\
+             Start-Sleep -Milliseconds 500\r\n\
+             Unblock-File -Path '{new_ps}' -ErrorAction SilentlyContinue\r\n\
+             Copy-Item -Path '{new_ps}' -Destination '{cur_ps}' -Force\r\n\
+             Start-Process -FilePath '{cur_ps}'\r\n\
+             Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue\r\n"
+        );
+        std::fs::write(&ps_path, script.as_bytes()).map_err(|e| e.to_string())?;
+
+        std::process::Command::new("powershell")
+            .args(["-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"])
+            .arg(&ps_path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
+}
+
+/// Exit the process cleanly (used on Windows portable after a self-update so
+/// that the waiting PowerShell script can copy the new exe in place).
+#[tauri::command]
+fn exit_for_update(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -246,6 +323,8 @@ pub fn run() {
             douyin::douyin_room_info,
             show_window,
             install_app_update,
+            install_portable_update,
+            exit_for_update,
             relaunch_app,
         ])
         .run(tauri::generate_context!())

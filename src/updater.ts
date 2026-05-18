@@ -1,11 +1,14 @@
 // Update utilities.
 //
-// checkForUpdate()  — channel-aware GitHub Releases API check (no side effects).
-//                    Pre-release builds see newer pre-releases; stable sees stable.
-// installAppUpdate() — downloads, verifies (Ed25519) and installs via
-//                      tauri-plugin-updater. Emits progress events during download.
-//                      Returns when installation is complete; caller prompts restart.
-// relaunchApp()     — restarts the process to apply the installed update.
+// checkForUpdate()         — channel-aware GitHub Releases API check (no side effects).
+//                            Pre-release builds see newer pre-releases; stable sees stable.
+// installAppUpdate()       — macOS: downloads via tauri-plugin-updater (Ed25519 verified).
+//                            Windows portable: downloads new .exe directly, queues a
+//                            PowerShell self-replace script, returns Ok.
+//                            Emits progress events during download.
+//                            Returns when download+queue is complete; caller prompts restart.
+// relaunchApp()            — macOS: restarts the process (tauri-plugin-process).
+// exitForUpdate()          — Windows: exits cleanly so the PS script can copy the new exe.
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -41,6 +44,10 @@ function diagEntry(msg: string): DiagEntry {
 }
 
 export const CURRENT_VERSION: string = __APP_VERSION__;
+
+/** True when running on Windows (portable exe distribution). */
+export const isWindows = (): boolean =>
+  typeof navigator !== 'undefined' && /Win/i.test(navigator.platform);
 
 const isPrerelease = (v: string): boolean => v.includes('-');
 
@@ -99,15 +106,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   }
 }
 
-/**
- * Download and install the update for the given release tag.
- * The manifest is fetched from the release's `latest.json` asset on GitHub.
- *
- * Calls `onProgress` repeatedly during download with cumulative bytes and
- * optional total size.  Returns when installation is complete — the caller
- * should then show a "restart now" prompt and call `relaunchApp()`.
- */
-/** Resolve the real CDN URL for latest.json from the GitHub API (avoids CDN caching issues). */
+/** Resolve the real CDN URL for latest.json via the GitHub API (avoids CDN caching). */
 async function resolveManifestUrl(tag: string): Promise<string> {
   const fallback = `https://github.com/${REPO}/releases/download/${tag}/latest.json`;
   try {
@@ -123,6 +122,35 @@ async function resolveManifestUrl(tag: string): Promise<string> {
   }
 }
 
+/** Resolve the Windows portable exe download URL via the GitHub API. */
+async function resolveWindowsExeUrl(tag: string): Promise<string> {
+  const version = tag.replace(/^v/, '');
+  const fallback = `https://github.com/${REPO}/releases/download/${tag}/SUSUSongBoard-Windows-x64-${version}.exe`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) return fallback;
+    const data: any = await res.json();
+    const asset = (data.assets as any[]).find(
+      (a: any) => a.name.startsWith('SUSUSongBoard-Windows') && a.name.endsWith('.exe'),
+    );
+    return asset?.browser_download_url ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Download and install the update for the given release tag.
+ *
+ * - macOS: fetches latest.json, uses tauri-plugin-updater (Ed25519 verified).
+ * - Windows portable: downloads new .exe directly, queues a PowerShell self-replace
+ *   script.  After this returns, call exitForUpdate() to trigger the replacement.
+ *
+ * Calls onProgress repeatedly during download.
+ * Returns when the update is ready to apply.
+ */
 export async function installAppUpdate(
   tag: string,
   onProgress?: (p: DownloadProgress) => void,
@@ -136,10 +164,6 @@ export async function installAppUpdate(
 
   log(`开始更新  target=${tag}`);
 
-  log('正在解析 manifest 地址...');
-  const manifestUrl = await resolveManifestUrl(tag);
-  log(`manifest URL: ${manifestUrl}`);
-
   let unlisten: (() => void) | undefined;
   if (onProgress) {
     unlisten = await listen<DownloadProgress>('updater://progress', (event) => {
@@ -148,20 +172,41 @@ export async function installAppUpdate(
   }
 
   try {
-    log('调用 install_app_update...');
-    await invoke('install_app_update', { manifestUrl });
-    log('install_app_update 返回成功');
+    if (isWindows()) {
+      log('Windows 便携模式，解析 exe 地址...');
+      const exeUrl = await resolveWindowsExeUrl(tag);
+      log(`exe URL: ${exeUrl}`);
+      log('调用 install_portable_update...');
+      await invoke('install_portable_update', { exeUrl });
+      log('下载完成，PowerShell 更新脚本已就绪');
+    } else {
+      log('正在解析 manifest 地址...');
+      const manifestUrl = await resolveManifestUrl(tag);
+      log(`manifest URL: ${manifestUrl}`);
+      log('调用 install_app_update...');
+      await invoke('install_app_update', { manifestUrl });
+      log('install_app_update 返回成功');
+    }
   } catch (e) {
-    log(`install_app_update 失败: ${String(e)}`);
+    log(`更新失败: ${String(e)}`);
     throw e;
   } finally {
     unlisten?.();
   }
 }
 
-/** Restart the application to apply an installed update. */
+/** Restart the application to apply an installed update (macOS). */
 export async function relaunchApp(): Promise<void> {
   await invoke('relaunch_app');
+}
+
+/**
+ * Exit the process cleanly so that the PowerShell self-update script
+ * (queued by install_portable_update) can copy the new exe and relaunch.
+ * Windows portable only.
+ */
+export async function exitForUpdate(): Promise<void> {
+  await invoke('exit_for_update');
 }
 
 export function skipVersion(tag: string): void {
