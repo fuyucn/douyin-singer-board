@@ -148,10 +148,16 @@ fn relaunch_app(app: tauri::AppHandle) {
     app.restart();
 }
 
-/// Download the portable Windows exe and schedule a self-replace via PowerShell.
-/// The PS script waits for THIS process to exit, then copies the new exe over
-/// the current one and relaunches it.  Returns Ok once the download is done and
-/// the script is queued — the caller should then exit via `exit_for_update`.
+/// Download the new portable exe into the same directory as the current exe,
+/// saved as `SUSUSongBoard_new.exe`.  Returns Ok with download complete;
+/// the caller then shows a restart button and calls `exit_for_update`.
+///
+/// On exit, `exit_for_update` does the atomic rename swap:
+///   current.exe  → current_old.exe   (renaming a running exe is allowed on Windows)
+///   _new.exe     → current.exe       (slot is now free)
+///   launch current.exe               (new version)
+///   exit                             (old process leaves)
+/// On next startup, `cleanup_old_portable_exe` deletes `_old.exe`.
 #[tauri::command]
 async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
@@ -164,12 +170,13 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
     {
         use futures_util::StreamExt;
 
-        let temp_dir = std::env::temp_dir();
-        let new_exe = temp_dir.join("SUSUSongBoard_update.exe");
         let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let my_pid = std::process::id();
+        let dir = current_exe
+            .parent()
+            .ok_or_else(|| "cannot determine exe directory".to_string())?;
+        let new_exe = dir.join("SUSUSongBoard_new.exe");
 
-        // Stream-download the new exe with progress events.
+        // Stream-download directly into the same directory.
         let client = reqwest::Client::new();
         let response = client
             .get(&exe_url)
@@ -192,35 +199,6 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
         }
 
         std::fs::write(&new_exe, &buf).map_err(|e| e.to_string())?;
-
-        // PowerShell: wait for THIS PID to fully exit, then replace + relaunch.
-        let ps_path = temp_dir.join("susu_selfupdate.ps1");
-        let new_ps = new_exe.to_string_lossy().replace('\'', "''");
-        let cur_ps = current_exe.to_string_lossy().replace('\'', "''");
-        let script = format!(
-            // Wait for the launcher to exit before touching the file.
-            "Wait-Process -Id {my_pid} -Timeout 30 -ErrorAction SilentlyContinue\r\n\
-             Start-Sleep -Milliseconds 500\r\n\
-             Unblock-File -Path '{new_ps}' -ErrorAction SilentlyContinue\r\n\
-             Copy-Item -Path '{new_ps}' -Destination '{cur_ps}' -Force\r\n\
-             Start-Process -FilePath '{cur_ps}'\r\n\
-             Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue\r\n"
-        );
-        std::fs::write(&ps_path, script.as_bytes()).map_err(|e| e.to_string())?;
-
-        // CREATE_NO_WINDOW (0x08000000) suppresses the console window at the
-        // Win32 level — unlike -WindowStyle Hidden which only hides it after
-        // PowerShell has already created the window, causing a visible flash.
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-        std::process::Command::new("powershell")
-            .args(["-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File"])
-            .arg(&ps_path)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-
         Ok(())
     }
 }
@@ -247,15 +225,59 @@ fn is_portable() -> bool {
     }
 }
 
-/// Exit the process cleanly (used on Windows portable after a self-update so
-/// that the waiting PowerShell script can copy the new exe in place).
+/// Atomic portable self-update swap, then exit.
+///
+/// Windows allows renaming (not deleting) a running exe.  Steps:
+///   1. rename SUSUSongBoard.exe → SUSUSongBoard_old.exe
+///   2. rename SUSUSongBoard_new.exe → SUSUSongBoard.exe
+///   3. spawn new SUSUSongBoard.exe
+///   4. exit this process
+///
+/// Next launch: startup cleanup removes SUSUSongBoard_old.exe.
 #[tauri::command]
 fn exit_for_update(app: tauri::AppHandle) {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(current) = std::env::current_exe() {
+            if let Some(dir) = current.parent() {
+                let new_exe = dir.join("SUSUSongBoard_new.exe");
+                let old_exe = dir.join("SUSUSongBoard_old.exe");
+
+                if new_exe.exists() {
+                    // Step 1: park the running exe under a different name.
+                    let _ = std::fs::rename(&current, &old_exe);
+                    // Step 2: move new exe into the canonical slot.
+                    let _ = std::fs::rename(&new_exe, &current);
+                    // Step 3: launch the new version.
+                    let _ = std::process::Command::new(&current).spawn();
+                }
+            }
+        }
+    }
     app.exit(0);
+}
+
+/// Delete leftover `SUSUSongBoard_old.exe` from a previous portable update.
+/// Called once at startup — the old exe can be deleted because it is no
+/// longer running.
+fn cleanup_old_portable_exe() {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(current) = std::env::current_exe() {
+            if let Some(dir) = current.parent() {
+                let old = dir.join("SUSUSongBoard_old.exe");
+                if old.exists() {
+                    let _ = std::fs::remove_file(old);
+                }
+            }
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    cleanup_old_portable_exe();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
