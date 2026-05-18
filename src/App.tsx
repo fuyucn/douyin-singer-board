@@ -222,6 +222,7 @@ export default function App() {
     } catch (e) {
       console.error('[updater] install failed:', e);
       setUpdatePhase('idle');
+      toast.error(`更新失败: ${String(e)}`);
     }
   }, [update, updatePhase]);
 

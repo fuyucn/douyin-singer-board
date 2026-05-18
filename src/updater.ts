@@ -95,11 +95,27 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
  * optional total size.  Returns when installation is complete — the caller
  * should then show a "restart now" prompt and call `relaunchApp()`.
  */
+/** Resolve the real CDN URL for latest.json from the GitHub API (avoids CDN caching issues). */
+async function resolveManifestUrl(tag: string): Promise<string> {
+  const fallback = `https://github.com/${REPO}/releases/download/${tag}/latest.json`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) return fallback;
+    const data: any = await res.json();
+    const asset = (data.assets as any[]).find((a: any) => a.name === 'latest.json');
+    return asset?.browser_download_url ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function installAppUpdate(
   tag: string,
   onProgress?: (p: DownloadProgress) => void,
 ): Promise<void> {
-  const manifestUrl = `https://github.com/${REPO}/releases/download/${tag}/latest.json`;
+  const manifestUrl = await resolveManifestUrl(tag);
 
   let unlisten: (() => void) | undefined;
   if (onProgress) {
