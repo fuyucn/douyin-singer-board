@@ -203,6 +203,83 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
     }
 }
 
+/// Download the NSIS setup installer to the system temp directory.
+/// Returns the local file path of the downloaded installer.
+/// Emits `updater://progress` events during download.
+#[tauri::command]
+async fn download_nsis_update(app: tauri::AppHandle, setup_url: String) -> Result<String, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (app, setup_url);
+        return Err("download_nsis_update is only available on Windows".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use futures_util::StreamExt;
+
+        let temp_dir = std::env::temp_dir();
+        let file_name = setup_url
+            .rsplit('/')
+            .next()
+            .filter(|s| s.ends_with(".exe"))
+            .unwrap_or("SUSUSongBoard-setup.exe");
+        let setup_path = temp_dir.join(file_name);
+
+        let client = reqwest::Client::new();
+        let response = client
+            .get(&setup_url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        let total_size = response.content_length();
+        let mut downloaded: u64 = 0;
+        let mut buf: Vec<u8> = Vec::new();
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| e.to_string())?;
+            downloaded += chunk.len() as u64;
+            buf.extend_from_slice(&chunk);
+            let _ = app.emit(
+                "updater://progress",
+                serde_json::json!({ "downloaded": downloaded, "total": total_size }),
+            );
+        }
+
+        std::fs::write(&setup_path, &buf).map_err(|e| e.to_string())?;
+        Ok(setup_path.to_string_lossy().into_owned())
+    }
+}
+
+/// Launch the NSIS installer silently (no visible window) then close the app.
+/// The installer runs with /S flag via CREATE_NO_WINDOW so no console appears.
+/// The NSIS installer handles closing/updating the running instance itself.
+#[tauri::command]
+fn launch_nsis_installer(window: tauri::WebviewWindow, setup_path: String) -> Result<(), String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (window, setup_path);
+        return Err("launch_nsis_installer is only available on Windows".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+        std::process::Command::new(&setup_path)
+            .arg("/S")
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+
+        // Close the app — the NSIS installer will relaunch the updated version.
+        let _ = window.close();
+        Ok(())
+    }
+}
+
 /// Returns true when the app is running as a portable (uninstalled) exe.
 /// Detection: NSIS installer always places Uninstall.exe next to the app exe;
 /// if that file is absent we're running portable.
@@ -326,6 +403,8 @@ pub fn run() {
             is_portable,
             install_app_update,
             install_portable_update,
+            download_nsis_update,
+            launch_nsis_installer,
             relaunch_app,
         ])
         .run(tauri::generate_context!())

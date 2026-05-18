@@ -52,6 +52,9 @@ export const isWindows = (): boolean =>
 /** Cached result of the is_portable Rust command. */
 let _isPortableCache: boolean | null = null;
 
+/** Path to downloaded NSIS setup.exe (Windows installed update). */
+let _nsisInstallerPath: string | null = null;
+
 /**
  * True when running as a portable (uninstalled) exe on Windows.
  * NSIS-installed apps have Uninstall.exe next to them; portable ones don't.
@@ -137,6 +140,25 @@ async function resolveManifestUrl(tag: string): Promise<string> {
   }
 }
 
+/** Resolve the NSIS setup.exe download URL via the GitHub API. */
+async function resolveWindowsSetupUrl(tag: string): Promise<string> {
+  const version = tag.replace(/^v/, '');
+  const fallback = `https://github.com/${REPO}/releases/download/${tag}/SUSUSongBoard_${version}_x64-setup.exe`;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) return fallback;
+    const data: any = await res.json();
+    const asset = (data.assets as any[]).find(
+      (a: any) => (a.name as string).endsWith('-setup.exe'),
+    );
+    return asset?.browser_download_url ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Resolve the Windows portable exe download URL via the GitHub API. */
 async function resolveWindowsExeUrl(tag: string): Promise<string> {
   const version = tag.replace(/^v/, '');
@@ -188,13 +210,23 @@ export async function installAppUpdate(
 
   try {
     if (await isPortableWindows()) {
+      // Windows portable: download versioned exe to same directory.
       log('Windows 便携模式，解析 exe 地址...');
       const exeUrl = await resolveWindowsExeUrl(tag);
       log(`exe URL: ${exeUrl}`);
       log('调用 install_portable_update...');
       await invoke('install_portable_update', { exeUrl });
-      log('下载完成，PowerShell 更新脚本已就绪');
+      log('下载完成');
+    } else if (isWindows()) {
+      // Windows NSIS installed: download setup.exe to temp, launch silently (no PowerShell).
+      log('Windows 安装版，解析 setup 地址...');
+      const setupUrl = await resolveWindowsSetupUrl(tag);
+      log(`setup URL: ${setupUrl}`);
+      log('调用 download_nsis_update...');
+      _nsisInstallerPath = await invoke<string>('download_nsis_update', { setupUrl });
+      log(`下载完成: ${_nsisInstallerPath}`);
     } else {
+      // macOS: use tauri-plugin-updater (Ed25519-verified).
       log('正在解析 manifest 地址...');
       const manifestUrl = await resolveManifestUrl(tag);
       log(`manifest URL: ${manifestUrl}`);
@@ -213,6 +245,15 @@ export async function installAppUpdate(
 /** Restart the application to apply an installed update (macOS). */
 export async function relaunchApp(): Promise<void> {
   await invoke('relaunch_app');
+}
+
+/**
+ * Launch the already-downloaded NSIS installer silently and close the app.
+ * Windows installed (non-portable) update path — no PowerShell involved.
+ */
+export async function launchNsisInstallerAndExit(): Promise<void> {
+  if (!_nsisInstallerPath) throw new Error('NSIS installer not downloaded yet');
+  await invoke('launch_nsis_installer', { setupPath: _nsisInstallerPath });
 }
 
 
