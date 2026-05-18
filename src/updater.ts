@@ -45,9 +45,24 @@ function diagEntry(msg: string): DiagEntry {
 
 export const CURRENT_VERSION: string = __APP_VERSION__;
 
-/** True when running on Windows (portable exe distribution). */
+/** True when the OS is Windows (any distribution). */
 export const isWindows = (): boolean =>
   typeof navigator !== 'undefined' && /Win/i.test(navigator.platform);
+
+/** Cached result of the is_portable Rust command. */
+let _isPortableCache: boolean | null = null;
+
+/**
+ * True when running as a portable (uninstalled) exe on Windows.
+ * NSIS-installed apps have Uninstall.exe next to them; portable ones don't.
+ * Result is cached after the first call.
+ */
+export async function isPortableWindows(): Promise<boolean> {
+  if (!isWindows()) return false;
+  if (_isPortableCache !== null) return _isPortableCache;
+  _isPortableCache = await invoke<boolean>('is_portable');
+  return _isPortableCache;
+}
 
 const isPrerelease = (v: string): boolean => v.includes('-');
 
@@ -172,7 +187,7 @@ export async function installAppUpdate(
   }
 
   try {
-    if (isWindows()) {
+    if (await isPortableWindows()) {
       log('Windows 便携模式，解析 exe 地址...');
       const exeUrl = await resolveWindowsExeUrl(tag);
       log(`exe URL: ${exeUrl}`);

@@ -225,6 +225,28 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
     }
 }
 
+/// Returns true when the app is running as a portable (uninstalled) exe.
+/// Detection: NSIS installer always places Uninstall.exe next to the app exe;
+/// if that file is absent we're running portable.
+#[tauri::command]
+fn is_portable() -> bool {
+    #[cfg(not(target_os = "windows"))]
+    return false;
+
+    #[cfg(target_os = "windows")]
+    {
+        let exe = match std::env::current_exe() {
+            Ok(p) => p,
+            Err(_) => return true, // assume portable if we can't determine
+        };
+        let dir = match exe.parent() {
+            Some(d) => d,
+            None => return true,
+        };
+        !dir.join("Uninstall.exe").exists()
+    }
+}
+
 /// Exit the process cleanly (used on Windows portable after a self-update so
 /// that the waiting PowerShell script can copy the new exe in place).
 #[tauri::command]
@@ -329,6 +351,7 @@ pub fn run() {
             kugou_api::kugou_api_request,
             douyin::douyin_room_info,
             show_window,
+            is_portable,
             install_app_update,
             install_portable_update,
             exit_for_update,

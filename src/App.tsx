@@ -15,7 +15,7 @@ import {
   installAppUpdate,
   relaunchApp,
   exitForUpdate,
-  isWindows,
+  isPortableWindows,
   skipVersion,
   type DownloadProgress,
   type UpdateInfo,
@@ -126,6 +126,7 @@ export default function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
+  const [isPortable, setIsPortable] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
@@ -206,11 +207,12 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [config]);
 
-  // Startup: update check
+  // Startup: update check + portable detection
   useEffect(() => {
     checkForUpdate().then((info) => {
       if (info) setUpdate(info);
     });
+    isPortableWindows().then(setIsPortable);
   }, []);
 
   // Download + install update, then prompt restart
@@ -571,14 +573,14 @@ export default function App() {
               {updatePhase === 'ready' && (
                 <>
                   <span>
-                    {isWindows() ? '更新已下载，退出后自动替换' : '更新已就绪，重启后生效'}
+                    {isPortable ? '更新已下载，退出后自动替换' : '更新已就绪，重启后生效'}
                   </span>
                   <Button
                     size="sm"
                     className="h-7 px-3 text-[13px]"
-                    onClick={() => (isWindows() ? exitForUpdate() : relaunchApp())}
+                    onClick={() => (isPortable ? exitForUpdate() : relaunchApp())}
                   >
-                    {isWindows() ? '退出并更新' : '立即重启'}
+                    {isPortable ? '退出并更新' : '立即重启'}
                   </Button>
                 </>
               )}
