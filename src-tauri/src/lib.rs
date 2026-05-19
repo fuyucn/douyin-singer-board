@@ -123,6 +123,18 @@ async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Resu
 
     if let Some(update) = update {
         let app_progress = app.clone();
+
+        // Grab handles to child processes so on_before_exit can kill them
+        // before tauri-plugin-updater calls std::process::exit(0).
+        // Without this the sidecar and kugou-api become orphans after the
+        // parent process exits and keep running in the background.
+        let sidecar_h = app
+            .try_state::<Arc<sidecar::SidecarHandle>>()
+            .map(|s| s.inner().clone());
+        let kugou_h = app
+            .try_state::<Arc<kugou_api::KugouApiHandle>>()
+            .map(|s| s.inner().clone());
+
         update
             .download_and_install(
                 move |chunk_length, content_length| {
@@ -134,7 +146,22 @@ async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Resu
                         }),
                     );
                 },
-                || {},
+                move || {
+                    // Called synchronously just before std::process::exit(0).
+                    // block_in_place allows blocking inside the Tokio worker thread.
+                    tokio::task::block_in_place(move || {
+                        tokio::runtime::Handle::current().block_on(async move {
+                            if let Some(h) = sidecar_h {
+                                let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
+                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                h.kill().await;
+                            }
+                            if let Some(k) = kugou_h {
+                                k.kill().await;
+                            }
+                        });
+                    });
+                },
             )
             .await
             .map_err(|e| e.to_string())?;
