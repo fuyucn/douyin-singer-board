@@ -49,20 +49,6 @@ export const CURRENT_VERSION: string = __APP_VERSION__;
 export const isWindows = (): boolean =>
   typeof navigator !== 'undefined' && /Win/i.test(navigator.platform);
 
-/** Cached result of the is_portable Rust command. */
-let _isPortableCache: boolean | null = null;
-
-/**
- * True when running as a portable (uninstalled) exe on Windows.
- * NSIS-installed apps have Uninstall.exe next to them; portable ones don't.
- * Result is cached after the first call.
- */
-export async function isPortableWindows(): Promise<boolean> {
-  if (!isWindows()) return false;
-  if (_isPortableCache !== null) return _isPortableCache;
-  _isPortableCache = await invoke<boolean>('is_portable');
-  return _isPortableCache;
-}
 
 const isPrerelease = (v: string): boolean => v.includes('-');
 
@@ -188,8 +174,8 @@ export async function installAppUpdate(
   }
 
   try {
-    if (await isPortableWindows()) {
-      // Windows portable: no installer available — download versioned exe to same directory.
+    if (isWindows()) {
+      // Windows portable: download versioned exe to the same directory.
       log('Windows 便携模式，解析 exe 地址...');
       const exeUrl = await resolveWindowsExeUrl(tag);
       log(`exe URL: ${exeUrl}`);
@@ -197,9 +183,7 @@ export async function installAppUpdate(
       await invoke('install_portable_update', { exeUrl });
       log('下载完成');
     } else {
-      // macOS + Windows NSIS installed: tauri-plugin-updater handles everything.
-      // On Windows (quiet mode): downloads installer → runs /S /R → app exits → installer restarts.
-      // On macOS: downloads update → extracts → returns; caller shows restart button.
+      // macOS: tauri-plugin-updater downloads + extracts; caller shows restart button.
       log('正在解析 manifest 地址...');
       const manifestUrl = await resolveManifestUrl(tag);
       log(`manifest URL: ${manifestUrl}`);

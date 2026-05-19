@@ -14,7 +14,7 @@ import {
   checkForUpdate,
   installAppUpdate,
   relaunchApp,
-  isPortableWindows,
+  isWindows,
   skipVersion,
   type DownloadProgress,
   type UpdateInfo,
@@ -125,7 +125,6 @@ export default function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready'>('idle');
   const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
-  const [isPortable, setIsPortable] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
@@ -206,12 +205,11 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [config]);
 
-  // Startup: update check + portable detection
+  // Startup: update check
   useEffect(() => {
     checkForUpdate().then((info) => {
       if (info) setUpdate(info);
     });
-    isPortableWindows().then(setIsPortable);
   }, []);
 
   // Download + install update, then prompt restart
@@ -571,7 +569,7 @@ export default function App() {
               )}
               {updatePhase === 'ready' && (
                 <>
-                  {isPortable ? (
+                  {isWindows() ? (
                     <span>
                       新版本已下载到当前目录（SUSUSongBoard-Windows-x64-{update.tag.replace(/^v/, '')}.exe），请手动启动
                     </span>

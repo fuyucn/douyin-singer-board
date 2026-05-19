@@ -112,36 +112,10 @@ fn show_window(window: tauri::WebviewWindow) {
 async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Result<(), String> {
     let url: url::Url = manifest_url.parse().map_err(|e: url::ParseError| e.to_string())?;
 
-    // Grab child-process handles BEFORE building the updater so the
-    // on_before_exit hook (called synchronously just before process::exit(0))
-    // can kill the sidecar and kugou-api.  Without this they become orphans.
-    let sidecar_h = app
-        .try_state::<Arc<sidecar::SidecarHandle>>()
-        .map(|s| s.inner().clone());
-    let kugou_h = app
-        .try_state::<Arc<kugou_api::KugouApiHandle>>()
-        .map(|s| s.inner().clone());
-
     let updater = app
         .updater_builder()
         .endpoints(vec![url])
         .map_err(|e| e.to_string())?
-        // on_before_exit is the correct hook — fires just before process::exit(0).
-        // The second arg of download_and_install is on_download_finish (too early).
-        .on_before_exit(move || {
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    if let Some(ref h) = sidecar_h {
-                        let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
-                        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                        h.kill().await;
-                    }
-                    if let Some(ref k) = kugou_h {
-                        k.kill().await;
-                    }
-                });
-            });
-        })
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -229,28 +203,6 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
     }
 }
 
-
-/// Returns true when the app is running as a portable (uninstalled) exe.
-/// Detection: NSIS installer always places Uninstall.exe next to the app exe;
-/// if that file is absent we're running portable.
-#[tauri::command]
-fn is_portable() -> bool {
-    #[cfg(not(target_os = "windows"))]
-    return false;
-
-    #[cfg(target_os = "windows")]
-    {
-        let exe = match std::env::current_exe() {
-            Ok(p) => p,
-            Err(_) => return true, // assume portable if we can't determine
-        };
-        let dir = match exe.parent() {
-            Some(d) => d,
-            None => return true,
-        };
-        !dir.join("Uninstall.exe").exists()
-    }
-}
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -350,7 +302,6 @@ pub fn run() {
             kugou_api::kugou_api_request,
             douyin::douyin_room_info,
             show_window,
-            is_portable,
             install_app_update,
             install_portable_update,
             relaunch_app,

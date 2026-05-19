@@ -130,16 +130,6 @@ jobs:
           # Portable single .exe (sidecar is embedded, no installer needed).
           $portable = "$out/SUSUSongBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
           Copy-Item "$target/sususongboard.exe" $portable
-          # NSIS installer + updater artifacts.
-          # installMode=currentUser → Tauri signs the .exe directly (.exe.sig)
-          # installMode=perMachine  → Tauri wraps in .nsis.zip (.nsis.zip.sig)
-          # Collect both so the workflow works regardless of mode.
-          if (Test-Path "$target/bundle/nsis") {
-            Copy-Item "$target/bundle/nsis/*-setup.exe"     $out -ErrorAction SilentlyContinue
-            Copy-Item "$target/bundle/nsis/*-setup.exe.sig" $out -ErrorAction SilentlyContinue
-            Get-ChildItem "$target/bundle/nsis" -Filter "*.nsis.zip"     | Copy-Item -Destination $out -ErrorAction SilentlyContinue
-            Get-ChildItem "$target/bundle/nsis" -Filter "*.nsis.zip.sig" | Copy-Item -Destination $out -ErrorAction SilentlyContinue
-          }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -179,29 +169,8 @@ jobs:
           MAC_SIG=""
           if [ -f "$MAC_SIG_FILE" ]; then MAC_SIG=$(cat "$MAC_SIG_FILE"); fi
 
-          # Windows x64 — currentUser mode signs the .exe directly (.exe.sig);
-          # perMachine mode uses .nsis.zip.  Detect which is present.
-          WIN_FILE=""
-          WIN_SIG=""
-          WIN_PLATFORM_KEY=""
-          # Prefer currentUser artifact: *-setup.exe.sig
-          WIN_EXE_SIG=$(find release -maxdepth 1 -name "*-setup.exe.sig" | head -1)
-          if [ -f "$WIN_EXE_SIG" ]; then
-            WIN_FILE="${WIN_EXE_SIG%.sig}"   # strip .sig to get the .exe
-            WIN_SIG=$(cat "$WIN_EXE_SIG")
-            WIN_PLATFORM_KEY="windows-x86_64-nsis"
-          else
-            # Fall back to perMachine: .nsis.zip.sig
-            WIN_ZIP=$(find release -maxdepth 1 -name "*.nsis.zip" | head -1)
-            WIN_SIG_FILE="${WIN_ZIP}.sig"
-            if [ -f "$WIN_SIG_FILE" ]; then
-              WIN_FILE="$WIN_ZIP"
-              WIN_SIG=$(cat "$WIN_SIG_FILE")
-              WIN_PLATFORM_KEY="windows-x86_64"
-            fi
-          fi
-
-          # Build JSON with jq — only include platforms that have artifacts
+          # Build JSON with jq — only macOS uses tauri-plugin-updater manifest;
+          # Windows uses direct portable exe download and does not need latest.json.
           PLATFORMS="{}"
           if [ -n "$MAC_SIG" ] && [ -n "$MAC_TAR" ]; then
             MAC_NAME=$(basename "$MAC_TAR")
@@ -209,14 +178,6 @@ jobs:
               --arg url "${BASE}/${MAC_NAME}" \
               --arg sig "$MAC_SIG" \
               '."darwin-aarch64" = {url: $url, signature: $sig}')
-          fi
-          if [ -n "$WIN_SIG" ] && [ -n "$WIN_FILE" ]; then
-            WIN_NAME=$(basename "$WIN_FILE")
-            PLATFORMS=$(echo "$PLATFORMS" | jq \
-              --arg key "$WIN_PLATFORM_KEY" \
-              --arg url "${BASE}/${WIN_NAME}" \
-              --arg sig "$WIN_SIG" \
-              '.[$key] = {url: $url, signature: $sig}')
           fi
 
           jq -n \
