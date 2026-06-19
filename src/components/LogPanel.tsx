@@ -125,13 +125,6 @@ export function LogPanel({ logs, onClear }: Props) {
           'hover:bg-bg-soft/80 transition-colors duration-100',
         ].join(' ')}
       >
-        {/* macOS-style traffic lights（纯装饰） */}
-        <span className="flex items-center gap-1 mr-1" aria-hidden>
-          <span className="size-2.5 rounded-full bg-red-400/70" />
-          <span className="size-2.5 rounded-full bg-amber-400/70" />
-          <span className="size-2.5 rounded-full bg-green-400/70" />
-        </span>
-
         {/* 标题 */}
         <span className="font-mono text-[11px] text-fg-muted tracking-wider uppercase">
           logs
@@ -247,9 +240,9 @@ export function LogPanel({ logs, onClear }: Props) {
                     {/* Thin vertical separator */}
                     <span className="shrink-0 self-stretch w-px bg-border-softer mx-1" />
 
-                    {/* Log message */}
+                    {/* Log message — strip the leading timestamp (shown in the time column) */}
                     <span className="min-w-0 flex-1 py-[5px] pr-3 text-[11px] text-fg-muted leading-relaxed break-all">
-                      {log}
+                      {log.replace(/^\d{2}:\d{2}:\d{2}\s+/, '')}
                     </span>
                   </div>
                 );
