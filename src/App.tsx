@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore, dedupedSongs } from './store';
+import { countAddedByUid, isOverUserLimit } from './lib/userQuota';
 import { useShallow } from 'zustand/react/shallow';
 import {
   loadConfig,
@@ -346,6 +347,13 @@ export default function App() {
     track_('song_added_auto', { song_name: song.song_name });
   }, [removeByMsgId, addPlayed]);
 
+  // Per-user playlist-added counts drive the session limit (see lib/userQuota).
+  const playedCountByUid = useMemo(() => countAddedByUid(played), [played]);
+  const isOverLimit = useCallback(
+    (song: DanmuInfo) => isOverUserLimit(song, playedCountByUid, config.max_songs_per_user),
+    [playedCountByUid, config.max_songs_per_user],
+  );
+
   useAutoSync({
     autoSync,
     songs: display,
@@ -355,6 +363,7 @@ export default function App() {
     onSynced: onAutoSynced,
     pushLog,
     checkCooldown: isInCooldown,
+    isOverLimit,
   });
 
   // ─── Render helpers ───────────────────────────────────────────
@@ -634,6 +643,7 @@ export default function App() {
                 addBlacklistSinger(singerName);
               }}
               cooldownRemaining={cooldownRemainingSeconds}
+              maxSongsPerUser={config.max_songs_per_user}
             />
           </div>
         ) : (
@@ -675,6 +685,7 @@ export default function App() {
                 addBlacklistSinger(singerName);
               }}
               cooldownRemaining={cooldownRemainingSeconds}
+              maxSongsPerUser={config.max_songs_per_user}
             />
           </div>
         )}

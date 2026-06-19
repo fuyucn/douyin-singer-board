@@ -229,6 +229,22 @@ export function LeftPanel({
           />
           <p className="text-[11px] text-[var(--fg-faint)]">同一首歌在冷却时间内不会重复加入歌单</p>
         </div>
+        <div className="mt-3 space-y-1.5">
+          <Label className="text-xs text-[var(--fg-muted)]">单人单场点歌上限</Label>
+          <Input
+            type="number"
+            min={0}
+            value={config.max_songs_per_user}
+            disabled={running}
+            onChange={(e) =>
+              onConfigChange({ max_songs_per_user: Math.max(0, Number(e.target.value) || 0) })
+            }
+            className="h-8 bg-[var(--bg-base)] text-sm"
+          />
+          <p className="text-[11px] text-[var(--fg-faint)]">
+            每位观众本场最多自动点歌的首数（0 = 不限制）；手动加入不受限
+          </p>
+        </div>
       </div>
 
       {/* Kugou歌单 — 仅登录后显示 */}

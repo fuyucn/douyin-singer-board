@@ -19,6 +19,8 @@ export interface Config {
   sing_cd: number;
   fans_level: number;
   cooldown_seconds: number;
+  /** Per-user per-session auto-request limit. 0 = unlimited. Manual adds bypass it. */
+  max_songs_per_user: number;
   target_playlist_name: string;
   target_playlist_id: number;
 }

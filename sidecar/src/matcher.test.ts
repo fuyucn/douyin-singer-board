@@ -195,3 +195,20 @@ describe('Matcher.match - blacklist', () => {
     expect(m.match(raw('点歌 new')).kind).toBe('skip');
   });
 });
+
+describe('Matcher.match - msg_id uniqueness', () => {
+  it('emits unique msg_id for same-user same-second requests', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    // sing_cd 0 so the same user can be accepted twice in one second.
+    const m = new Matcher(baseConfig({ sing_cd: 0 }));
+    const a = m.match(raw('点歌 a'));
+    const b = m.match(raw('点歌 b'));
+    expect(a.kind).toBe('song');
+    expect(b.kind).toBe('song');
+    if (a.kind === 'song' && b.kind === 'song') {
+      expect(a.danmu.msg_id).not.toBe(b.danmu.msg_id);
+    }
+    vi.useRealTimers();
+  });
+});

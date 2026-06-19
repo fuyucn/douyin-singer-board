@@ -11,6 +11,9 @@ interface Props {
   onSynced: (track: KuGouTrack, song: DanmuInfo) => void;
   pushLog: (line: string) => void;
   checkCooldown: (songName: string) => boolean;
+  // True when this song is over its requester's per-session limit. Such songs
+  // are skipped (left in the queue, never synced) rather than removed.
+  isOverLimit: (song: DanmuInfo) => boolean;
 }
 
 /** Process songs in display order, auto-adding found ones with 3-5s random delay.
@@ -26,6 +29,7 @@ export function useAutoSync({
   onSynced,
   pushLog,
   checkCooldown,
+  isOverLimit,
 }: Props) {
   const timerRef = useRef<number | null>(null);
   const processingRef = useRef(false);
@@ -33,11 +37,13 @@ export function useAutoSync({
   const cacheRef = useRef(kugouCache);
   const lastSkippedRef = useRef<Set<string>>(new Set());
   const checkCooldownRef = useRef(checkCooldown);
+  const isOverLimitRef = useRef(isOverLimit);
   const failCountRef = useRef(0);
 
   songsRef.current = songs;
   cacheRef.current = kugouCache;
   checkCooldownRef.current = checkCooldown;
+  isOverLimitRef.current = isOverLimit;
 
   useEffect(() => {
     if (!autoSync || !kugouLoggedIn || !targetPlaylistId) {
@@ -66,9 +72,12 @@ export function useAutoSync({
         const currentSongs = songsRef.current;
         const currentCache = cacheRef.current;
 
-        // Prune skip-log entries for songs that are no longer blocked
+        // Prune skip-log entries for songs that are no longer blocked.
+        // cooldown:/limit: keys are not cache keys — leave them (limit: keys are
+        // per-msg_id and bounded by session size); only blacklist keys (bare
+        // song names) are re-evaluated against the cache here.
         for (const key of lastSkippedRef.current) {
-          if (key.startsWith('cooldown:')) continue;
+          if (key.startsWith('cooldown:') || key.startsWith('limit:')) continue;
           const entry = currentCache[key.trim()];
           if (!entry?.blockedReason) lastSkippedRef.current.delete(key);
         }
@@ -78,6 +87,14 @@ export function useAutoSync({
         for (const s of currentSongs) {
           const entry = currentCache[s.song_name.trim()];
           if (!entry || entry.status !== 'found' || entry.blockedReason) continue;
+          // Over the per-user session limit: leave it in the queue, never sync.
+          if (isOverLimitRef.current(s)) {
+            if (!lastSkippedRef.current.has(`limit:${s.msg_id}`)) {
+              pushLog(`[auto-sync] ${s.uname} 本场点歌已达上限，跳过: ${s.song_name}`);
+              lastSkippedRef.current.add(`limit:${s.msg_id}`);
+            }
+            continue; // skip, try next song
+          }
           if (checkCooldownRef.current(s.song_name)) {
             if (!lastSkippedRef.current.has(`cooldown:${s.song_name}`)) {
               pushLog(`[auto-sync] cooldown skip: ${s.song_name}`);

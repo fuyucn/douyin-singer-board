@@ -4,6 +4,8 @@ import { Trash2, Music, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import { countAddedByUid } from '@/lib/userQuota';
 import { SongTable, songColumnHelper } from './SongTable';
 import { BlacklistPanel, type BlacklistItemUI } from './BlacklistPanel';
 import { LogPanel } from './LogPanel';
@@ -31,18 +33,61 @@ interface Props {
   onRemoveBlacklist: (id: number) => void;
   onAddSingerBlacklist: (singerName: string) => void;
   cooldownRemaining: (songName: string) => number;
+  maxSongsPerUser: number;
 }
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-type SongsMeta = {
+type UserCountMeta = {
+  // How many songs this requester has already added to the playlist (played)
+  // this session, plus the configured limit (0 = unlimited). Same value for
+  // every row of a given user; drives the "2/3" badge and turns red at/over
+  // the limit (those users' further requests are skipped by auto-sync).
+  addedCount: (uid: string) => number;
+  maxSongsPerUser: number;
+};
+
+type SongsMeta = UserCountMeta & {
   kugouCache: Record<string, EnrichedEntry>;
   renderActions: (s: DanmuInfo) => React.ReactNode;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
   cooldownRemaining: (songName: string) => number;
 };
 
-type PlayedMeta = {
+// Renders the username plus a per-user "added/limit" badge (e.g. "2/3"):
+// how many songs this user has already added to the playlist this session.
+// Same value for all of a user's rows. Hidden when the limit is unlimited (0)
+// or for manual host adds. Red once the user is at/over the limit — their
+// further requests are skipped by auto-sync.
+function renderUserCell(ctx: {
+  table: { options: { meta?: unknown } };
+  row: { original: DanmuInfo };
+}) {
+  const meta = ctx.table.options.meta as UserCountMeta | undefined;
+  const song = ctx.row.original;
+  const limit = meta?.maxSongsPerUser ?? 0;
+  const show = limit > 0 && song.uid !== 'manual';
+  const count = show ? (meta?.addedCount(song.uid) ?? 0) : 0;
+  const capped = count >= limit;
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-fg-muted truncate text-xs">{song.uname}</span>
+      {show && (
+        <span
+          className={cn(
+            'shrink-0 rounded px-1 text-[10px] tabular-nums',
+            capped ? 'bg-red-500/15 text-red-400' : 'bg-border-softer text-fg-faint',
+          )}
+          title={`本场已加入歌单 ${count}/${limit}`}
+        >
+          {count}/{limit}
+        </span>
+      )}
+    </div>
+  );
+}
+
+type PlayedMeta = UserCountMeta & {
   kugouCache: Record<string, EnrichedEntry>;
   renderActions: (s: DanmuInfo) => React.ReactNode;
   onContextMenu: (e: React.MouseEvent, song: DanmuInfo) => void;
@@ -60,9 +105,7 @@ function useSongsColumns() {
       songColumnHelper.accessor('uname', {
         header: '用户',
         size: 120,
-        cell: (ctx) => (
-          <span className="text-fg-muted block truncate text-xs">{ctx.getValue()}</span>
-        ),
+        cell: renderUserCell,
       }),
       songColumnHelper.accessor('song_name', {
         header: '点歌',
@@ -172,9 +215,7 @@ function usePlayedColumns() {
       songColumnHelper.accessor('uname', {
         header: '用户',
         size: 110,
-        cell: (ctx) => (
-          <span className="text-fg-muted block truncate text-xs">{ctx.getValue()}</span>
-        ),
+        cell: renderUserCell,
       }),
       songColumnHelper.accessor('song_name', {
         header: '点歌',
@@ -235,11 +276,20 @@ export function MainContent({
   onRemoveBlacklist,
   onAddSingerBlacklist,
   cooldownRemaining,
+  maxSongsPerUser,
 }: Props) {
   const songsColumns = useSongsColumns();
   const playedColumns = usePlayedColumns();
   const [playedQuery, setPlayedQuery] = useState('');
   const [showLogs] = useShowLogs();
+
+  // Songs each user has already added to the playlist (played) this session.
+  // Same source of truth as the auto-sync limit check (lib/userQuota), so the
+  // badge and enforcement can never diverge.
+  const addedCount = useMemo(() => {
+    const m = countAddedByUid(played);
+    return (uid: string) => m.get(uid) ?? 0;
+  }, [played]);
 
   const filteredPlayed = useMemo(() => {
     const q = playedQuery.trim().toLowerCase();
@@ -252,13 +302,26 @@ export function MainContent({
   }, [played, playedQuery]);
 
   const songsMeta: SongsMeta = useMemo(
-    () => ({ kugouCache, renderActions: renderSongActions, onContextMenu, cooldownRemaining }),
-    [kugouCache, renderSongActions, onContextMenu, cooldownRemaining],
+    () => ({
+      kugouCache,
+      renderActions: renderSongActions,
+      onContextMenu,
+      cooldownRemaining,
+      addedCount,
+      maxSongsPerUser,
+    }),
+    [kugouCache, renderSongActions, onContextMenu, cooldownRemaining, addedCount, maxSongsPerUser],
   );
 
   const playedMeta: PlayedMeta = useMemo(
-    () => ({ kugouCache, renderActions: renderPlayedActions, onContextMenu }),
-    [kugouCache, renderPlayedActions, onContextMenu],
+    () => ({
+      kugouCache,
+      renderActions: renderPlayedActions,
+      onContextMenu,
+      addedCount,
+      maxSongsPerUser,
+    }),
+    [kugouCache, renderPlayedActions, onContextMenu, addedCount, maxSongsPerUser],
   );
 
   const windowWidth = useWindowWidth();

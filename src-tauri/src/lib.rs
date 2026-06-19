@@ -96,6 +96,14 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "config: max_songs_per_user (per-user per-session request limit, 0=unlimited)",
+            sql: "
+                ALTER TABLE config ADD COLUMN max_songs_per_user INTEGER NOT NULL DEFAULT 3;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
