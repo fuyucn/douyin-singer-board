@@ -210,6 +210,35 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
   }
 }
 
+// Unified shutdown: kill the companion kugou-api, best-effort stop the
+// listener, then exit. Never blocks on stop() — a hung close() must not keep
+// the process (and its child) alive. Idempotent.
+let shuttingDown = false;
+function shutdown(reason: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    log('info', `shutting down: ${reason}`);
+  } catch {
+    /* stdout may be gone if the parent already died */
+  }
+  if (companionPid !== null) {
+    try {
+      if (process.platform === 'win32') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { execSync } = require('node:child_process') as typeof import('node:child_process');
+        execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
+      } else {
+        process.kill(companionPid, 'SIGKILL');
+      }
+    } catch {
+      /* already gone */
+    }
+  }
+  void stop(); // closes the listener synchronously; do not await
+  process.exit(0);
+}
+
 const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', (line) => {
   if (!line.trim()) return;
@@ -228,8 +257,14 @@ rl.on('line', (line) => {
   void handleCmd(result.data);
 });
 
-process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
-process.on('SIGINT', () => void stop().then(() => process.exit(0)));
+// Primary parent-death signal: when the Tauri parent dies, the stdin pipe's
+// write end closes and we get EOF here. Far more reliable than polling ppid
+// (which can be cached / defeated by PID reuse on macOS). Covers force-quit
+// and crashes where the Rust-side cleanup never runs.
+rl.on('close', () => shutdown('stdin closed (parent gone)'));
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Survive late events from douyin-danma-listener after close()
 // (e.g. queued WS frames decoded after the listener is null'd).
@@ -281,19 +316,8 @@ setInterval(() => {
     }
   }
   if (parentGone) {
-    log('info', `parent process gone (ppid was ${originalParentPid}, now ${currentPpid}), exiting`);
-    if (companionPid !== null) {
-      try {
-        if (process.platform === 'win32') {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { execSync } = require('node:child_process') as typeof import('node:child_process');
-          execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
-        } else {
-          process.kill(companionPid, 'SIGKILL');
-        }
-      } catch {}
-    }
-    void stop().then(() => process.exit(0));
+    // Belt-and-suspenders behind the stdin-EOF handler above.
+    shutdown(`parent process gone (ppid was ${originalParentPid}, now ${currentPpid})`);
   }
 }, 2000);
 
