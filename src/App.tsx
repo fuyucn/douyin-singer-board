@@ -28,7 +28,12 @@ import { AboutModal } from './AboutModal';
 import { KugouDebugModal } from './KugouDebugModal';
 import { KugouLoginModal } from './KugouLoginModal';
 import { applyTheme, loadTheme, type Theme } from './theme';
-import { addTrackToPlaylist, type KuGouTrack, type EnrichedEntry } from './kugouSession';
+import {
+  addTrackToPlaylist,
+  resolvePlaylistByName,
+  type KuGouTrack,
+  type EnrichedEntry,
+} from './kugouSession';
 import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
@@ -366,6 +371,29 @@ export default function App() {
     isOverLimit,
   });
 
+  const handleAutoSyncToggle = useCallback(async () => {
+    if (autoSync) {
+      setAutoSync(false);
+      return;
+    }
+    // Turning ON
+    const name = config.target_playlist_name.trim();
+    if (name) {
+      try {
+        const { listid } = await resolvePlaylistByName(name);
+        setConfig({ target_playlist_id: listid });
+        await saveConfig({ ...config, target_playlist_id: listid });
+      } catch (e) {
+        toast.error(`解析歌单失败: ${e}`);
+        return;
+      }
+    } else if (!config.target_playlist_id) {
+      const ok = window.confirm('没有配置歌单，自动同步不会添加歌曲到歌单。确定继续吗？');
+      if (!ok) return;
+    }
+    setAutoSync(true);
+  }, [autoSync, config]);
+
   // ─── Render helpers ───────────────────────────────────────────
 
   const renderSongActions = (s: DanmuInfo) => {
@@ -614,7 +642,7 @@ export default function App() {
                 onConfigChange={setConfig}
                 onManualTextChange={setManualText}
                 onManualAdd={onManualAdd}
-                onAutoSyncToggle={() => setAutoSync(!autoSync)}
+                onAutoSyncToggle={handleAutoSyncToggle}
                 appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
               />
             </CollapsiblePanel>
@@ -657,9 +685,9 @@ export default function App() {
               onConfigChange={setConfig}
               onManualTextChange={setManualText}
               onManualAdd={onManualAdd}
-              onAutoSyncToggle={() => setAutoSync(!autoSync)}
-              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
-            />
+               onAutoSyncToggle={handleAutoSyncToggle}
+               appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+             />
 
             <MainContent
               songs={display}

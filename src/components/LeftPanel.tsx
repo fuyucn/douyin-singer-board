@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { Config } from '../types';
-import { resolvePlaylistByName, clearPlaylistByName } from '../kugouSession';
+import { clearPlaylistByName } from '../kugouSession';
 import { toast } from 'sonner';
 import { saveConfig } from '../db';
 import { Input } from '@/components/ui/input';
@@ -64,25 +64,6 @@ export function LeftPanel({
     }, 600);
     return () => window.clearTimeout(timer);
   }, [config.room_id]);
-
-  const handleSavePlaylist = async () => {
-    const name = config.target_playlist_name.trim();
-    if (!name) {
-      toast.error('请先填歌单名');
-      return;
-    }
-    try {
-      const { listid, created } = await resolvePlaylistByName(name);
-      onConfigChange({ target_playlist_id: listid });
-      await saveConfig({ ...config, target_playlist_name: name, target_playlist_id: listid });
-      toast(created ? `已新建歌单 (id: ${listid})` : `已绑定歌单 (id: ${listid})`);
-    } catch (e) {
-      const detail = String(e);
-      toast.error(
-        detail.includes('not logged in') ? '请先点酷狗图标扫码登录' : `解析失败: ${detail}`,
-      );
-    }
-  };
 
   const handleClearPlaylist = async () => {
     const name = config.target_playlist_name.trim();
@@ -293,13 +274,6 @@ export function LeftPanel({
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="h-8 flex-1 bg-blue-500 text-white hover:bg-blue-600"
-                  onClick={handleSavePlaylist}
-                >
-                  保存
-                </Button>
-                <Button
-                  size="sm"
                   variant="outline"
                   className="h-8 flex-1 border-red-400 text-red-500 hover:bg-red-50 hover:text-red-600"
                   onClick={handleClearPlaylist}
@@ -308,21 +282,19 @@ export function LeftPanel({
                   <Trash2 className="size-3" />
                   清理
                 </Button>
-                {config.target_playlist_id > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      'auto-sync-btn h-8 flex-1 border-[var(--border-strong)] text-xs',
-                      autoSync && 'active border-transparent!',
-                    )}
-                    onClick={onAutoSyncToggle}
-                    title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
-                  >
-                    <RefreshCw className={`size-3 ${autoSync ? 'animate-spin' : ''}`} />
-                    自动同步
-                  </Button>
-                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={cn(
+                    'auto-sync-btn h-8 flex-1 border-[var(--border-strong)] text-xs',
+                    autoSync && 'active border-transparent!',
+                  )}
+                  onClick={onAutoSyncToggle}
+                  title={autoSync ? '自动歌单同步中' : '自动歌单同步'}
+                >
+                  <RefreshCw className={`size-3 ${autoSync ? 'animate-spin' : ''}`} />
+                  {autoSync ? '同步中' : '自动同步'}
+                </Button>
               </div>
             </div>
           </div>
