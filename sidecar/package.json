@@ -1,12 +1,12 @@
 {
   "name": "sidecar",
   "private": true,
-  "version": "0.0.40-4",
+  "version": "0.0.40-5",
   "type": "module",
   "main": "build/index.cjs",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "dev:watch": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs --watch",
+    "dev:watch": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs --watch=forever",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs",
     "build:bin": "node scripts/build-bin.mjs"
   },

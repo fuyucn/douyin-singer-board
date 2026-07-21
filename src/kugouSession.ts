@@ -336,4 +336,47 @@ export async function addTrackToPlaylist(track: KuGouTrack, listid: number): Pro
   }
 }
 
+/**
+ * Delete-and-recreate a playlist by name.
+ * - If a playlist with `name` exists, deletes it first, then creates a fresh one.
+ * - If it doesn't exist, just creates it.
+ * Returns the new playlist's listid.
+ */
+export async function clearPlaylistByName(
+  name: string,
+): Promise<{ listid: number; created: boolean }> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('playlist name is empty');
+  const cookie = await currentCookie();
+  if (!cookie) throw new Error('not logged in (no cookie)');
+
+  // 1) check existing
+  const list = await call('GET', '/user/playlist?pagesize=100', cookie);
+  const arr: Array<{ name: string; listid: number }> = list.body?.data?.info ?? [];
+  const found = arr.find((p) => (p.name || '').trim() === trimmed);
+
+  // 2) if found, delete it
+  if (found && found.listid) {
+    const del = await call('GET', `/playlist/del?listid=${found.listid}`, cookie);
+    if (del.body?.status !== 1) {
+      throw new Error(
+        `playlist/del failed: status=${del.status} body=${JSON.stringify(del.body)}`,
+      );
+    }
+  }
+
+  // 3) create fresh
+  const create = await call('GET', `/playlist/add?name=${encodeURIComponent(trimmed)}`, cookie);
+  const data = create.body?.data ?? {};
+  const info = data.info ?? {};
+  const newId =
+    info.listid ?? info.list_create_listid ?? data.listid ?? data.list_create_listid ?? 0;
+  if (create.body?.status !== 1 || !newId) {
+    throw new Error(
+      `playlist/add failed: status=${create.status} body=${JSON.stringify(create.body)}`,
+    );
+  }
+  return { listid: Number(newId), created: true };
+}
+
 export type { KugouSession };

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { Config } from '../types';
-import { resolvePlaylistByName } from '../kugouSession';
+import { resolvePlaylistByName, clearPlaylistByName } from '../kugouSession';
 import { toast } from 'sonner';
 import { saveConfig } from '../db';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle } from 'lucide-react';
+import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DouyinRoomInfo {
@@ -80,6 +80,25 @@ export function LeftPanel({
       const detail = String(e);
       toast.error(
         detail.includes('not logged in') ? '请先点酷狗图标扫码登录' : `解析失败: ${detail}`,
+      );
+    }
+  };
+
+  const handleClearPlaylist = async () => {
+    const name = config.target_playlist_name.trim();
+    if (!name) {
+      toast.error('请先填歌单名');
+      return;
+    }
+    try {
+      const { listid } = await clearPlaylistByName(name);
+      onConfigChange({ target_playlist_id: listid });
+      await saveConfig({ ...config, target_playlist_name: name, target_playlist_id: listid });
+      toast(`歌单已清空重建 (id: ${listid})`);
+    } catch (e) {
+      const detail = String(e);
+      toast.error(
+        detail.includes('not logged in') ? '请先点酷狗图标扫码登录' : `清理失败: ${detail}`,
       );
     }
   };
@@ -278,6 +297,16 @@ export function LeftPanel({
                   onClick={handleSavePlaylist}
                 >
                   保存
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 flex-1 border-red-400 text-red-500 hover:bg-red-50 hover:text-red-600"
+                  onClick={handleClearPlaylist}
+                  title="清空并重建歌单"
+                >
+                  <Trash2 className="size-3" />
+                  清理
                 </Button>
                 {config.target_playlist_id > 0 && (
                   <Button
