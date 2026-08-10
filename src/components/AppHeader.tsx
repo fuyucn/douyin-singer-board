@@ -9,6 +9,7 @@ import type { Theme } from '../theme';
 interface Props {
   theme: Theme;
   running: boolean;
+  kugouEnabled: boolean;
   kugouLoggedIn: boolean;
   onThemeChange: (t: Theme) => void;
   onShowKgLogin: () => void;
@@ -21,6 +22,7 @@ interface Props {
 export function AppHeader({
   theme,
   running,
+  kugouEnabled,
   kugouLoggedIn,
   onThemeChange,
   onShowKgLogin,
@@ -56,23 +58,25 @@ export function AppHeader({
         </Button>
 
         {/* Kugou login */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={onShowKgLogin}
-          title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
-        >
-          <img
-            src="/kugou.svg"
-            className={`block size-4 rounded-full object-contain ${kugouLoggedIn ? '' : 'opacity-80 grayscale'}`}
-            alt="KuGou"
-            draggable={false}
-          />
-        </Button>
+        {kugouEnabled && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={onShowKgLogin}
+            title={kugouLoggedIn ? '酷狗已登录' : '酷狗未登录'}
+          >
+            <img
+              src="/kugou.svg"
+              className={`block size-4 rounded-full object-contain ${kugouLoggedIn ? '' : 'opacity-80 grayscale'}`}
+              alt="KuGou"
+              draggable={false}
+            />
+          </Button>
+        )}
 
         {/* Settings / debug */}
-        {onShowKgDebug && (
+        {kugouEnabled && onShowKgDebug && (
           <Button
             variant="ghost"
             size="icon"

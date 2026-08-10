@@ -3,8 +3,8 @@ mod kugou;
 mod kugou_api;
 mod sidecar;
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_sql::{Migration, MigrationKind};
 use tauri_plugin_updater::UpdaterExt;
@@ -104,6 +104,22 @@ fn migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 7,
+            description: "config: kugou_enabled (master switch, default off)",
+            sql: "
+                ALTER TABLE config ADD COLUMN kugou_enabled INTEGER NOT NULL DEFAULT 0;
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "config: kugou_enabled default on for Kugou builds",
+            sql: "
+                UPDATE config SET kugou_enabled = 1 WHERE id = 1;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }
 
@@ -154,6 +170,36 @@ async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Resu
 #[tauri::command]
 fn relaunch_app(app: tauri::AppHandle) {
     app.restart();
+}
+
+/// Start or stop the embedded kugou-api process. Enabling also registers the
+/// child PID with the sidecar watchdog; disabling kills the process and
+/// clears the watchdog's companion PID.
+#[tauri::command]
+async fn kugou_set_enabled(
+    app: tauri::AppHandle,
+    enabled: bool,
+    kugou: tauri::State<'_, kugou_api::KugouApiState>,
+    sidecar: tauri::State<'_, sidecar::SidecarState>,
+) -> Result<(), String> {
+    if enabled {
+        kugou.spawn(app.clone()).await?;
+        if let Some(pid) = kugou.pid().await {
+            let cmd = serde_json::json!({ "cmd": "set_companion_pid", "pid": pid });
+            if let Err(e) = sidecar.send(cmd).await {
+                eprintln!("[tauri] set_companion_pid failed: {e}");
+            }
+        }
+        kugou.set_enabled(true);
+    } else {
+        kugou.set_enabled(false);
+        kugou.kill().await;
+        let cmd = serde_json::json!({ "cmd": "set_companion_pid" });
+        if let Err(e) = sidecar.send(cmd).await {
+            eprintln!("[tauri] clear companion pid failed: {e}");
+        }
+    }
+    Ok(())
 }
 
 /// Download the new portable exe into the same directory as the current exe,
@@ -239,23 +285,6 @@ pub fn run() {
             let kugou_api_handle = Arc::new(kugou_api::KugouApiHandle::new());
             app.manage(kugou_api_handle.clone());
 
-            let app_handle_kg = app.handle().clone();
-            let kugou_spawn = kugou_api_handle.clone();
-            let handle_notify = handle.clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = kugou_spawn.spawn(app_handle_kg.clone()).await {
-                    eprintln!("[tauri] kugou-api spawn failed: {}", e);
-                    return;
-                }
-                // Tell sidecar the kugou-api pid so it can kill it on watchdog exit.
-                if let Some(pid) = kugou_api::get_pid() {
-                    let cmd = serde_json::json!({ "cmd": "set_companion_pid", "pid": pid });
-                    if let Err(e) = handle_notify.send(cmd).await {
-                        eprintln!("[tauri] set_companion_pid failed: {e}");
-                    }
-                }
-            });
-
             // Kill all child processes when the main window is destroyed.
             // Covers Alt+F4, taskbar close, OS shutdown on Windows where
             // kill_on_drop is unreliable.
@@ -306,6 +335,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             sidecar::sidecar_send,
             sidecar::sidecar_respawn,
+            kugou_set_enabled,
             kugou::kugou_search,
             kugou_api::kugou_api_request,
             douyin::douyin_room_info,

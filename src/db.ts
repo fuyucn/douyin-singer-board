@@ -70,7 +70,7 @@ export async function loadConfig(): Promise<Config> {
   const db = await getDb();
   const rows = await db.select<Config[]>(
     `SELECT room_id, sing_prefix, fans_level, sing_cd, cooldown_seconds,
-            max_songs_per_user, target_playlist_name, target_playlist_id
+            max_songs_per_user, target_playlist_name, target_playlist_id, kugou_enabled
      FROM config WHERE id = 1`,
   );
   if (rows.length === 0) {
@@ -85,9 +85,11 @@ export async function loadConfig(): Promise<Config> {
       max_songs_per_user: 3,
       target_playlist_name: '',
       target_playlist_id: 0,
+      kugou_enabled: true,
     };
   }
-  return rows[0];
+  const row = rows[0];
+  return { ...row, kugou_enabled: Boolean(row.kugou_enabled) };
 }
 
 export async function saveConfig(cfg: Config): Promise<void> {
@@ -95,7 +97,8 @@ export async function saveConfig(cfg: Config): Promise<void> {
   await db.execute(
     `UPDATE config SET room_id = $1, sing_prefix = $2, fans_level = $3, sing_cd = $4,
                        cooldown_seconds = $5, max_songs_per_user = $6,
-                       target_playlist_name = $7, target_playlist_id = $8
+                       target_playlist_name = $7, target_playlist_id = $8,
+                       kugou_enabled = $9
      WHERE id = 1`,
     [
       cfg.room_id,
@@ -106,6 +109,7 @@ export async function saveConfig(cfg: Config): Promise<void> {
       cfg.max_songs_per_user ?? 3,
       cfg.target_playlist_name ?? '',
       cfg.target_playlist_id ?? 0,
+      cfg.kugou_enabled ? 1 : 0,
     ],
   );
 }

@@ -1,6 +1,7 @@
 import { Cross2Icon } from '@radix-ui/react-icons';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { invoke } from '@tauri-apps/api/core';
 import {
   CURRENT_VERSION,
   openInBrowser,
@@ -17,16 +18,22 @@ import {
 } from './telemetry';
 import { Switch } from './components/ui/switch';
 import { useShowLogs } from './hooks/useShowLogs';
+import { saveConfig } from './db';
+import { useAppStore } from './store';
 
 interface Props {
   onClose: () => void;
 }
 
 export function AboutModal({ onClose }: Props) {
+  const config = useAppStore((s) => s.config);
+  const setConfig = useAppStore((s) => s.setConfig);
+  const setAutoSync = useAppStore((s) => s.setAutoSync);
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
   const [telemetryOn, setTelemetryOn] = useState(false);
   const [showLogs, setShowLogs] = useShowLogs();
+  const [kugouBusy, setKugouBusy] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -81,6 +88,22 @@ export function AboutModal({ onClose }: Props) {
     clearSkippedVersion();
     setSkipped(null);
     toast('已重置跳过记录');
+  };
+
+  const onToggleKugou = async (next: boolean) => {
+    if (kugouBusy) return;
+    setKugouBusy(true);
+    try {
+      await invoke('kugou_set_enabled', { enabled: next });
+      setConfig({ kugou_enabled: next });
+      if (!next) setAutoSync(false);
+      await saveConfig({ ...config, kugou_enabled: next });
+      toast.success(next ? '已启用 Kugou 功能' : '已关闭 Kugou 功能');
+    } catch (e) {
+      toast.error(`Kugou 功能切换失败: ${e}`);
+    } finally {
+      setKugouBusy(false);
+    }
   };
 
   return (
@@ -164,6 +187,23 @@ export function AboutModal({ onClose }: Props) {
                 </div>
               </div>
               <Switch checked={showLogs} onCheckedChange={setShowLogs} />
+            </div>
+          </div>
+
+          {/* Kugou feature toggle */}
+          <div className="border-border-soft mt-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-fg-base text-sm font-medium">Kugou 功能</div>
+                <div className="text-fg-muted text-[11px] leading-snug">
+                  启用酷狗登录、搜索与歌单同步服务。
+                </div>
+              </div>
+              <Switch
+                checked={config.kugou_enabled}
+                disabled={kugouBusy}
+                onCheckedChange={onToggleKugou}
+              />
             </div>
           </div>
         </div>

@@ -22,6 +22,7 @@ interface DouyinRoomInfo {
 interface Props {
   config: Config;
   running: boolean;
+  kugouEnabled: boolean;
   autoSync: boolean;
   kugouLoggedIn: boolean;
   manualText: string;
@@ -36,6 +37,7 @@ interface Props {
 export function LeftPanel({
   config,
   running,
+  kugouEnabled,
   autoSync,
   kugouLoggedIn,
   manualText,
@@ -66,6 +68,7 @@ export function LeftPanel({
   }, [config.room_id]);
 
   const handleClearPlaylist = async () => {
+    if (!kugouEnabled) return;
     const name = config.target_playlist_name.trim();
     if (!name) {
       toast.error('请先填歌单名');
@@ -248,7 +251,7 @@ export function LeftPanel({
       </div>
 
       {/* Kugou歌单 — 仅登录后显示 */}
-      {kugouLoggedIn && (
+      {kugouEnabled && kugouLoggedIn && (
         <>
           <Separator className="bg-[var(--border-soft)]" />
           <div className="p-4">

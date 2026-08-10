@@ -201,8 +201,9 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
         else log('warn', 'reload_config before start, ignored');
         break;
       case 'set_companion_pid':
-        companionPid = cmd.pid;
-        log('info', `companion pid set: ${cmd.pid}`);
+        companionPid = cmd.pid ?? null;
+        if (cmd.pid) log('info', `companion pid set: ${cmd.pid}`);
+        else log('info', 'companion pid cleared');
         break;
     }
   } catch (e) {
@@ -222,7 +223,7 @@ function shutdown(reason: string): void {
   } catch {
     /* stdout may be gone if the parent already died */
   }
-  if (companionPid !== null) {
+  if (companionPid) {
     try {
       if (process.platform === 'win32') {
         // eslint-disable-next-line @typescript-eslint/no-require-imports

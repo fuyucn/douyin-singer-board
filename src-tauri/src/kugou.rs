@@ -5,6 +5,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::kugou_api::KugouApiState;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct KuGouSong {
     pub filename: String,
@@ -42,7 +44,14 @@ fn pick(top: &Value, keys: &[&str]) -> String {
 }
 
 #[tauri::command]
-pub async fn kugou_search(keyword: String) -> Result<Option<KuGouSong>, String> {
+pub async fn kugou_search(
+    state: tauri::State<'_, KugouApiState>,
+    keyword: String,
+) -> Result<Option<KuGouSong>, String> {
+    if !state.is_enabled() {
+        return Err("Kugou features are disabled".to_string());
+    }
+
     let kw = keyword.trim();
     if kw.is_empty() {
         return Ok(None);

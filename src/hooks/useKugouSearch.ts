@@ -7,17 +7,29 @@ interface Options {
   played: DanmuInfo[];
   kugouLoggedIn: boolean;
   preferCumulative: boolean;
+  enabled: boolean;
 }
 
 /**
  * Pre-fetches KuGou search results for every unique song name in songs+played.
  * Caches results by song name; never re-fetches the same name.
  */
-export function useKugouSearch({ songs, played, kugouLoggedIn, preferCumulative }: Options) {
+export function useKugouSearch({
+  songs,
+  played,
+  kugouLoggedIn,
+  preferCumulative,
+  enabled,
+}: Options) {
   const [cache, setCache] = useState<Record<string, KuGouEntry>>({});
   const startedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!enabled) {
+      setCache({});
+      startedRef.current.clear();
+      return;
+    }
     if (!kugouLoggedIn) return;
     const search = preferCumulative ? searchKuGouPreferredHit : searchKuGouTopHit;
 
@@ -38,7 +50,7 @@ export function useKugouSearch({ songs, played, kugouLoggedIn, preferCumulative 
           setCache((prev) => ({ ...prev, [name]: { status: 'error', msg: String(err) } }));
         });
     }
-  }, [songs, played, kugouLoggedIn, preferCumulative]);
+  }, [songs, played, kugouLoggedIn, preferCumulative, enabled]);
 
   return cache;
 }

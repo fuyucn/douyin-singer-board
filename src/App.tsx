@@ -140,11 +140,15 @@ export default function App() {
   const windowWidth = useWindowWidth();
   const isNarrow = windowWidth < 720;
 
-  const kugouLoggedIn = useKugouAuth({ watchTokens: [showKgDebug, showKgLogin] });
+  const kugouEnabled = config.kugou_enabled;
+  const kugouLoggedIn = useKugouAuth({
+    watchTokens: [showKgDebug, showKgLogin],
+    enabled: kugouEnabled,
+  });
 
   useEffect(() => {
-    if (kugouLoggedIn) setStartupStep('kugou', 'done');
-  }, [kugouLoggedIn, setStartupStep]);
+    if (kugouEnabled && kugouLoggedIn) setStartupStep('kugou', 'done');
+  }, [kugouEnabled, kugouLoggedIn, setStartupStep]);
 
   // Show window after React mounts — avoids black-screen flash on macOS.
   useEffect(() => {
@@ -160,12 +164,17 @@ export default function App() {
   }, []);
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
+  const visibleStartupSteps = useMemo(
+    () => (kugouEnabled ? startupSteps : startupSteps.filter((s) => s.key !== 'kugou')),
+    [kugouEnabled, startupSteps],
+  );
 
   const kugouCache = useKugouSearch({
     songs: display,
     played,
     kugouLoggedIn,
     preferCumulative,
+    enabled: kugouEnabled,
   });
 
   // Enrich cache with blacklist status — single source of truth consumed by
@@ -194,13 +203,22 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        hydrateConfig(await loadConfig());
+        const cfg = await loadConfig();
+        hydrateConfig(cfg);
         configHydratedRef.current = true;
+        invoke('kugou_set_enabled', { enabled: cfg.kugou_enabled }).catch((e) =>
+          pushLog(`[kugou] set_enabled failed: ${e}`),
+        );
       } catch (e) {
         setBootError(`加载配置失败: ${e}`);
       }
     })();
-  }, [hydrateConfig]);
+  }, [hydrateConfig, pushLog]);
+
+  // A disabled Kugou feature must never leave auto-sync running.
+  useEffect(() => {
+    if (!kugouEnabled && autoSync) setAutoSync(false);
+  }, [kugouEnabled, autoSync, setAutoSync]);
 
   // Auto-save config 500ms after any change (skip before initial hydration)
   useEffect(() => {
@@ -318,6 +336,7 @@ export default function App() {
   };
 
   const onAddToPlaylist = async (track: KuGouTrack, song: DanmuInfo) => {
+    if (!kugouEnabled) return;
     if (!config.target_playlist_id) {
       toast.error('请先在"Kugou歌单"里保存一个歌单');
       return;
@@ -344,13 +363,16 @@ export default function App() {
     }
   };
 
-  const onAutoSynced = useCallback((kgTrack: KuGouTrack, song: DanmuInfo) => {
-    removeByMsgId(song.msg_id);
-    addPlayed(song);
-    deleteHistoryByMsgId(song.msg_id).catch(() => {});
-    toast(`[自动] 已加入歌单: ${kgTrack.filename}`);
-    track_('song_added_auto', { song_name: song.song_name });
-  }, [removeByMsgId, addPlayed]);
+  const onAutoSynced = useCallback(
+    (kgTrack: KuGouTrack, song: DanmuInfo) => {
+      removeByMsgId(song.msg_id);
+      addPlayed(song);
+      deleteHistoryByMsgId(song.msg_id).catch(() => {});
+      toast(`[自动] 已加入歌单: ${kgTrack.filename}`);
+      track_('song_added_auto', { song_name: song.song_name });
+    },
+    [removeByMsgId, addPlayed],
+  );
 
   // Per-user playlist-added counts drive the session limit (see lib/userQuota).
   const playedCountByUid = useMemo(() => countAddedByUid(played), [played]);
@@ -360,6 +382,7 @@ export default function App() {
   );
 
   useAutoSync({
+    enabled: kugouEnabled,
     autoSync,
     songs: display,
     kugouCache: enrichedCache,
@@ -372,6 +395,10 @@ export default function App() {
   });
 
   const handleAutoSyncToggle = useCallback(async () => {
+    if (!kugouEnabled) {
+      toast.error('Kugou 功能未开启');
+      return;
+    }
     if (autoSync) {
       setAutoSync(false);
       return;
@@ -392,7 +419,7 @@ export default function App() {
       if (!ok) return;
     }
     setAutoSync(true);
-  }, [autoSync, config]);
+  }, [autoSync, config, kugouEnabled]);
 
   // ─── Render helpers ───────────────────────────────────────────
 
@@ -417,7 +444,7 @@ export default function App() {
     }
     return (
       <div className="flex items-center gap-1">
-        {kugouLoggedIn && (
+        {kugouEnabled && kugouLoggedIn && (
           <Tooltip>
             <TooltipTrigger>
               <Button
@@ -513,34 +540,36 @@ export default function App() {
             }
           },
         },
-        ...(kgFound
-          ? [
-              {
-                label: `黑名单这首歌: ${kgFound.filename} - ${kgFound.singer_name}`,
-                onClick: () => {
-                  addBlacklistSong(kgFound.filename, kgFound.singer_name, ctxSong!.msg_id);
-                  toast(`已加入黑名单: ${kgFound.filename}`);
+        ...(kugouEnabled
+          ? kgFound
+            ? [
+                {
+                  label: `黑名单这首歌: ${kgFound.filename} - ${kgFound.singer_name}`,
+                  onClick: () => {
+                    addBlacklistSong(kgFound.filename, kgFound.singer_name, ctxSong!.msg_id);
+                    toast(`已加入黑名单: ${kgFound.filename}`);
+                  },
                 },
-              },
-              ...(kgFound.singer_name
-                ? [
-                    {
-                      label: `黑名单该歌手: ${kgFound.singer_name}`,
-                      onClick: () => {
-                        addBlacklistSinger(kgFound.singer_name);
-                        toast(`已加入黑名单歌手: ${kgFound.singer_name}`);
+                ...(kgFound.singer_name
+                  ? [
+                      {
+                        label: `黑名单该歌手: ${kgFound.singer_name}`,
+                        onClick: () => {
+                          addBlacklistSinger(kgFound.singer_name);
+                          toast(`已加入黑名单歌手: ${kgFound.singer_name}`);
+                        },
                       },
-                    },
-                  ]
-                : []),
-            ]
-          : [
-              {
-                label: '加入黑名单 (搜索中…)',
-                disabled: true,
-                onClick: () => {},
-              },
-            ]),
+                    ]
+                  : []),
+              ]
+            : [
+                {
+                  label: '加入黑名单 (搜索中…)',
+                  disabled: true,
+                  onClick: () => {},
+                },
+              ]
+          : []),
       ]
     : [];
 
@@ -553,6 +582,7 @@ export default function App() {
         <AppHeader
           theme={theme}
           running={running}
+          kugouEnabled={kugouEnabled}
           kugouLoggedIn={kugouLoggedIn}
           onThemeChange={(t) => {
             setTheme(t);
@@ -560,7 +590,11 @@ export default function App() {
           }}
           onShowKgLogin={() => setShowKgLogin(true)}
           onShowAbout={() => setShowAbout(true)}
-          onShowKgDebug={import.meta.env.DEV || import.meta.env.VITE_DEBUG ? () => setShowKgDebug(true) : undefined}
+          onShowKgDebug={
+            kugouEnabled && (import.meta.env.DEV || import.meta.env.VITE_DEBUG)
+              ? () => setShowKgDebug(true)
+              : undefined
+          }
           onStart={onStart}
           onStop={onStop}
         />
@@ -635,6 +669,7 @@ export default function App() {
               <LeftPanel
                 config={config}
                 running={running}
+                kugouEnabled={kugouEnabled}
                 autoSync={autoSync}
                 kugouLoggedIn={kugouLoggedIn}
                 manualText={manualText}
@@ -679,15 +714,16 @@ export default function App() {
             <LeftPanel
               config={config}
               running={running}
+              kugouEnabled={kugouEnabled}
               autoSync={autoSync}
               kugouLoggedIn={kugouLoggedIn}
               manualText={manualText}
               onConfigChange={setConfig}
               onManualTextChange={setManualText}
               onManualAdd={onManualAdd}
-               onAutoSyncToggle={handleAutoSyncToggle}
-               appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
-             />
+              onAutoSyncToggle={handleAutoSyncToggle}
+              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+            />
 
             <MainContent
               songs={display}
@@ -730,18 +766,13 @@ export default function App() {
         )}
 
         {/* Combined footer: startup checklist + live session stats */}
-        <SessionStats
-          songs={songs}
-          played={played}
-          running={running}
-          steps={startupSteps}
-        />
+        <SessionStats songs={songs} played={played} running={running} steps={visibleStartupSteps} />
 
         <Toaster position="bottom-right" richColors closeButton />
 
         {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
-        {showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
-        {showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
+        {kugouEnabled && showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
+        {kugouEnabled && showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
       </div>
     </TooltipProvider>
   );

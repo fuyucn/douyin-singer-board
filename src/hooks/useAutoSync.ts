@@ -3,6 +3,7 @@ import { addTrackToPlaylist, type KuGouTrack, type EnrichedEntry } from '../kugo
 import type { DanmuInfo } from '../types';
 
 interface Props {
+  enabled: boolean;
   autoSync: boolean;
   songs: DanmuInfo[];
   kugouCache: Record<string, EnrichedEntry>;
@@ -21,6 +22,7 @@ interface Props {
  *  Blacklisted entries are skipped (left in queue with red text) — the loop
  *  finds the first non-blocked 'found' song instead. */
 export function useAutoSync({
+  enabled,
   autoSync,
   songs,
   kugouCache,
@@ -46,7 +48,7 @@ export function useAutoSync({
   isOverLimitRef.current = isOverLimit;
 
   useEffect(() => {
-    if (!autoSync || !kugouLoggedIn || !targetPlaylistId) {
+    if (!enabled || !autoSync || !kugouLoggedIn || !targetPlaylistId) {
       if (timerRef.current !== null) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -141,5 +143,5 @@ export function useAutoSync({
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
     };
-  }, [autoSync, kugouLoggedIn, targetPlaylistId, onSynced, pushLog]);
+  }, [enabled, autoSync, kugouLoggedIn, targetPlaylistId, onSynced, pushLog]);
 }

@@ -23,6 +23,8 @@ export interface Config {
   max_songs_per_user: number;
   target_playlist_name: string;
   target_playlist_id: number;
+  /** When false, Kugou services and UI are fully disabled. */
+  kugou_enabled: boolean;
 }
 
 export const SidecarEventSchema = z.discriminatedUnion('event', [

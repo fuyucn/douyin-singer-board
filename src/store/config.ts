@@ -19,6 +19,7 @@ export const createConfigSlice: StateCreator<AppStore, [], [], ConfigSlice> = (s
     max_songs_per_user: 3,
     target_playlist_name: '',
     target_playlist_id: 0,
+    kugou_enabled: true,
   },
   setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
   hydrateConfig: (cfg) => set({ config: cfg }),

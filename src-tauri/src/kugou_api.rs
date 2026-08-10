@@ -3,33 +3,43 @@
 // `pnpm kugou-api:build:bin` and embedded at compile time. At first run we
 // extract it to the temp dir, pick a free local port, spawn it, and poll
 // until the Express server is accepting connections. Other Rust modules call
-// it via `http://127.0.0.1:<port>/...` through `kugou_api_url(path)`.
+// it via `http://127.0.0.1:<port>/...` through `KugouApiHandle::api_url()`.
 
+use process_wrap::tokio::*;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::{Mutex, OnceCell};
-use process_wrap::tokio::*;
+use tokio::sync::Mutex;
 
 const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api.bin"));
 
-static PORT: OnceCell<u16> = OnceCell::const_new();
-static PID: OnceCell<u32> = OnceCell::const_new();
-
-pub fn get_pid() -> Option<u32> {
-    PID.get().copied()
-}
-
 pub struct KugouApiHandle {
     child: Mutex<Option<Box<dyn ChildWrapper>>>,
+    port: Mutex<Option<u16>>,
+    pid: Mutex<Option<u32>>,
+    enabled: AtomicBool,
 }
 
 impl KugouApiHandle {
     pub fn new() -> Self {
-        Self { child: Mutex::new(None) }
+        Self {
+            child: Mutex::new(None),
+            port: Mutex::new(None),
+            pid: Mutex::new(None),
+            enabled: AtomicBool::new(false),
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.store(enabled, Ordering::SeqCst);
     }
 
     /// Explicitly kill the child process, then drop the wrapper.
@@ -44,6 +54,24 @@ impl KugouApiHandle {
                 child.wait(),
             )
             .await;
+        }
+        *self.port.lock().await = None;
+        *self.pid.lock().await = None;
+    }
+
+    pub async fn pid(&self) -> Option<u32> {
+        *self.pid.lock().await
+    }
+
+    /// Returns the base URL of the running kugou-api server, or an error if
+    /// it is not currently running.
+    pub async fn api_url(&self, path: &str) -> Result<String, String> {
+        let port = *self.port.lock().await;
+        let port = port.ok_or_else(|| "kugou-api not running".to_string())?;
+        if path.starts_with('/') {
+            Ok(format!("http://127.0.0.1:{port}{path}"))
+        } else {
+            Ok(format!("http://127.0.0.1:{port}/{path}"))
         }
     }
 
@@ -120,7 +148,7 @@ impl KugouApiHandle {
     }
 
     pub async fn spawn(&self, app: AppHandle) -> Result<(), String> {
-        if PORT.initialized() {
+        if self.port.lock().await.is_some() {
             return Ok(());
         }
 
@@ -164,7 +192,7 @@ impl KugouApiHandle {
             .map_err(|e| format!("spawn {}: {e}", path.display()))?;
 
         if let Some(pid) = child.id() {
-            let _ = PID.set(pid);
+            *self.pid.lock().await = Some(pid);
         }
         let stdout = child.stdout().take().ok_or("no stdout")?;
         let stderr = child.stderr().take().ok_or("no stderr")?;
@@ -203,30 +231,27 @@ impl KugouApiHandle {
             .build()
             .map_err(|e| format!("client: {e}"))?;
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let mut ready = false;
         loop {
             if std::time::Instant::now() > deadline {
-                return Err("kugou-api did not become ready within 15s".into());
+                break;
             }
             match client.get(&url).send().await {
-                Ok(_) => break,
+                Ok(_) => {
+                    ready = true;
+                    break;
+                }
                 Err(_) => tokio::time::sleep(std::time::Duration::from_millis(200)).await,
             }
         }
+        if !ready {
+            self.kill().await;
+            return Err("kugou-api did not become ready within 15s".into());
+        }
 
-        PORT.set(port).map_err(|_| "PORT already set".to_string())?;
+        *self.port.lock().await = Some(port);
         log_to_ui(&app, "info", &format!("kugou-api ready on :{port}"));
         Ok(())
-    }
-}
-
-/// Returns the base URL of the running kugou-api server, or an error if it's
-/// not yet ready. Other Rust modules build their request URLs from this.
-pub fn kugou_api_url(path: &str) -> Result<String, String> {
-    let port = PORT.get().ok_or("kugou-api not ready yet".to_string())?;
-    if path.starts_with('/') {
-        Ok(format!("http://127.0.0.1:{port}{path}"))
-    } else {
-        Ok(format!("http://127.0.0.1:{port}/{path}"))
     }
 }
 
@@ -322,11 +347,16 @@ fn sanitize_cookie(raw: &str) -> String {
 
 #[tauri::command]
 pub async fn kugou_api_request(
+    state: tauri::State<'_, KugouApiState>,
     method: String,
     path: String,
     cookie: Option<String>,
     body: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
+    if !state.is_enabled() {
+        return Err("Kugou features are disabled".to_string());
+    }
+
     // KuGouMusicApi's documented way to pass cookies for non-browser clients
     // is the `?cookie=token=X;userid=Y;dfid=Z` query string. Its HTTP Cookie
     // header parser in server.js requires `;\s+` to split entries (i.e. a
@@ -358,7 +388,7 @@ pub async fn kugou_api_request(
         None => path.clone(),
     };
 
-    let url = kugou_api_url(&path_with_cookie)?;
+    let url = state.api_url(&path_with_cookie).await?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()
