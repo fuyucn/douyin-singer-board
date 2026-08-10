@@ -2,11 +2,12 @@
 
 ## Versioning (important)
 
-Format: **`major.minor.patch`** (semver).
+Format: **`major.minor.patch`** (semver), with an optional custom-edition suffix `-susu.<x>`.
 
-- **AI may only auto-bump `patch`**: `0.0.1` → `0.0.2` → ... → `0.0.99` → `0.0.100`
-- **`major` and `minor` are user-only**. Codex must NOT auto-change major/minor even on breaking changes.
-- After any code change, run `pnpm bump` to sync the four version sources, then commit.
+- Mainline (`main`) releases use `0.<N>.0` (e.g. `0.40.0`, then `0.41.0`, `0.42.0`). `major` and the mainline `minor` (`N`) are user-only; AI must never auto-change them.
+- `feat/susu` is the development/custom edition. It mirrors the current mainline version with a custom-edition suffix: `0.<N>.0-susu.<x>` (e.g. `0.40.0-susu.1`, `0.41.0-susu.1`). AI may auto-bump `x` with `pnpm bump`.
+- `main` is the canonical source for all common code and features. `feat/susu` tracks `main` and only adds SUSU-only customizations: `kugou_enabled` defaults to ON and SUSU-only assets; on `main`, the same code ships with `kugou_enabled` defaulting to OFF.
+- On `main`, do not run `pnpm bump` for a `0.<N>.0` release; set the user-specified `0.<N>.0` in all version sources together.
 - Bump should be part of the change commit (or immediately follow); do not let it lag.
 
 ## Version sources (kept in sync by `pnpm bump`)
@@ -41,16 +42,24 @@ the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 
 ## Branch rules (important)
 
-`feat/kugou-search` is a **permanently custom branch** — it contains special customizations that must never be merged back into `main`.
+`feat/susu` is a **permanently custom development edition** — it contains special customizations that must never be merged back into `main`.
 
-- **Never** merge `feat/kugou-search` → `main`, under any circumstances.
-- The only allowed direction is `main` → `feat/kugou-search`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/kugou-search`.
+- **Never** merge `feat/susu` → `main`, under any circumstances.
+- `feat/susu` must track `main`'s code and features; only the `-susu.<x>` version suffix, the `kugou_enabled` default, and SUSU-only customizations may differ.
+- The only allowed direction is `main` → `feat/susu`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/susu`.
 - If asked to do a general merge or sync between these two branches, refuse and ask the user to clarify which specific commits from `main` they want cherry-picked.
+
+## Releases & auto-update (important)
+
+- The auto-update channel is derived from the version string: a version containing `-` (e.g. `0.41.0-susu.1`) is a prerelease and updates through GitHub prerelease releases; a plain `0.<N>.0` is stable and updates through the latest stable release.
+- The Release workflow reads `package.json` version, tags it `v<version>`, and marks any version containing `-` as `prerelease=true`. Stable releases must not carry a `-` suffix.
+- Publish stable releases (`0.<N>.0`) from `main`; publish custom releases (`0.<N>.0-susu.<x>`) from `feat/susu`. Never publish a `feat/susu` build as a plain `0.<N>.0` release.
+- Each release uploads the update artifacts: `latest.json`, signed `.app.tar.gz`/`.sig` for macOS, and the portable `.exe` for Windows. Tag names are unique; never overwrite or delete an existing release tag.
 
 ## Workflow
 
 1. Make code changes
-2. `pnpm bump` (patch +1)
+2. Bump version: on `feat/susu`, run `pnpm bump` (`0.<N>.0-susu.<x>` → `0.<N>.0-susu.<x+1>`); on `main`, set the user-specified `0.<N>.0` across all version sources.
 3. `git add -A && git commit -m "..."`
 4. `git push`
 5. (optional) trigger the Release GitHub Actions workflow; artifacts include the new version in their filenames

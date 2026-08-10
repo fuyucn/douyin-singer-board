@@ -17,7 +17,10 @@ const targets = [
 ];
 
 function bumpPatch(v) {
-  // Preserve the branch suffix when present: 0.0.30-24 -> 0.0.30-25.
+  // Custom susu edition: 0.41.0-susu.1 -> 0.41.0-susu.2.
+  const susu = /^(\d+\.\d+\.\d+)-susu\.(\d+)$/.exec(v);
+  if (susu) return `${susu[1]}-susu.${Number(susu[2]) + 1}`;
+  // Preserve a legacy numeric branch suffix when present: 0.0.30-24 -> 0.0.30-25.
   const suffixed = /^(\d+\.\d+\.\d+)-(\d+)$/.exec(v);
   if (suffixed) return `${suffixed[1]}-${Number(suffixed[2]) + 1}`;
   const plain = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
