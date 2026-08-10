@@ -49,6 +49,13 @@ the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 - The only allowed direction is `main` → `feat/susu`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/susu`.
 - If asked to do a general merge or sync between these two branches, refuse and ask the user to clarify which specific commits from `main` they want cherry-picked.
 
+## Releases & auto-update (important)
+
+- The auto-update channel is derived from the version string: a version containing `-` (e.g. `0.41.0-susu.1`) is a prerelease and updates through GitHub prerelease releases; a plain `0.<N>.0` is stable and updates through the latest stable release.
+- The Release workflow reads `package.json` version, tags it `v<version>`, and marks any version containing `-` as `prerelease=true`. Stable releases must not carry a `-` suffix.
+- Publish stable releases (`0.<N>.0`) from `main`; publish custom releases (`0.<N>.0-susu.<x>`) from `feat/susu`. Never publish a `feat/susu` build as a plain `0.<N>.0` release.
+- Each release uploads the update artifacts: `latest.json`, signed `.app.tar.gz`/`.sig` for macOS, and the portable `.exe` for Windows. Tag names are unique; never overwrite or delete an existing release tag.
+
 ## Workflow
 
 1. Make code changes

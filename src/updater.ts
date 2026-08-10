@@ -32,7 +32,7 @@ export interface DownloadProgress {
 }
 
 export interface DiagEntry {
-  ts: string;      // HH:mm:ss.ms
+  ts: string; // HH:mm:ss.ms
   version: string; // running app version
   msg: string;
 }
@@ -48,7 +48,6 @@ export const CURRENT_VERSION: string = __APP_VERSION__;
 /** True when the OS is Windows (any distribution). */
 export const isWindows = (): boolean =>
   typeof navigator !== 'undefined' && /Win/i.test(navigator.platform);
-
 
 const isPrerelease = (v: string): boolean => v.includes('-');
 
@@ -122,7 +121,6 @@ async function resolveManifestUrl(tag: string): Promise<string> {
     return fallback;
   }
 }
-
 
 /** Resolve the Windows portable exe download URL via the GitHub API. */
 async function resolveWindowsExeUrl(tag: string): Promise<string> {
@@ -204,8 +202,6 @@ export async function relaunchApp(): Promise<void> {
   await invoke('relaunch_app');
 }
 
-
-
 export function skipVersion(tag: string): void {
   if (typeof localStorage === 'undefined' || !tag) return;
   localStorage.setItem(SKIP_KEY, tag);
@@ -231,9 +227,16 @@ export function compareFullSemver(a: string, b: string): number {
   const [baseB, preB] = b.split('-');
   const cmp = compareSemver(baseA, baseB);
   if (cmp !== 0) return cmp;
-  const nA = preA !== undefined ? parseInt(preA, 10) || 0 : -1;
-  const nB = preB !== undefined ? parseInt(preB, 10) || 0 : -1;
+  const nA = preA !== undefined ? prereleaseNumber(preA) : -1;
+  const nB = preB !== undefined ? prereleaseNumber(preB) : -1;
   return nA - nB;
+}
+
+/** Numeric order for prerelease suffixes; susu custom builds use `susu.<x>`. */
+function prereleaseNumber(pre: string): number {
+  const susu = /^susu\.(\d+)$/.exec(pre);
+  if (susu) return Number(susu[1]);
+  return parseInt(pre, 10) || 0;
 }
 
 function compareSemver(a: string, b: string): number {
