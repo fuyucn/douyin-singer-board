@@ -5,9 +5,17 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-set-theme",
     "core:event:default",
     "shell:allow-execute",
-    "shell:allow-open",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "url": "^https?://" },
+        { "url": "^kugou://" },
+        { "url": "^mackugou://" }
+      ]
+    },
     "sql:default",
     "sql:allow-load",
     "sql:allow-execute",
@@ -15,6 +23,8 @@
     {
       "identifier": "sql:allow-load",
       "allow": [{ "name": "sqlite:sususongboard.db" }]
-    }
+    },
+    "updater:default",
+    "process:allow-restart"
   ]
 }

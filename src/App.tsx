@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useAppStore, dedupedSongs } from './store';
+import { countAddedByUid, isOverUserLimit } from './lib/userQuota';
+import { useShallow } from 'zustand/react/shallow';
 import {
   loadConfig,
   saveConfig,
@@ -9,90 +10,224 @@ import {
   deleteHistoryByMsgId,
   clearSessionHistory,
 } from './db';
-import type { DanmuInfo, SidecarEvent } from './types';
-import { checkForUpdate, openInBrowser, skipVersion, type UpdateInfo } from './updater';
-import { CircleBackslashIcon, InfoCircledIcon, MoonIcon, SunIcon } from '@radix-ui/react-icons';
-import { AboutModal } from './AboutModal';
-import { applyTheme, loadTheme, nextTheme, saveTheme, themeLabel, type Theme } from './theme';
+import type { DanmuInfo } from './types';
+import {
+  checkForUpdate,
+  installAppUpdate,
+  relaunchApp,
+  isWindows,
+  skipVersion,
+  type DownloadProgress,
+  type UpdateInfo,
+} from './updater';
+import { Button } from '@/components/ui/button';
 
+import { Copy, Trash2, ListPlus, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { AboutModal } from './AboutModal';
+import { KugouDebugModal } from './KugouDebugModal';
+import { KugouLoginModal } from './KugouLoginModal';
+import { applyTheme, loadTheme, type Theme } from './theme';
+import {
+  addTrackToPlaylist,
+  resolvePlaylistByName,
+  type KuGouTrack,
+  type EnrichedEntry,
+} from './kugouSession';
+import { useAutoSync } from './hooks/useAutoSync';
 import { useBlacklist } from './hooks/useBlacklist';
 import { useContextMenu } from './hooks/useContextMenu';
-import { SongList } from './components/SongList';
-import { BlacklistPanel } from './components/BlacklistPanel';
+import { useKugouAuth } from './hooks/useKugouAuth';
+import { useKugouSearch } from './hooks/useKugouSearch';
+import { useSidecarEvents } from './hooks/useSidecarEvents';
+import { useSidecarRecovery } from './hooks/useSidecarRecovery';
+import { track as track_, pruneOldEvents } from './telemetry';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { ContextMenu } from './components/ContextMenu';
-import { AppLogo } from './components/AppLogo';
-import { ConnectionStatus } from './components/ConnectionStatus';
+import { SessionStats } from './components/SessionStats';
+import { AppHeader } from './components/AppHeader';
+import { LeftPanel } from './components/LeftPanel';
+import { MainContent } from './components/MainContent';
+import { CollapsiblePanel } from './components/CollapsiblePanel';
+import { useWindowWidth } from './hooks/useWindowWidth';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
-function ThemeIcon({ theme }: { theme: Theme }) {
-  if (theme === 'light') return <SunIcon />;
-  if (theme === 'dark') return <MoonIcon />;
-  return <CircleBackslashIcon />;
-}
-
-// shared button styles
-const btnBase =
-  'py-1.5 px-3.5 border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer hover:bg-bg-soft disabled:opacity-40 disabled:cursor-not-allowed';
-const btnAction =
-  'px-2.5 py-1 text-xs border border-border-strong rounded bg-bg-elev text-fg-base cursor-pointer hover:bg-bg-soft';
+declare const __APP_VERSION__: string;
 
 export default function App() {
-  const config = useAppStore((s) => s.config);
-  const setConfig = useAppStore((s) => s.setConfig);
-  const hydrateConfig = useAppStore((s) => s.hydrateConfig);
-  const running = useAppStore((s) => s.running);
-  const setRunning = useAppStore((s) => s.setRunning);
-  const sessionId = useAppStore((s) => s.sessionId);
-  const newSession = useAppStore((s) => s.newSession);
-  const setStatus = useAppStore((s) => s.setStatus);
-  const songs = useAppStore((s) => s.songs);
-  const addSong = useAppStore((s) => s.addSong);
-  const cancelByUid = useAppStore((s) => s.cancelByUid);
-  const removeByMsgId = useAppStore((s) => s.removeByMsgId);
-  const clearSongs = useAppStore((s) => s.clearSongs);
-  const manualAdd = useAppStore((s) => s.manualAdd);
-  const logs = useAppStore((s) => s.logs);
-  const pushLog = useAppStore((s) => s.pushLog);
-  const played = useAppStore((s) => s.played);
-  const addPlayed = useAppStore((s) => s.addPlayed);
-  const clearPlayed = useAppStore((s) => s.clearPlayed);
+  const {
+    config,
+    setConfig,
+    hydrateConfig,
+    running,
+    setRunning,
+    sessionId,
+    newSession,
+    setStatus,
+    songs,
+    removeByMsgId,
+    clearSongs,
+    manualAdd,
+    logs,
+    pushLog,
+    clearLogs,
+    preferCumulative,
+    autoSync,
+    setAutoSync,
+    played,
+    addPlayed,
+    removePlayed,
+    clearPlayed,
+    isInCooldown,
+    cooldownRemainingSeconds,
+    startupSteps,
+    setStartupStep,
+    resetStartupSteps,
+  } = useAppStore(
+    useShallow((s) => ({
+      config: s.config,
+      setConfig: s.setConfig,
+      hydrateConfig: s.hydrateConfig,
+      running: s.running,
+      setRunning: s.setRunning,
+      sessionId: s.sessionId,
+      newSession: s.newSession,
+      setStatus: s.setStatus,
+      songs: s.songs,
+      removeByMsgId: s.removeByMsgId,
+      clearSongs: s.clearSongs,
+      manualAdd: s.manualAdd,
+      logs: s.logs,
+      pushLog: s.pushLog,
+      clearLogs: s.clearLogs,
+      preferCumulative: s.preferCumulative,
+      autoSync: s.autoSync,
+      setAutoSync: s.setAutoSync,
+      played: s.played,
+      addPlayed: s.addPlayed,
+      removePlayed: s.removePlayed,
+      clearPlayed: s.clearPlayed,
+      isInCooldown: s.isInCooldown,
+      cooldownRemainingSeconds: s.cooldownRemainingSeconds,
+      startupSteps: s.startupSteps,
+      setStartupStep: s.setStartupStep,
+      resetStartupSteps: s.resetStartupSteps,
+    })),
+  );
 
   const {
     blacklist,
-    add: addBlacklist,
+    checkTrack,
+    addSong: addBlacklistSong,
+    addSinger: addBlacklistSinger,
     remove: removeBlacklist,
-    getNames: getBlacklistNames,
+    syncSidecar: syncBlacklist,
   } = useBlacklist();
   const { ctxMenu, open: openCtxMenu, close: closeCtxMenu } = useContextMenu();
 
   const [manualText, setManualText] = useState('');
   const [bootError, setBootError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; kind: 'success' | 'error' } | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'downloading' | 'ready'>('idle');
+  const [dlProgress, setDlProgress] = useState<DownloadProgress | null>(null);
   const [showAbout, setShowAbout] = useState(false);
+  const [showKgDebug, setShowKgDebug] = useState(false);
+  const [showKgLogin, setShowKgLogin] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
+
+  const windowWidth = useWindowWidth();
+  const isNarrow = windowWidth < 720;
+
+  const kugouEnabled = config.kugou_enabled;
+  const kugouLoggedIn = useKugouAuth({
+    watchTokens: [showKgDebug, showKgLogin],
+    enabled: kugouEnabled,
+  });
+
+  useEffect(() => {
+    if (kugouEnabled && kugouLoggedIn) setStartupStep('kugou', 'done');
+  }, [kugouEnabled, kugouLoggedIn, setStartupStep]);
+
+  // Show window after React mounts — avoids black-screen flash on macOS.
+  useEffect(() => {
+    invoke('show_window').catch(() => {});
+  }, []);
+
+  // Remove splash screen after first render.
+  useEffect(() => {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    splash.style.opacity = '0';
+    setTimeout(() => splash.remove(), 200);
+  }, []);
+
+  const display = useMemo(() => dedupedSongs(songs), [songs]);
+  const visibleStartupSteps = useMemo(
+    () => (kugouEnabled ? startupSteps : startupSteps.filter((s) => s.key !== 'kugou')),
+    [kugouEnabled, startupSteps],
+  );
+
+  const kugouCache = useKugouSearch({
+    songs: display,
+    played,
+    kugouLoggedIn,
+    preferCumulative,
+    enabled: kugouEnabled,
+  });
+
+  // Enrich cache with blacklist status — single source of truth consumed by
+  // both UI (red text) and auto-sync (skip decision).
+  const enrichedCache = useMemo<Record<string, EnrichedEntry>>(() => {
+    const result: Record<string, EnrichedEntry> = {};
+    for (const [name, entry] of Object.entries(kugouCache)) {
+      if (entry.status === 'found') {
+        result[name] = { ...entry, blockedReason: checkTrack(entry.track) };
+      } else {
+        result[name] = entry;
+      }
+    }
+    return result;
+  }, [kugouCache, checkTrack]);
+
+  useSidecarEvents({ onReconnect: syncBlacklist });
+  useSidecarRecovery({ syncBlacklist });
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
-  const showToast = (msg: string, kind: 'success' | 'error' = 'success') => {
-    setToast({ msg, kind });
-    window.setTimeout(() => setToast(null), 1600);
-  };
-
-  const display = useMemo(() => dedupedSongs(songs), [songs]);
-
-  // Startup: config
+  // Startup: load config
+  const configHydratedRef = useRef(false);
   useEffect(() => {
     (async () => {
       try {
-        hydrateConfig(await loadConfig());
+        const cfg = await loadConfig();
+        hydrateConfig(cfg);
+        configHydratedRef.current = true;
+        invoke('kugou_set_enabled', { enabled: cfg.kugou_enabled }).catch((e) =>
+          pushLog(`[kugou] set_enabled failed: ${e}`),
+        );
       } catch (e) {
         setBootError(`加载配置失败: ${e}`);
       }
     })();
-  }, [hydrateConfig]);
+  }, [hydrateConfig, pushLog]);
+
+  // A disabled Kugou feature must never leave auto-sync running.
+  useEffect(() => {
+    if (!kugouEnabled && autoSync) setAutoSync(false);
+  }, [kugouEnabled, autoSync, setAutoSync]);
+
+  // Auto-save config 500ms after any change (skip before initial hydration)
+  useEffect(() => {
+    if (!configHydratedRef.current) return;
+    const timer = window.setTimeout(() => {
+      saveConfig(config).catch((e) => console.error('[config] auto-save failed:', e));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [config]);
 
   // Startup: update check
   useEffect(() => {
@@ -101,34 +236,32 @@ export default function App() {
     });
   }, []);
 
-  // Sidecar events
+  // Download + install update, then prompt restart
+  const handleInstallUpdate = useCallback(async () => {
+    if (!update || updatePhase !== 'idle') return;
+    setUpdatePhase('downloading');
+    setDlProgress(null);
+    try {
+      await installAppUpdate(
+        update.tag,
+        (p) => setDlProgress(p),
+        (e) => pushLog(`[updater] ${e.ts} v${e.version}  ${e.msg}`),
+      );
+      setUpdatePhase('ready');
+    } catch (e) {
+      console.error('[updater] install failed:', e);
+      setUpdatePhase('idle');
+      toast.error(`更新失败: ${String(e)}`);
+    }
+  }, [update, updatePhase]);
+
+  // Telemetry: app_launched + prune old events
   useEffect(() => {
-    const unlisten = listen<SidecarEvent>('sidecar-event', (e) => {
-      const ev = e.payload;
-      switch (ev.event) {
-        case 'danmu':
-          if (blacklist.has(ev.data.song_name)) break;
-          addSong(ev.data);
-          if (sessionId) insertHistory(ev.data, sessionId).catch((err) => pushLog(`db: ${err}`));
-          break;
-        case 'cancel':
-          cancelByUid(ev.uid);
-          break;
-        case 'status':
-          setStatus({ connected: ev.connected, message: ev.message });
-          break;
-        case 'log':
-          pushLog(`[${ev.level}] ${ev.msg}`);
-          break;
-        case 'error':
-          pushLog(`[error] ${ev.msg}`);
-          break;
-      }
+    track_('app_launched', {
+      version: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0',
     });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [addSong, cancelByUid, setStatus, pushLog, sessionId, blacklist]);
+    pruneOldEvents();
+  }, []);
 
   const onStart = async () => {
     pushLog('[app] start clicked');
@@ -137,19 +270,23 @@ export default function App() {
       return;
     }
     setBootError(null);
+    resetStartupSteps();
+    setRunning(true);
     try {
       await saveConfig(config);
       const sid = newSession();
       clearSongs();
       clearPlayed();
       await clearSessionHistory(sid).catch(() => {});
-      const blNames = await getBlacklistNames();
+      const blNames = blacklist
+        .filter((e) => e.entryType === 'song' && e.songName)
+        .map((e) => e.songName);
       await invoke('sidecar_send', {
         cmd: { cmd: 'start', config: { ...config, blacklist: blNames } },
       });
-      setRunning(true);
       pushLog(`[app] sidecar started, session=${sid}`);
     } catch (e) {
+      setRunning(false);
       pushLog(`[app] start failed: ${e}`);
       setBootError(`启动失败: ${e}`);
     }
@@ -170,19 +307,9 @@ export default function App() {
   const onCopy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      showToast(`已复制: ${text}`);
+      toast(`已复制: ${text}`);
     } catch (e) {
-      showToast(`复制失败: ${e}`, 'error');
-    }
-  };
-
-  const onCopyAll = async () => {
-    if (display.length === 0) return;
-    try {
-      await navigator.clipboard.writeText(display.map((s) => s.song_name).join('\n'));
-      showToast(`已复制 ${display.length} 条到剪贴板`);
-    } catch (e) {
-      showToast(`复制失败: ${e}`, 'error');
+      toast.error(`复制失败: ${e}`);
     }
   };
 
@@ -192,322 +319,461 @@ export default function App() {
     const item = manualAdd(t);
     if (sessionId) insertHistory(item, sessionId).catch(() => {});
     setManualText('');
-    showToast(`已添加: ${t}`);
+    toast(`已添加: ${t}`);
   };
 
   const onRemoveOne = async (msgId: string, name: string) => {
     removeByMsgId(msgId);
     await deleteHistoryByMsgId(msgId).catch(() => {});
-    showToast(`已删除: ${name}`);
+    toast(`已删除: ${name}`);
   };
 
   const onClearList = async () => {
     const n = display.length;
     clearSongs();
     if (sessionId) await clearSessionHistory(sessionId).catch(() => {});
-    showToast(`已清空 ${n} 条`);
+    toast(`已清空 ${n} 条`);
   };
 
-  const onAddToPlayed = (song: DanmuInfo) => {
-    removeByMsgId(song.msg_id);
-    addPlayed(song);
-    deleteHistoryByMsgId(song.msg_id).catch(() => {});
-    showToast(`已点: ${song.song_name}`);
+  const onAddToPlaylist = async (track: KuGouTrack, song: DanmuInfo) => {
+    if (!kugouEnabled) return;
+    if (!config.target_playlist_id) {
+      toast.error('请先在"Kugou歌单"里保存一个歌单');
+      return;
+    }
+    const reason = checkTrack(track);
+    if (reason) {
+      toast.error(
+        reason === 'singer'
+          ? `已黑名单该歌手: ${track.singer_name}`
+          : `已黑名单: ${track.filename} - ${track.singer_name}`,
+      );
+      return;
+    }
+    try {
+      await addTrackToPlaylist(track, config.target_playlist_id);
+      removeByMsgId(song.msg_id);
+      addPlayed(song);
+      await deleteHistoryByMsgId(song.msg_id).catch(() => {});
+      toast(`已加入歌单: ${track.filename}`);
+      track_('song_added_manual', { song_name: song.song_name });
+    } catch (e) {
+      toast.error(`加入歌单失败: ${e}`);
+      track_('add_playlist_error', { msg: String(e).slice(0, 200) });
+    }
   };
+
+  const onAutoSynced = useCallback(
+    (kgTrack: KuGouTrack, song: DanmuInfo) => {
+      removeByMsgId(song.msg_id);
+      addPlayed(song);
+      deleteHistoryByMsgId(song.msg_id).catch(() => {});
+      toast(`[自动] 已加入歌单: ${kgTrack.filename}`);
+      track_('song_added_auto', { song_name: song.song_name });
+    },
+    [removeByMsgId, addPlayed],
+  );
+
+  // Per-user playlist-added counts drive the session limit (see lib/userQuota).
+  const playedCountByUid = useMemo(() => countAddedByUid(played), [played]);
+  const isOverLimit = useCallback(
+    (song: DanmuInfo) => isOverUserLimit(song, playedCountByUid, config.max_songs_per_user),
+    [playedCountByUid, config.max_songs_per_user],
+  );
+
+  useAutoSync({
+    enabled: kugouEnabled,
+    autoSync,
+    songs: display,
+    kugouCache: enrichedCache,
+    targetPlaylistId: config.target_playlist_id,
+    kugouLoggedIn,
+    onSynced: onAutoSynced,
+    pushLog,
+    checkCooldown: isInCooldown,
+    isOverLimit,
+  });
+
+  const handleAutoSyncToggle = useCallback(async () => {
+    if (!kugouEnabled) {
+      toast.error('Kugou 功能未开启');
+      return;
+    }
+    if (autoSync) {
+      setAutoSync(false);
+      return;
+    }
+    // Turning ON
+    const name = config.target_playlist_name.trim();
+    if (name) {
+      try {
+        const { listid } = await resolvePlaylistByName(name);
+        setConfig({ target_playlist_id: listid });
+        await saveConfig({ ...config, target_playlist_id: listid });
+      } catch (e) {
+        toast.error(`解析歌单失败: ${e}`);
+        return;
+      }
+    } else if (!config.target_playlist_id) {
+      const ok = window.confirm('没有配置歌单，自动同步不会添加歌曲到歌单。确定继续吗？');
+      if (!ok) return;
+    }
+    setAutoSync(true);
+  }, [autoSync, config, kugouEnabled]);
 
   // ─── Render helpers ───────────────────────────────────────────
 
-  const renderSongActions = (s: DanmuInfo) => (
-    <>
-      <button className={btnAction} onClick={() => onAddToPlayed(s)}>
-        已点
-      </button>
-      <button className={btnAction} onClick={() => onCopy(s.song_name)}>
-        复制
-      </button>
-      <button className={btnAction} onClick={() => onRemoveOne(s.msg_id, s.song_name)}>
-        删除
-      </button>
-    </>
-  );
+  const renderSongActions = (s: DanmuInfo) => {
+    const entry: EnrichedEntry = enrichedCache[s.song_name.trim()] ?? { status: 'pending' };
+    const hasTarget = config.target_playlist_id > 0;
+    let title = '';
+    let enabled = entry.status === 'found' && hasTarget;
+    switch (entry.status) {
+      case 'pending':
+        title = '正在 KuGou 查找…';
+        break;
+      case 'found':
+        title = hasTarget ? `加入歌单: ${entry.track.filename}` : '请先保存Kugou歌单';
+        break;
+      case 'not_found':
+        title = 'KuGou 未找到这首歌';
+        break;
+      case 'error':
+        title = `KuGou 搜索失败: ${entry.msg}`;
+        break;
+    }
+    return (
+      <div className="flex items-center gap-1">
+        {kugouEnabled && kugouLoggedIn && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 text-[var(--fg-muted)] hover:text-blue-500"
+                disabled={!enabled}
+                onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
+              >
+                {entry.status === 'pending' ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <ListPlus className="size-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              {title || '加入歌单'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
+              onClick={() => onCopy(s.song_name)}
+            >
+              <Copy className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            复制歌名
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 text-[var(--fg-muted)] hover:text-red-500"
+              onClick={() => onRemoveOne(s.msg_id, s.song_name)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            删除
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  };
 
   const renderPlayedActions = (s: DanmuInfo) => (
-    <button className={btnAction} onClick={() => onCopy(s.song_name)}>
-      复制
-    </button>
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
+          onClick={() => onCopy(s.song_name)}
+        >
+          <Copy className="size-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs">
+        复制歌名
+      </TooltipContent>
+    </Tooltip>
   );
+
+  const ctxSong = ctxMenu?.song;
+  const kgEntry = ctxSong ? enrichedCache[ctxSong.song_name.trim()] : undefined;
+  const kgFound = kgEntry?.status === 'found' && kgEntry.track;
 
   const ctxActions = ctxMenu
     ? [
-        { label: '复制歌名', onClick: () => onCopy(ctxMenu.song.song_name) },
-        { label: '删除', onClick: () => onRemoveOne(ctxMenu.song.msg_id, ctxMenu.song.song_name) },
+        { label: '复制弹幕', onClick: () => onCopy(ctxSong!.raw_msg) },
         {
-          label: '加入黑名单',
+          label: kgFound ? '复制歌名' : '复制歌名 (未找到)',
+          onClick: () => kgFound && onCopy(kgFound.filename),
+          disabled: !kgFound,
+        },
+        {
+          label: '删除',
           onClick: () => {
-            addBlacklist(ctxMenu.song.song_name, ctxMenu.song.msg_id);
-            showToast(`已加入黑名单: ${ctxMenu.song.song_name}`);
+            if (activeTab === 'played') {
+              removePlayed(ctxSong!.msg_id);
+            } else {
+              onRemoveOne(ctxSong!.msg_id, ctxSong!.song_name);
+            }
           },
         },
+        ...(kugouEnabled
+          ? kgFound
+            ? [
+                {
+                  label: `黑名单这首歌: ${kgFound.filename} - ${kgFound.singer_name}`,
+                  onClick: () => {
+                    addBlacklistSong(kgFound.filename, kgFound.singer_name, ctxSong!.msg_id);
+                    toast(`已加入黑名单: ${kgFound.filename}`);
+                  },
+                },
+                ...(kgFound.singer_name
+                  ? [
+                      {
+                        label: `黑名单该歌手: ${kgFound.singer_name}`,
+                        onClick: () => {
+                          addBlacklistSinger(kgFound.singer_name);
+                          toast(`已加入黑名单歌手: ${kgFound.singer_name}`);
+                        },
+                      },
+                    ]
+                  : []),
+              ]
+            : [
+                {
+                  label: '加入黑名单 (搜索中…)',
+                  disabled: true,
+                  onClick: () => {},
+                },
+              ]
+          : []),
       ]
     : [];
-
-  // shared label + input block
-  const configLabel = (label: string, input: React.ReactNode) => (
-    <label className="flex min-w-[140px] flex-1 basis-[180px] flex-col gap-1">
-      <span className="text-fg-muted text-xs">{label}</span>
-      {input}
-    </label>
-  );
-
-  const configInput =
-    'py-1.5 px-2.5 border border-border-strong rounded bg-bg-base text-fg-base disabled:bg-bg-disabled disabled:text-fg-faint';
 
   // ─── Render ────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-screen flex-col">
-      {/* Header */}
-      <header className="border-border-soft bg-bg-elev flex items-center gap-4 border-b px-5 py-3">
-        <AppLogo />
-        <h1 className="m-0 text-lg">SUSUSongBoard</h1>
-        <ConnectionStatus />
-        <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base ml-auto inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 text-sm leading-none"
-          onClick={() => {
-            const t = nextTheme(theme);
-            saveTheme(t);
+    <TooltipProvider>
+      <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg-base)]">
+        {/* Header */}
+        <AppHeader
+          theme={theme}
+          running={running}
+          kugouEnabled={kugouEnabled}
+          kugouLoggedIn={kugouLoggedIn}
+          onThemeChange={(t) => {
             setTheme(t);
+            applyTheme(t);
           }}
-          title={`主题: ${themeLabel(theme)}`}
-        >
-          <ThemeIcon theme={theme} />
-        </button>
-        <button
-          className="text-fg-muted hover:bg-bg-soft hover:border-border-strong hover:text-fg-base inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent bg-transparent p-0 leading-none"
-          onClick={() => setShowAbout(true)}
-          title="关于 / 检查更新"
-        >
-          <InfoCircledIcon />
-        </button>
-      </header>
+          onShowKgLogin={() => setShowKgLogin(true)}
+          onShowAbout={() => setShowAbout(true)}
+          onShowKgDebug={
+            kugouEnabled && (import.meta.env.DEV || import.meta.env.VITE_DEBUG)
+              ? () => setShowKgDebug(true)
+              : undefined
+          }
+          onStart={onStart}
+          onStop={onStop}
+        />
 
-      {/* Error banner */}
-      {bootError && (
-        <div className="bg-danger-soft-bg text-danger-soft-fg px-5 py-2">{bootError}</div>
-      )}
+        {/* Error banner */}
+        {bootError && (
+          <div className="bg-danger-soft-bg text-danger-soft-fg px-5 py-2 text-sm">{bootError}</div>
+        )}
 
-      {/* Update banner */}
-      {update && (
-        <div className="border-accent-soft-border bg-accent-soft-bg text-accent-soft-fg flex items-center gap-3 border-b px-5 py-2">
-          <span>新版本 {update.tag} 可用</span>
-          <button
-            className="border-accent bg-accent hover:bg-accent-hover cursor-pointer rounded border px-3 py-1 text-[13px] text-white"
-            onClick={() => openInBrowser(update.htmlUrl)}
-          >
-            前往下载
-          </button>
-          <button
-            className="text-accent-soft-fg ml-auto cursor-pointer border-none bg-transparent px-2 py-0 text-lg hover:bg-black/[.08]"
-            onClick={() => {
-              skipVersion(update.tag);
-              setUpdate(null);
-            }}
-          >
-            跳过
-          </button>
-        </div>
-      )}
+        {/* Update banner */}
+        {update && (
+          <div className="border-accent-soft-border bg-accent-soft-bg text-accent-soft-fg flex flex-col border-b text-sm">
+            <div className="flex items-center gap-3 px-5 py-2">
+              {updatePhase === 'idle' && (
+                <>
+                  <span>新版本 {update.tag} 可用</span>
+                  <Button size="sm" className="h-7 px-3 text-[13px]" onClick={handleInstallUpdate}>
+                    立即更新
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 px-2 text-[13px]"
+                    onClick={() => {
+                      skipVersion(update.tag);
+                      setUpdate(null);
+                    }}
+                  >
+                    跳过
+                  </Button>
+                </>
+              )}
+              {updatePhase === 'downloading' && (
+                <>
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                  <span>
+                    下载更新中
+                    {dlProgress?.total
+                      ? ` ${Math.round((dlProgress.downloaded / dlProgress.total) * 100)}%`
+                      : '…'}
+                  </span>
+                </>
+              )}
+              {updatePhase === 'ready' && (
+                <>
+                  {isWindows() ? (
+                    <span>
+                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-{update.tag.replace(/^v/, '')}.exe），请手动启动
+                    </span>
+                  ) : (
+                    <>
+                      <span>更新已就绪，重启后生效</span>
+                      <Button
+                        size="sm"
+                        className="h-7 px-3 text-[13px]"
+                        onClick={() => relaunchApp()}
+                      >
+                        立即重启
+                      </Button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
 
-      {/* Config */}
-      <section className="border-border-soft bg-bg-elev flex flex-wrap items-end gap-3 border-b px-5 py-3">
-        {configLabel(
-          '抖音直播间 ID',
-          <input
-            className={configInput}
-            type="text"
-            value={config.room_id}
-            disabled={running}
-            onChange={(e) => setConfig({ room_id: e.target.value })}
-            placeholder="例如 221321076494"
-          />,
-        )}
-        {configLabel(
-          '点歌指令模板',
-          <input
-            className={configInput}
-            type="text"
-            value={config.sing_prefix}
-            disabled={running}
-            onChange={(e) => setConfig({ sing_prefix: e.target.value })}
-            placeholder="点歌[space][song]"
-            title="Placeholders: [space]=whitespace, [song]=song name"
-          />,
-        )}
-        {configLabel(
-          '最低粉丝团等级',
-          <input
-            className={configInput}
-            type="number"
-            min={0}
-            value={config.fans_level}
-            disabled={running}
-            onChange={(e) => setConfig({ fans_level: Number(e.target.value) || 0 })}
-          />,
-        )}
-        {configLabel(
-          '点歌冷却 (秒)',
-          <input
-            className={configInput}
-            type="number"
-            min={0}
-            value={config.sing_cd}
-            disabled={running}
-            onChange={(e) => setConfig({ sing_cd: Math.max(0, Number(e.target.value) || 0) })}
-          />,
-        )}
-        {!running ? (
-          <button
-            className="bg-success hover:bg-success-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white"
-            onClick={onStart}
-          >
-            开始
-          </button>
+        {/* Main layout — side-by-side on wide, stacked on narrow */}
+        {isNarrow ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <CollapsiblePanel>
+              <LeftPanel
+                config={config}
+                running={running}
+                kugouEnabled={kugouEnabled}
+                autoSync={autoSync}
+                kugouLoggedIn={kugouLoggedIn}
+                manualText={manualText}
+                compact
+                onConfigChange={setConfig}
+                onManualTextChange={setManualText}
+                onManualAdd={onManualAdd}
+                onAutoSyncToggle={handleAutoSyncToggle}
+                appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+              />
+            </CollapsiblePanel>
+
+            <MainContent
+              songs={display}
+              played={played}
+              blacklist={blacklist}
+              running={running}
+              kugouLoggedIn={kugouLoggedIn}
+              kugouCache={enrichedCache}
+              logs={logs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onClearList={onClearList}
+              onClearPlayed={clearPlayed}
+              onClearLogs={clearLogs}
+              onContextMenu={openCtxMenu}
+              renderSongActions={renderSongActions}
+              renderPlayedActions={renderPlayedActions}
+              onRemoveBlacklist={(id) => {
+                removeBlacklist(id);
+                toast('已移出黑名单');
+              }}
+              onAddSingerBlacklist={(singerName) => {
+                addBlacklistSinger(singerName);
+              }}
+              cooldownRemaining={cooldownRemainingSeconds}
+              maxSongsPerUser={config.max_songs_per_user}
+            />
+          </div>
         ) : (
-          <button
-            className="bg-danger hover:bg-danger-hover cursor-pointer rounded border-none px-6 py-2 font-medium text-white"
-            onClick={onStop}
-          >
-            停止
-          </button>
+          <div className="flex min-h-0 flex-1">
+            <LeftPanel
+              config={config}
+              running={running}
+              kugouEnabled={kugouEnabled}
+              autoSync={autoSync}
+              kugouLoggedIn={kugouLoggedIn}
+              manualText={manualText}
+              onConfigChange={setConfig}
+              onManualTextChange={setManualText}
+              onManualAdd={onManualAdd}
+              onAutoSyncToggle={handleAutoSyncToggle}
+              appVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0'}
+            />
+
+            <MainContent
+              songs={display}
+              played={played}
+              blacklist={blacklist}
+              running={running}
+              kugouLoggedIn={kugouLoggedIn}
+              kugouCache={enrichedCache}
+              logs={logs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              onClearList={onClearList}
+              onClearPlayed={clearPlayed}
+              onClearLogs={clearLogs}
+              onContextMenu={openCtxMenu}
+              renderSongActions={renderSongActions}
+              renderPlayedActions={renderPlayedActions}
+              onRemoveBlacklist={(id) => {
+                removeBlacklist(id);
+                toast('已移出黑名单');
+              }}
+              onAddSingerBlacklist={(singerName) => {
+                addBlacklistSinger(singerName);
+              }}
+              cooldownRemaining={cooldownRemainingSeconds}
+              maxSongsPerUser={config.max_songs_per_user}
+            />
+          </div>
         )}
-      </section>
 
-      {/* Toolbar */}
-      <section className="border-border-soft bg-bg-elev flex gap-2 border-b px-5 py-3">
-        <input
-          className="border-border-strong bg-bg-base text-fg-base flex-1 rounded border px-2.5 py-1.5"
-          type="text"
-          placeholder="手动点歌"
-          value={manualText}
-          onChange={(e) => setManualText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onManualAdd()}
-        />
-        <button className={btnBase} onClick={onManualAdd}>
-          添加
-        </button>
-        {activeTab === 'songs' ? (
-          <>
-            <button className={btnBase} onClick={onCopyAll} disabled={display.length === 0}>
-              复制列表 ({display.length})
-            </button>
-            <button className={btnBase} onClick={onClearList} disabled={display.length === 0}>
-              清空
-            </button>
-          </>
-        ) : (
-          <span className="text-fg-muted self-center text-xs">
-            {activeTab === 'played'
-              ? '已点歌曲列表，当前 session 有效'
-              : '黑名单中的歌曲不会被匹配到'}
-          </span>
+        {/* Context menu */}
+        {ctxMenu && (
+          <ContextMenu
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            song={ctxMenu.song}
+            items={ctxActions}
+            onClose={closeCtxMenu}
+          />
         )}
-      </section>
 
-      {/* Tabs */}
-      <nav className="border-border-medium bg-bg-elev flex shrink-0 border-b px-5">
-        {(['songs', 'played', 'blacklist'] as const).map((tab) => {
-          const labels = {
-            songs: `点歌列表 (${display.length})`,
-            played: `已点歌单 (${played.length})`,
-            blacklist: `黑名单 (${blacklist.size})`,
-          };
-          return (
-            <button
-              key={tab}
-              className={[
-                'cursor-pointer border-none bg-transparent px-5 py-2.5 text-sm font-medium transition-colors',
-                '-mb-px border-b-2',
-                activeTab === tab
-                  ? 'text-accent border-accent'
-                  : 'text-fg-muted hover:text-fg-base border-transparent',
-              ].join(' ')}
-              onClick={() => setActiveTab(tab)}
-            >
-              {labels[tab]}
-            </button>
-          );
-        })}
-      </nav>
+        {/* Combined footer: startup checklist + live session stats */}
+        <SessionStats songs={songs} played={played} running={running} steps={visibleStartupSteps} />
 
-      {/* Tab content */}
-      {activeTab === 'songs' ? (
-        <SongList
-          songs={display}
-          emptyText={running ? '等待点歌...' : '点击 "开始" 连接直播间'}
-          renderActions={renderSongActions}
-          onContextMenu={openCtxMenu}
-        />
-      ) : activeTab === 'played' ? (
-        <SongList
-          songs={played}
-          emptyText="暂无已点歌曲"
-          headerLabels={{ uname: '添加时间', song: '已点歌曲', actions: '操作' }}
-          renderActions={renderPlayedActions}
-          renderUname={(s) => {
-            const ts = s.played_at ?? s.send_time;
-            const d = new Date(ts * 1000);
-            const pad = (n: number) => String(n).padStart(2, '0');
-            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-          }}
-          onContextMenu={openCtxMenu}
-        />
-      ) : (
-        <BlacklistPanel
-          items={Array.from(blacklist)}
-          onRemove={(name) => {
-            removeBlacklist(name);
-            showToast(`已移出黑名单: ${name}`);
-          }}
-        />
-      )}
+        <Toaster position="bottom-right" richColors closeButton />
 
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          song={ctxMenu.song}
-          items={ctxActions}
-          onClose={closeCtxMenu}
-        />
-      )}
-
-      {/* Logs */}
-      <details className="border-border-soft text-fg-muted bg-bg-base max-h-[220px] overflow-y-auto border-t text-xs">
-        <summary className="logs-summary border-border-soft bg-bg-softer text-fg-base sticky top-0 z-10 cursor-pointer list-none border-b px-5 py-1.5 select-none">
-          日志 ({logs.length})
-        </summary>
-        <pre className="m-0 px-5 py-1.5 break-all whitespace-pre-wrap">{logs.join('\n')}</pre>
-      </details>
-
-      {/* Toast */}
-      {toast && (
-        <div
-          className={[
-            'fixed bottom-6 left-1/2 z-[1000] -translate-x-1/2 cursor-pointer rounded-md px-5 py-2.5 text-[13px] whitespace-nowrap text-white hover:opacity-85',
-            toast.kind === 'success' ? 'bg-success' : 'bg-danger',
-          ].join(' ')}
-          style={{
-            boxShadow: 'var(--shadow-toast)',
-            animation: 'toast-in 0.18s ease-out, toast-out 0.3s ease-in 1.3s forwards',
-          }}
-          onClick={() => setToast(null)}
-          title="Click to dismiss"
-        >
-          {toast.msg}
-        </div>
-      )}
-
-      {showAbout && <AboutModal onClose={() => setShowAbout(false)} onShowToast={showToast} />}
-    </div>
+        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+        {kugouEnabled && showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
+        {kugouEnabled && showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
+      </div>
+    </TooltipProvider>
   );
 }

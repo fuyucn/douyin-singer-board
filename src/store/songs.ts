@@ -1,0 +1,80 @@
+import type { StateCreator } from 'zustand';
+import type { AppStore } from './index';
+import type { DanmuInfo } from '../types';
+
+export interface SongsSlice {
+  songs: DanmuInfo[];
+  setSongs: (songs: DanmuInfo[]) => void;
+  addSong: (s: DanmuInfo) => void;
+  cancelByUid: (uid: string) => void;
+  removeByMsgId: (msgId: string) => void;
+  clearSongs: () => void;
+  manualAdd: (name: string) => DanmuInfo;
+  played: DanmuInfo[];
+  addPlayed: (song: DanmuInfo) => void;
+  removePlayed: (msgId: string) => void;
+  clearPlayed: () => void;
+  isInCooldown: (songName: string) => boolean;
+  cooldownRemainingSeconds: (songName: string) => number;
+}
+
+export const createSongsSlice: StateCreator<AppStore, [], [], SongsSlice> = (set, get) => ({
+  songs: [],
+  setSongs: (songs) => set({ songs }),
+  addSong: (s) => set((state) => ({ songs: [s, ...state.songs] })),
+  cancelByUid: (uid) =>
+    set((state) => {
+      const idx = state.songs.findIndex((x) => x.uid === uid);
+      if (idx < 0) return {};
+      const next = [...state.songs];
+      next.splice(idx, 1);
+      return { songs: next };
+    }),
+  removeByMsgId: (msgId) =>
+    set((state) => ({ songs: state.songs.filter((x) => x.msg_id !== msgId) })),
+  clearSongs: () => set({ songs: [] }),
+  manualAdd: (name) => {
+    const now = Math.floor(Date.now() / 1000);
+    const trimmed = name.trim();
+    const item: DanmuInfo = {
+      msg_id: `manual_${now}_${Math.random().toString(36).slice(2, 6)}`,
+      uid: 'manual',
+      uname: 'Host',
+      song_name: trimmed,
+      raw_msg: trimmed,
+      medal_level: 0,
+      medal_name: '',
+      send_time: now,
+    };
+    set((state) => ({ songs: [item, ...state.songs] }));
+    return item;
+  },
+
+  played: [],
+  addPlayed: (song) =>
+    set((s) => {
+      const item = { ...song, played_at: Math.floor(Date.now() / 1000) };
+      const next = [item, ...s.played].sort((a, b) => (b.played_at ?? 0) - (a.played_at ?? 0));
+      return { played: next };
+    }),
+  removePlayed: (msgId) => set((s) => ({ played: s.played.filter((x) => x.msg_id !== msgId) })),
+  clearPlayed: () => set({ played: [] }),
+  isInCooldown: (songName) => {
+    const now = Math.floor(Date.now() / 1000);
+    const window = get().config.cooldown_seconds;
+    const target = songName.trim();
+    return get().played.some(
+      (p) => p.song_name.trim() === target && (p.played_at ?? 0) > now - window,
+    );
+  },
+  cooldownRemainingSeconds: (songName) => {
+    const now = Math.floor(Date.now() / 1000);
+    const window = get().config.cooldown_seconds;
+    const target = songName.trim();
+    const match = get().played.find(
+      (p) => p.song_name.trim() === target && (p.played_at ?? 0) > now - window,
+    );
+    if (!match) return 0;
+    return (match.played_at ?? 0) + window - now;
+  },
+});

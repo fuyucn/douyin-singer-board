@@ -1,0 +1,3 @@
+[submodule "kugou-api"]
+	path = kugou-api
+	url = https://github.com/MakcRe/KuGouMusicApi.git

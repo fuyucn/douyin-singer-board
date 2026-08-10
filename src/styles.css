@@ -1,95 +1,160 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
 
 /* ─── Dark mode variant (data-theme="dark" OR system preference) ─── */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* ─── Design tokens ─────────────────────────────────────────────── */
+/* ─── Design tokens — mapped to shadcn theme vars ────────────────── */
 :root {
-  --bg-base: #ffffff;
-  --bg-elev: #ffffff;
-  --bg-soft: #f5f5f5;
-  --bg-softer: #fafafa;
-  --bg-disabled: #f5f5f5;
-  --fg-base: #111;
-  --fg-muted: #666;
-  --fg-faint: #999;
-  --border-strong: #ddd;
-  --border-medium: #e0e0e0;
-  --border-soft: #eee;
-  --border-softer: #f0f0f0;
-  --success: #2e7d32;
-  --success-hover: #1b5e20;
-  --danger: #c62828;
-  --danger-hover: #8e0000;
-  --danger-soft-bg: #fdecea;
-  --danger-soft-fg: #b71c1c;
-  --accent: #1976d2;
-  --accent-hover: #1565c0;
-  --accent-soft-bg: #e3f2fd;
-  --accent-soft-fg: #0d47a1;
-  --accent-soft-border: #bbdefb;
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.2);
-  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.18);
+  /* Legacy token bridge → new theme */
+  --bg-base: var(--background);
+  --bg-elev: var(--card);
+  --bg-soft: var(--secondary);
+  --bg-softer: var(--accent);
+  --bg-disabled: var(--muted);
+  --fg-base: var(--foreground);
+  --fg-muted: var(--muted-foreground);
+  --fg-faint: oklch(from var(--muted-foreground) l c h / 0.6);
+  --border-strong: var(--border);
+  --border-medium: var(--border);
+  --border-soft: var(--border);
+  --border-softer: oklch(from var(--border) l c h / 0.5);
+  --success: oklch(0.55 0.17 145);
+  --success-hover: oklch(0.45 0.17 145);
+  --danger: var(--destructive);
+  --danger-hover: oklch(from var(--destructive) calc(l - 0.07) c h);
+  --danger-soft-bg: oklch(from var(--destructive) 0.97 0.02 h);
+  --danger-soft-fg: oklch(from var(--destructive) 0.4 c h);
+  --accent-hover: var(--primary);
+  --accent-soft-bg: oklch(from var(--primary) 0.95 0.03 h);
+  --accent-soft-fg: var(--primary);
+  --accent-soft-border: oklch(from var(--primary) 0.85 0.06 h);
+  --shadow-modal: var(--shadow-lg);
   --overlay: rgba(0, 0, 0, 0.4);
+  --background: oklch(0.961 0.0029 264.5419);
+  --foreground: oklch(0.2035 0.0016 197.0331);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2035 0.0016 197.0331);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2035 0.0016 197.0331);
+  --primary: oklch(0.5665 0.2379 263.3708);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9368 0.0029 264.5416);
+  --secondary-foreground: oklch(0.2035 0.0016 197.0331);
+  --muted: oklch(0.8883 0.0072 268.5419);
+  --muted-foreground: oklch(0.5307 0.0101 264.4824);
+  --accent: oklch(0.9764 0.0013 286.3755);
+  --accent-foreground: oklch(0.5665 0.2379 263.3708);
+  --destructive: oklch(0.5954 0.2219 20.7198);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8972 0.0059 264.5304);
+  --input: oklch(0.925 0.0042 271.3671);
+  --ring: oklch(0.5668 0.2378 263.4868);
+  --chart-1: oklch(0.5538 0.2501 277.67);
+  --chart-2: oklch(0.8484 0.1234 166.1848);
+  --chart-3: oklch(0.8103 0.1158 232.1656);
+  --chart-4: oklch(0.8575 0.1752 88.4887);
+  --chart-5: oklch(0.634 0.2029 25.0867);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.3674 0.0037 264.5182);
+  --sidebar-primary: oklch(0.5665 0.2379 263.3708);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9759 0.0029 264.542);
+  --sidebar-accent-foreground: oklch(0.5668 0.2378 263.4868);
+  --sidebar-border: oklch(0.9454 0.0107 286.1934);
+  --sidebar-ring: oklch(0.9468 0.0268 288.1741);
+  --font-sans: 'Geist', 'Geist Fallback', Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Geist', ui-serif, Merriweather, serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', 'Roboto Mono', ui-monospace, monospace;
+  --radius: 0.4rem;
+  --shadow-2xs: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.07);
+  --shadow-xs: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.07);
+  --shadow-sm: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow-md: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 2px 4px -1px hsl(0 0% 0% / 0.15);
+  --shadow-lg: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 4px 6px -1px hsl(0 0% 0% / 0.15);
+  --shadow-xl: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 8px 10px -1px hsl(0 0% 0% / 0.15);
+  --shadow-2xl: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.38);
 }
 
 :root[data-theme='dark'] {
-  --bg-base: #1a1a1a;
-  --bg-elev: #242424;
-  --bg-soft: #1f1f1f;
-  --bg-softer: #1d1d1d;
-  --bg-disabled: #2a2a2a;
-  --fg-base: #e8e8e8;
-  --fg-muted: #a0a0a0;
-  --fg-faint: #6a6a6a;
-  --border-strong: #3a3a3a;
-  --border-medium: #333;
-  --border-soft: #2a2a2a;
-  --border-softer: #262626;
-  --success: #4caf50;
-  --success-hover: #66bb6a;
-  --danger: #ef5350;
-  --danger-hover: #f06b67;
-  --danger-soft-bg: #3a1f1f;
-  --danger-soft-fg: #ef9a9a;
-  --accent: #4f9eea;
-  --accent-hover: #7ab6f0;
-  --accent-soft-bg: #1f2d3d;
-  --accent-soft-fg: #90c8f5;
-  --accent-soft-border: #2a3f55;
-  --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
-  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
   --overlay: rgba(0, 0, 0, 0.6);
+  --shadow-modal: var(--shadow-lg);
+  --background: oklch(0.1579 0.0017 196.9874);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.2252 0.0049 248.0473);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.2252 0.0049 248.0473);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(0.5665 0.2379 263.3708);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.284 0.0101 260.706);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.2252 0.0049 248.0473);
+  --muted-foreground: oklch(0.5606 0.0091 253.8999);
+  --accent: oklch(0.1579 0.0017 196.9874);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.69 0.1762 22.0665);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.2465 0.0048 248.0237);
+  --input: oklch(0.1579 0.0017 196.9874);
+  --ring: oklch(0.5668 0.2378 263.4868);
+  --chart-1: oklch(0.5538 0.2501 277.67);
+  --chart-2: oklch(0.8484 0.1234 166.1848);
+  --chart-3: oklch(0.8103 0.1158 232.1656);
+  --chart-4: oklch(0.8575 0.1752 88.4887);
+  --chart-5: oklch(0.634 0.2029 25.0867);
+  --sidebar: oklch(0.2252 0.0049 248.0473);
+  --sidebar-foreground: oklch(0.6133 0.0158 268.4038);
+  --sidebar-primary: oklch(0.5668 0.2378 263.4868);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.1579 0.0017 196.9874);
+  --sidebar-accent-foreground: oklch(0.5668 0.2378 263.4868);
+  --sidebar-border: oklch(0.2465 0.0048 248.0237);
+  --sidebar-ring: oklch(0.5668 0.2378 263.4868);
+  --shadow-2xs: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.07);
+  --shadow-xs: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.07);
+  --shadow-sm: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow-md: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 2px 4px -1px hsl(0 0% 0% / 0.15);
+  --shadow-lg: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 4px 6px -1px hsl(0 0% 0% / 0.15);
+  --shadow-xl: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.15), 0.25px 8px 10px -1px hsl(0 0% 0% / 0.15);
+  --shadow-2xl: 0.25px 1px 12px 0px hsl(0 0% 0% / 0.38);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg-base: #1a1a1a;
-    --bg-elev: #242424;
-    --bg-soft: #1f1f1f;
-    --bg-softer: #1d1d1d;
-    --bg-disabled: #2a2a2a;
-    --fg-base: #e8e8e8;
-    --fg-muted: #a0a0a0;
-    --fg-faint: #6a6a6a;
-    --border-strong: #3a3a3a;
-    --border-medium: #333;
-    --border-soft: #2a2a2a;
-    --border-softer: #262626;
-    --success: #4caf50;
-    --success-hover: #66bb6a;
-    --danger: #ef5350;
-    --danger-hover: #f06b67;
-    --danger-soft-bg: #3a1f1f;
-    --danger-soft-fg: #ef9a9a;
-    --accent: #4f9eea;
-    --accent-hover: #7ab6f0;
-    --accent-soft-bg: #1f2d3d;
-    --accent-soft-fg: #90c8f5;
-    --accent-soft-border: #2a3f55;
-    --shadow-modal: 0 16px 40px rgba(0, 0, 0, 0.6);
-    --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.5);
     --overlay: rgba(0, 0, 0, 0.6);
+    --shadow-modal: var(--shadow-lg);
+    --background: oklch(0.1579 0.0017 196.9874);
+    --foreground: oklch(1 0 0);
+    --card: oklch(0.2252 0.0049 248.0473);
+    --card-foreground: oklch(1 0 0);
+    --popover: oklch(0.2252 0.0049 248.0473);
+    --popover-foreground: oklch(1 0 0);
+    --primary: oklch(0.5665 0.2379 263.3708);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.284 0.0101 260.706);
+    --secondary-foreground: oklch(1 0 0);
+    --muted: oklch(0.2252 0.0049 248.0473);
+    --muted-foreground: oklch(0.5606 0.0091 253.8999);
+    --accent: oklch(0.1579 0.0017 196.9874);
+    --accent-foreground: oklch(1 0 0);
+    --destructive: oklch(0.69 0.1762 22.0665);
+    --destructive-foreground: oklch(1 0 0);
+    --border: oklch(0.2465 0.0048 248.0237);
+    --input: oklch(0.1579 0.0017 196.9874);
+    --ring: oklch(0.5668 0.2378 263.4868);
+    --sidebar: oklch(0.2252 0.0049 248.0473);
+    --sidebar-foreground: oklch(0.6133 0.0158 268.4038);
+    --sidebar-primary: oklch(0.5668 0.2378 263.4868);
+    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-accent: oklch(0.1579 0.0017 196.9874);
+    --sidebar-accent-foreground: oklch(0.5668 0.2378 263.4868);
+    --sidebar-border: oklch(0.2465 0.0048 248.0237);
+    --sidebar-ring: oklch(0.5668 0.2378 263.4868);
   }
 }
 
@@ -121,12 +186,64 @@
   --color-overlay: var(--overlay);
   --animate-fade-in: fade-in 0.15s ease-out;
   --animate-scale-in: scale-in 0.18s ease-out;
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
 }
 
 /* ─── Base reset ─────────────────────────────────────────────────── */
 @layer base {
+  html {
+    background: var(--bg-base);
+    @apply font-sans;
+  }
   * {
     box-sizing: border-box;
+    @apply border-border outline-ring/50;
   }
   body {
     margin: 0;
@@ -135,7 +252,14 @@
     color: var(--fg-base);
     user-select: none;
     font-size: 14px;
+    overscroll-behavior: none;
+    position: fixed;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    @apply bg-background text-foreground;
   }
+
   input,
   button {
     font-family: inherit;
@@ -162,26 +286,7 @@
     transform: scale(1);
   }
 }
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 12px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-@keyframes toast-out {
-  from {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-  to {
-    opacity: 0;
-    transform: translate(-50%, 12px);
-  }
-}
+
 @keyframes auto-sync-rotate {
   100% {
     transform: rotate(360deg);
@@ -253,4 +358,444 @@
 }
 details[open] .logs-summary::before {
   transform: rotate(90deg);
+}
+
+/* ─── Context Menu ───────────────────────────────────────── */
+.ctx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+.ctx-menu {
+  position: fixed;
+  z-index: 901;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  min-width: 140px;
+}
+.ctx-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--fg-base);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.ctx-menu button:hover {
+  background: var(--bg-soft);
+}
+
+/* ─── About / settings modal ─────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fade-in 0.15s ease-out;
+}
+.modal {
+  background: var(--bg-elev);
+  color: var(--fg-base);
+  border-radius: 8px;
+  min-width: 380px;
+  max-width: 520px;
+  box-shadow: var(--shadow-modal);
+  animation: scale-in 0.18s ease-out;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+  flex: 1;
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--fg-faint);
+  padding: 0 4px;
+}
+.modal-close:hover {
+  color: var(--fg-base);
+}
+.modal-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-body .row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 14px;
+}
+.modal-body .row .label {
+  flex: 0 0 90px;
+  text-align: right;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.modal-body .row .value {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+}
+.modal-body .link {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  text-decoration: none;
+}
+.modal-body .link:hover {
+  text-decoration: underline;
+}
+.modal-body .link.inline {
+  font-size: 12px;
+  margin-left: 4px;
+}
+.modal-body .actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.modal-body .actions .primary {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+}
+.modal-body .actions .primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.modal-body .actions .primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── KuGou debug modal ──────────────────────────────────────────── */
+.modal.kg-debug {
+  min-width: 620px;
+  max-width: 800px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+.modal.kg-debug .modal-body {
+  overflow-y: auto;
+}
+.modal.kg-debug .kg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal.kg-debug .kg-row.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.modal.kg-debug .kg-row .label {
+  flex: 0 0 70px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.modal.kg-debug .kg-row.inline .label {
+  text-align: right;
+}
+.modal.kg-debug .kg-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-base);
+  color: var(--fg-base);
+  font-size: 13px;
+}
+.modal.kg-debug .kg-cookie {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-base);
+  color: var(--fg-base);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  resize: vertical;
+}
+.modal.kg-debug .kg-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.modal.kg-debug .kg-actions button,
+.modal.kg-debug .kg-row.inline button {
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-elev);
+  color: var(--fg-base);
+  cursor: pointer;
+  font-size: 13px;
+}
+.modal.kg-debug button:hover:not(:disabled) {
+  background: var(--bg-soft);
+}
+.modal.kg-debug button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.modal.kg-debug .kg-status {
+  font-size: 12px;
+  color: var(--fg-muted);
+  padding: 4px 0;
+}
+.modal.kg-debug .kg-status.error {
+  color: var(--danger-soft-fg);
+}
+.modal.kg-debug .kg-result {
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: var(--bg-base);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.modal.kg-debug .kg-result > summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  background: var(--bg-soft);
+  border-radius: 4px;
+  color: var(--fg-base);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal.kg-debug .kg-result > summary::-webkit-details-marker {
+  display: none;
+}
+.modal.kg-debug .kg-copy {
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-elev);
+  color: var(--fg-base);
+  cursor: pointer;
+  font-size: 11px;
+}
+.modal.kg-debug .kg-copy:hover {
+  background: var(--bg-soft);
+}
+.modal.kg-debug .kg-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  padding: 4px 0;
+  cursor: pointer;
+}
+.modal.kg-debug .kg-switch input {
+  margin: 0;
+}
+.modal.kg-debug .kg-result pre {
+  margin: 0;
+  padding: 10px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--fg-base);
+}
+.modal.kg-debug .kg-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: var(--bg-base);
+}
+.modal.kg-debug .kg-qr img {
+  width: 220px;
+  height: 220px;
+  image-rendering: pixelated;
+}
+.modal.kg-debug .kg-qr-status {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.modal.kg-debug .kg-qr-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.modal.kg-debug .kg-qr-url code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+  padding: 4px 8px;
+  background: var(--bg-soft);
+  border-radius: 3px;
+}
+.modal.kg-debug .kg-qr-help {
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+  max-width: 320px;
+}
+
+/* ─── KuGou login modal ──────────────────────────────────────────── */
+.modal.kg-login {
+  min-width: 360px;
+  max-width: 440px;
+}
+.kg-login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+.kg-login-prompt p {
+  font-size: 13px;
+  color: var(--fg-muted);
+  margin: 0;
+  max-width: 280px;
+}
+.kg-login-prompt button {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+}
+.kg-login-prompt button:hover {
+  background: var(--accent-hover);
+}
+.kg-login-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.kg-login-badge {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--success);
+}
+.kg-login-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+}
+.kg-login-refresh {
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+.kg-login-logout {
+  padding: 6px 20px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13px;
+}
+.kg-login-logout:hover:not(:disabled) {
+  background: var(--danger-soft-bg);
+}
+.kg-login-logout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.kg-login-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.kg-login-error button {
+  padding: 6px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-elev);
+  color: var(--fg-base);
+  cursor: pointer;
+  font-size: 13px;
+}
+.kg-login-error button:hover {
+  background: var(--bg-soft);
+}
+.kg-qr-cancel {
+  padding: 4px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--bg-elev);
+  color: var(--fg-base);
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 8px;
+}
+.kg-qr-cancel:hover {
+  background: var(--bg-soft);
+}
+
+/* Overlay scrollbars — only appear on hover/scroll, like macOS */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(128, 128, 128, 0.4) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.4);
 }

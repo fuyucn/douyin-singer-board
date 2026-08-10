@@ -41,3 +41,7 @@ TASK_BOARD.md
 
 # Local config
 config.json
+.orka/
+TASK_BOARD.md
+.alma-snapshots
+tmp/

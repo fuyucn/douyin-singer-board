@@ -15,7 +15,8 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use process_wrap::tokio::*;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex;
@@ -24,11 +25,28 @@ const SIDECAR_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sidecar.bin
 
 pub struct SidecarHandle {
     stdin: Mutex<Option<ChildStdin>>,
+    child: Mutex<Option<Box<dyn ChildWrapper>>>,
 }
 
 impl SidecarHandle {
     pub fn new() -> Self {
-        Self { stdin: Mutex::new(None) }
+        Self { stdin: Mutex::new(None), child: Mutex::new(None) }
+    }
+
+    /// Explicitly kill the child process, then drop the wrapper.
+    /// On Windows the Job Object cleanup fires; on Unix KillOnDrop sends SIGKILL.
+    /// We also briefly wait so the child is reaped before we return.
+    pub async fn kill(&self) {
+        let mut child_opt = self.child.lock().await;
+        if let Some(mut child) = child_opt.take() {
+            let _ = child.start_kill();
+            // Best-effort wait so the OS reaps the child before we return.
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                child.wait(),
+            )
+            .await;
+        }
     }
 
     fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
@@ -41,12 +59,18 @@ impl SidecarHandle {
         }
         let version = env!("CARGO_PKG_VERSION");
         let ext = if cfg!(windows) { ".exe" } else { "" };
-        let dir = std::env::temp_dir().join("sususongboard");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir temp: {}", e))?;
-        let path = dir.join(format!("sidecar-{}{}", version, ext));
+        // Layout: <app_local_data_dir>/<version>/sidecar/bin[.exe]
+        let data_dir = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| format!("app_local_data_dir: {e}"))?;
+        let dir = data_dir.join(version).join("sidecar");
+        let path = dir.join(format!("bin{ext}"));
 
-        let needs_extract = !path.exists()
-            || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0) != SIDECAR_BIN.len() as u64;
+        // Stale version cleanup is handled by kugou_api on startup.
+        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir sidecar: {}", e))?;
+
+        let needs_extract = !path.exists();
         if needs_extract {
             log_to_ui(app, "info", &format!("extracting sidecar to {}", path.display()));
             std::fs::write(&path, SIDECAR_BIN).map_err(|e| format!("write sidecar: {}", e))?;
@@ -69,37 +93,53 @@ impl SidecarHandle {
             return Ok(());
         }
 
-        let path = Self::extract_to_temp(&app)?;
-        log_to_ui(&app, "info", &format!("spawning sidecar: {}", path.display()));
-
-        let mut cmd = Command::new(&path);
+        // Dev hot-reload: if SIDECAR_DEV_PATH is set, spawn `node <path>`
+        // directly instead of extracting the embedded binary. The script
+        // self-restarts when esbuild --watch rebuilds it (see sidecar/index.ts).
+        let dev_path = std::env::var("SIDECAR_DEV_PATH").ok();
+        let mut cmd = if let Some(ref dev) = dev_path {
+            log_to_ui(&app, "info", &format!("dev: spawning node {}", dev));
+            let mut c = Command::new("node");
+            c.arg(dev);
+            c.env("SIDECAR_DEV", "1");
+            c
+        } else {
+            let path = Self::extract_to_temp(&app)?;
+            log_to_ui(&app, "info", &format!("spawning sidecar: {}", path.display()));
+            Command::new(&path)
+        };
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            // Silence Node's DeprecationWarnings/process warnings from transitive deps
-            // (e.g. legacy Buffer() usage in protobufjs). Keeps the UI log clean.
             .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
 
-        // Windows: pkg-compiled Node binaries are console-subsystem .exe files.
-        // Without CREATE_NO_WINDOW the OS opens a cmd window for them, which the
-        // user can close, killing the child and producing "pipe is being closed".
+        // Bind entire process tree via Job Object (Windows) / process group (Unix).
+        // CreationFlags MUST come before JobObject so our CREATE_NO_WINDOW is
+        // merged into JobObject's CREATE_SUSPENDED in pre_spawn.
+        // KillOnDrop ensures the child is killed (whole group on Unix) when the
+        // wrapper is dropped — without it, orphaned sidecar processes pile up.
+        let mut wrap = CommandWrap::from(cmd);
         #[cfg(windows)]
         {
+            use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
             const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
+            wrap.wrap(CreationFlags(PROCESS_CREATION_FLAGS(CREATE_NO_WINDOW)));
+            wrap.wrap(JobObject);
         }
+        #[cfg(unix)]
+        wrap.wrap(ProcessGroup::leader());
+        wrap.wrap(KillOnDrop);
 
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| format!("spawn {}: {}", path.display(), e))?;
-        let stdout = child.stdout.take().ok_or("no stdout")?;
-        let stderr = child.stderr.take().ok_or("no stderr")?;
-        let stdin = child.stdin.take().ok_or("no stdin")?;
+        let mut child = wrap.spawn().map_err(|e| format!("spawn: {}", e))?;
+
+        let stdout = child.stdout().take().ok_or("no stdout")?;
+        let stderr = child.stderr().take().ok_or("no stderr")?;
+        let stdin = child.stdin().take().ok_or("no stdin")?;
 
         *self.stdin.lock().await = Some(stdin);
 
         // stdout: parse JSON, forward as sidecar-event.
+        // On EOF (process exit), reset state and emit crash event for frontend recovery.
         let app_out = app.clone();
         tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -108,6 +148,13 @@ impl SidecarHandle {
                     let _ = app_out.emit("sidecar-event", v);
                 }
             }
+            // EOF: sidecar process exited
+            log_to_ui(&app_out, "warn", "[sidecar] process exited (stdout EOF)");
+            if let Some(state) = app_out.try_state::<SidecarState>() {
+                *state.stdin.lock().await = None;
+                *state.child.lock().await = None;
+            }
+            let _ = app_out.emit("sidecar-event", json!({ "event": "crashed" }));
         });
 
         // stderr: each line surfaces in the UI log panel.
@@ -119,22 +166,8 @@ impl SidecarHandle {
             }
         });
 
-        // Wait task: when the child exits, surface the exit code in the UI log
-        // so 'broken pipe' is preceded by a clear cause line.
-        let app_wait = app.clone();
-        tauri::async_runtime::spawn(async move {
-            match child.wait().await {
-                Ok(status) => {
-                    let code = status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into());
-                    log_to_ui(
-                        &app_wait,
-                        "error",
-                        &format!("[sidecar] process exited (code={})", code),
-                    );
-                }
-                Err(e) => log_to_ui(&app_wait, "error", &format!("[sidecar] wait failed: {}", e)),
-            }
-        });
+        // Store child to keep Job Object / process group handle alive.
+        *self.child.lock().await = Some(child);
 
         Ok(())
     }
@@ -166,4 +199,12 @@ pub async fn sidecar_send(
     cmd: Value,
 ) -> Result<(), String> {
     state.send(cmd).await
+}
+
+#[tauri::command]
+pub async fn sidecar_respawn(
+    state: tauri::State<'_, SidecarState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    state.spawn(app).await
 }

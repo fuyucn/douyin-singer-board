@@ -19,6 +19,10 @@ const CANCEL_PREFIX = '取消点歌';
 export class Matcher {
   private config: Config;
   private lastByUid = new Map<string, number>();
+  // Monotonic counter making every emitted msg_id unique. `${now}_${uid}` alone
+  // collides when one user sends two requests in the same second, which breaks
+  // dedup, removeByMsgId, and history inserts downstream.
+  private seq = 0;
   private compiled: RegExp;
   private blacklist: Set<string>;
 
@@ -114,7 +118,7 @@ export class Matcher {
     this.lastByUid.set(uid, now);
 
     const danmu: DanmuInfo = {
-      msg_id: `${now}_${uid}`,
+      msg_id: `${now}_${uid}_${this.seq++}`,
       uid,
       uname,
       song_name: song,

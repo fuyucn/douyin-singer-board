@@ -11,17 +11,29 @@ on:
 permissions:
   contents: write   # required to create releases
 
+env:
+  # Run JS-based GitHub Actions (checkout, setup-node, etc.) on Node 24 to
+  # silence the Node-20 deprecation warnings.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   read-version:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - id: v
         run: |
           VER=$(node -p "require('./package.json').version")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
+          # Anything with a pre-release tag (e.g. 0.0.30-rc.1, 1.0.0-beta) is marked as pre-release.
+          if [[ "$VER" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "version: $VER"
 
   build:
@@ -41,6 +53,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -50,7 +64,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -74,6 +88,9 @@ jobs:
       - name: Build sidecar binary
         run: pnpm sidecar:build:bin
 
+      - name: Build kugou-api sidecar binary
+        run: pnpm kugou-api:build:bin
+
       - name: Clean stale bundle artifacts
         # The cached target dir would otherwise carry forward .dmg/.msi/.exe
         # files from previous version builds; we'd then accidentally upload them.
@@ -81,6 +98,9 @@ jobs:
         run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
 
       - name: Build Tauri app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm exec tauri build --target ${{ matrix.rust_target }}
 
       - name: Collect artifact (macOS)
@@ -96,6 +116,9 @@ jobs:
             ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" \
               "$OUT_DIR/SUSUSongBoard-macOS-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.zip"
           fi
+          # Updater artifacts (.app.tar.gz + .sig)
+          cp "$BUNDLE_DIR"/macos/*.app.tar.gz     "$OUT_DIR"/ 2>/dev/null || true
+          cp "$BUNDLE_DIR"/macos/*.app.tar.gz.sig "$OUT_DIR"/ 2>/dev/null || true
 
       - name: Collect artifact (Windows)
         if: runner.os == 'Windows'
@@ -107,9 +130,6 @@ jobs:
           # Portable single .exe (sidecar is embedded, no installer needed).
           $portable = "$out/SUSUSongBoard-Windows-${{ matrix.arch }}-${{ needs.read-version.outputs.version }}.exe"
           Copy-Item "$target/sususongboard.exe" $portable
-          # Also keep MSI / NSIS installers if the bundler produced them, for users who prefer them.
-          if (Test-Path "$target/bundle/msi") { Copy-Item "$target/bundle/msi/*.msi" $out -ErrorAction SilentlyContinue }
-          if (Test-Path "$target/bundle/nsis") { Copy-Item "$target/bundle/nsis/*-setup.exe" $out -ErrorAction SilentlyContinue }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -133,16 +153,57 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p release
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.msi' -o -name '*.tar.gz' -o -name '*.sig' \) -exec cp {} release/ \;
           ls -lh release/
+
+      - name: Generate latest.json update manifest
+        run: |
+          VERSION="${{ needs.read-version.outputs.version }}"
+          TAG="v${VERSION}"
+          BASE="https://github.com/fuyucn/douyin-singer-board/releases/download/${TAG}"
+          PUB_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # macOS aarch64
+          MAC_TAR=$(find release -maxdepth 1 -name "*.app.tar.gz" | head -1)
+          MAC_SIG_FILE="${MAC_TAR}.sig"
+          MAC_SIG=""
+          if [ -f "$MAC_SIG_FILE" ]; then MAC_SIG=$(cat "$MAC_SIG_FILE"); fi
+
+          # Build JSON with jq — only macOS uses tauri-plugin-updater manifest;
+          # Windows uses direct portable exe download and does not need latest.json.
+          PLATFORMS="{}"
+          if [ -n "$MAC_SIG" ] && [ -n "$MAC_TAR" ]; then
+            MAC_NAME=$(basename "$MAC_TAR")
+            PLATFORMS=$(echo "$PLATFORMS" | jq \
+              --arg url "${BASE}/${MAC_NAME}" \
+              --arg sig "$MAC_SIG" \
+              '."darwin-aarch64" = {url: $url, signature: $sig}')
+          fi
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --argjson platforms "$PLATFORMS" \
+            '{version: $version, notes: "", pub_date: $pub_date, platforms: $platforms}' \
+            > release/latest.json
+
+          echo "--- latest.json ---"
+          cat release/latest.json
 
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.read-version.outputs.version }}
           name: v${{ needs.read-version.outputs.version }}
-          files: release/*
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.msi
+            release/*.tar.gz
+            release/*.sig
+            release/latest.json
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.read-version.outputs.prerelease == 'true' }}
           generate_release_notes: true
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false

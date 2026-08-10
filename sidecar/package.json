@@ -1,16 +1,18 @@
 {
   "name": "sidecar",
   "private": true,
-  "version": "0.0.38",
+  "version": "0.0.39",
   "type": "module",
   "main": "build/index.cjs",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "dev:watch": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs --watch=forever",
     "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs",
     "build:bin": "node scripts/build-bin.mjs"
   },
   "dependencies": {
-    "douyin-danma-listener": "^0.4.1"
+    "douyin-danma-listener": "^0.4.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

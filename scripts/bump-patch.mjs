@@ -17,9 +17,12 @@ const targets = [
 ];
 
 function bumpPatch(v) {
-  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
-  if (!m) throw new Error(`bad version ${v}`);
-  return `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
+  // Preserve the branch suffix when present: 0.0.30-24 -> 0.0.30-25.
+  const suffixed = /^(\d+\.\d+\.\d+)-(\d+)$/.exec(v);
+  if (suffixed) return `${suffixed[1]}-${Number(suffixed[2]) + 1}`;
+  const plain = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
+  if (!plain) throw new Error(`bad version ${v} (expected x.y.z or x.y.z-N)`);
+  return `${plain[1]}.${plain[2]}.${Number(plain[3]) + 1}`;
 }
 
 function readJsonVersion(path, key) {

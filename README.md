@@ -80,6 +80,11 @@ MSI and an NSIS installer — those auto-handle the WebView2 dependency.
 
 Click **Start** to connect, **Stop** to disconnect. Each Start clears the on-screen list (DB history is preserved).
 
+## Bundled third-party
+
+- [`douyin-danma-listener`](https://www.npmjs.com/package/douyin-danma-listener) — Douyin live-room WebSocket / signature / protobuf (GPLv3, makes this project GPLv3 transitively).
+- [`MakcRe/KuGouMusicApi`](https://github.com/MakcRe/KuGouMusicApi) — KuGou client API server vendored as a git submodule under `kugou-api/`, built into a sidecar binary. MIT.
+
 ## License
 
 GPLv3 (transitive from `douyin-danma-listener`)

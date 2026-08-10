@@ -1,0 +1,147 @@
+import { useEffect, useRef } from 'react';
+import { addTrackToPlaylist, type KuGouTrack, type EnrichedEntry } from '../kugouSession';
+import type { DanmuInfo } from '../types';
+
+interface Props {
+  enabled: boolean;
+  autoSync: boolean;
+  songs: DanmuInfo[];
+  kugouCache: Record<string, EnrichedEntry>;
+  targetPlaylistId: number;
+  kugouLoggedIn: boolean;
+  onSynced: (track: KuGouTrack, song: DanmuInfo) => void;
+  pushLog: (line: string) => void;
+  checkCooldown: (songName: string) => boolean;
+  // True when this song is over its requester's per-session limit. Such songs
+  // are skipped (left in the queue, never synced) rather than removed.
+  isOverLimit: (song: DanmuInfo) => boolean;
+}
+
+/** Process songs in display order, auto-adding found ones with 3-5s random delay.
+ *  Only songs already found by the eager search are eligible; never retries.
+ *  Blacklisted entries are skipped (left in queue with red text) — the loop
+ *  finds the first non-blocked 'found' song instead. */
+export function useAutoSync({
+  enabled,
+  autoSync,
+  songs,
+  kugouCache,
+  targetPlaylistId,
+  kugouLoggedIn,
+  onSynced,
+  pushLog,
+  checkCooldown,
+  isOverLimit,
+}: Props) {
+  const timerRef = useRef<number | null>(null);
+  const processingRef = useRef(false);
+  const songsRef = useRef(songs);
+  const cacheRef = useRef(kugouCache);
+  const lastSkippedRef = useRef<Set<string>>(new Set());
+  const checkCooldownRef = useRef(checkCooldown);
+  const isOverLimitRef = useRef(isOverLimit);
+  const failCountRef = useRef(0);
+
+  songsRef.current = songs;
+  cacheRef.current = kugouCache;
+  checkCooldownRef.current = checkCooldown;
+  isOverLimitRef.current = isOverLimit;
+
+  useEffect(() => {
+    if (!enabled || !autoSync || !kugouLoggedIn || !targetPlaylistId) {
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+
+    const schedule = (backoff = false) => {
+      // Exponential backoff on consecutive failures: 5s, 10s, 20s, 40s, capped at 60s
+      const baseDelay = backoff
+        ? Math.min(5000 * 2 ** (failCountRef.current - 1), 60000)
+        : 3000 + Math.random() * 2000;
+      timerRef.current = window.setTimeout(tick, baseDelay);
+    };
+
+    const tick = async () => {
+      if (processingRef.current) {
+        schedule();
+        return;
+      }
+      processingRef.current = true;
+      try {
+        const currentSongs = songsRef.current;
+        const currentCache = cacheRef.current;
+
+        // Prune skip-log entries for songs that are no longer blocked.
+        // cooldown:/limit: keys are not cache keys — leave them (limit: keys are
+        // per-msg_id and bounded by session size); only blacklist keys (bare
+        // song names) are re-evaluated against the cache here.
+        for (const key of lastSkippedRef.current) {
+          if (key.startsWith('cooldown:') || key.startsWith('limit:')) continue;
+          const entry = currentCache[key.trim()];
+          if (!entry?.blockedReason) lastSkippedRef.current.delete(key);
+        }
+
+        // Find first 'found', non-blocked, non-cooldown song
+        let found: DanmuInfo | undefined;
+        for (const s of currentSongs) {
+          const entry = currentCache[s.song_name.trim()];
+          if (!entry || entry.status !== 'found' || entry.blockedReason) continue;
+          // Over the per-user session limit: leave it in the queue, never sync.
+          if (isOverLimitRef.current(s)) {
+            if (!lastSkippedRef.current.has(`limit:${s.msg_id}`)) {
+              pushLog(`[auto-sync] ${s.uname} 本场点歌已达上限，跳过: ${s.song_name}`);
+              lastSkippedRef.current.add(`limit:${s.msg_id}`);
+            }
+            continue; // skip, try next song
+          }
+          if (checkCooldownRef.current(s.song_name)) {
+            if (!lastSkippedRef.current.has(`cooldown:${s.song_name}`)) {
+              pushLog(`[auto-sync] cooldown skip: ${s.song_name}`);
+              lastSkippedRef.current.add(`cooldown:${s.song_name}`);
+            }
+            continue; // skip, try next song
+          }
+          found = s;
+          break;
+        }
+
+        if (found) {
+          const entry = currentCache[found.song_name.trim()];
+          if (entry?.status === 'found') {
+            await addTrackToPlaylist(entry.track, targetPlaylistId);
+            failCountRef.current = 0; // reset backoff on success
+            lastSkippedRef.current.delete(`cooldown:${found.song_name}`);
+            onSynced(entry.track, found);
+            pushLog(`[auto-sync] ${found.song_name} → playlist`);
+          }
+        } else {
+          // Log once per blocked/cooldown song to avoid spam
+          for (const s of currentSongs) {
+            const entry = currentCache[s.song_name.trim()];
+            if (entry?.status === 'found' && entry.blockedReason) {
+              if (!lastSkippedRef.current.has(s.song_name)) {
+                pushLog(`[auto-sync] skip blocked (${entry.blockedReason}): ${s.song_name}`);
+                lastSkippedRef.current.add(s.song_name);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        failCountRef.current += 1;
+        const delay = Math.min(5000 * 2 ** (failCountRef.current - 1), 60000);
+        pushLog(`[auto-sync] err (retry in ${delay / 1000}s): ${e}`);
+      } finally {
+        processingRef.current = false;
+        schedule(failCountRef.current > 0);
+      }
+    };
+
+    timerRef.current = window.setTimeout(tick, 2000);
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, [enabled, autoSync, kugouLoggedIn, targetPlaylistId, onSynced, pushLog]);
+}

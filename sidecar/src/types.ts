@@ -1,26 +1,33 @@
-export interface Config {
-  room_id: string;
-  sing_prefix: string;
-  sing_cd: number;
-  fans_level: number;
-  blacklist?: string[];
-}
+import { z } from 'zod';
 
-export interface DanmuInfo {
-  msg_id: string;
-  uid: string;
-  uname: string;
-  song_name: string;
-  raw_msg: string;
-  medal_level: number;
-  medal_name: string;
-  send_time: number;
-}
+export const ConfigSchema = z.object({
+  room_id: z.string(),
+  sing_prefix: z.string(),
+  sing_cd: z.number(),
+  fans_level: z.number(),
+  blacklist: z.array(z.string()).optional(),
+});
+export type Config = z.infer<typeof ConfigSchema>;
 
-export type SidecarCmd =
-  | { cmd: 'start'; config: Config }
-  | { cmd: 'stop' }
-  | { cmd: 'reload_config'; config: Config };
+export const DanmuInfoSchema = z.object({
+  msg_id: z.string(),
+  uid: z.string(),
+  uname: z.string(),
+  song_name: z.string(),
+  raw_msg: z.string(),
+  medal_level: z.number(),
+  medal_name: z.string(),
+  send_time: z.number(),
+});
+export type DanmuInfo = z.infer<typeof DanmuInfoSchema>;
+
+export const SidecarCmdSchema = z.discriminatedUnion('cmd', [
+  z.object({ cmd: z.literal('start'), config: ConfigSchema }),
+  z.object({ cmd: z.literal('stop') }),
+  z.object({ cmd: z.literal('reload_config'), config: ConfigSchema }),
+  z.object({ cmd: z.literal('set_companion_pid'), pid: z.number().optional() }),
+]);
+export type SidecarCmd = z.infer<typeof SidecarCmdSchema>;
 
 export type SidecarEvent =
   | { event: 'status'; connected: boolean; message?: string }

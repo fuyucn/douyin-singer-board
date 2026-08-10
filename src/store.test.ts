@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { dedupedSongs } from './store';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { dedupedSongs, useAppStore } from './store';
 import type { DanmuInfo } from './types';
 
 const song = (over: Partial<DanmuInfo>): DanmuInfo => ({
@@ -78,5 +78,197 @@ describe('dedupedSongs', () => {
     const out = dedupedSongs([auto, manual]);
     expect(out).toHaveLength(1);
     expect(out[0].msg_id).toBe('m');
+  });
+});
+
+// ─── Store actions ─────────────────────────────────────────────
+
+describe('useAppStore', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      songs: [],
+      played: [],
+      blacklist: [],
+      blockedSongKeys: new Set<string>(),
+      blockedSingers: new Set<string>(),
+      autoSync: false,
+    });
+  });
+
+  describe('songs', () => {
+    it('addSong prepends', () => {
+      const a = song({ msg_id: 'a', song_name: 'A', send_time: 1 });
+      const b = song({ msg_id: 'b', song_name: 'B', send_time: 2 });
+      useAppStore.getState().addSong(a);
+      useAppStore.getState().addSong(b);
+      expect(useAppStore.getState().songs.map((s) => s.msg_id)).toEqual(['b', 'a']);
+    });
+
+    it('removeByMsgId removes matching song', () => {
+      useAppStore.getState().addSong(song({ msg_id: 'a', song_name: 'A' }));
+      useAppStore.getState().addSong(song({ msg_id: 'b', song_name: 'B' }));
+      useAppStore.getState().removeByMsgId('a');
+      expect(useAppStore.getState().songs.map((s) => s.msg_id)).toEqual(['b']);
+    });
+
+    it('cancelByUid removes song by uid', () => {
+      useAppStore.getState().addSong(song({ msg_id: 'a', uid: 'u1', song_name: 'A' }));
+      useAppStore.getState().addSong(song({ msg_id: 'b', uid: 'u2', song_name: 'B' }));
+      useAppStore.getState().cancelByUid('u1');
+      expect(useAppStore.getState().songs.map((s) => s.msg_id)).toEqual(['b']);
+    });
+
+    it('clearSongs empties the list', () => {
+      useAppStore.getState().addSong(song({ msg_id: 'a', song_name: 'A' }));
+      useAppStore.getState().clearSongs();
+      expect(useAppStore.getState().songs).toHaveLength(0);
+    });
+
+    it('manualAdd creates a manual entry with uid=manual and uname=Host', () => {
+      const item = useAppStore.getState().manualAdd('测试歌曲');
+      expect(item.uid).toBe('manual');
+      expect(item.uname).toBe('Host');
+      expect(item.song_name).toBe('测试歌曲');
+      expect(useAppStore.getState().songs).toHaveLength(1);
+    });
+  });
+
+  describe('played', () => {
+    it('addPlayed attaches played_at and moves to played list', () => {
+      const s = song({ msg_id: 'a', song_name: 'A' });
+      useAppStore.getState().addPlayed(s);
+      const played = useAppStore.getState().played;
+      expect(played).toHaveLength(1);
+      expect(played[0].msg_id).toBe('a');
+      expect(played[0].played_at).toBeGreaterThan(0);
+    });
+
+    it('played songs are sorted by played_at descending', () => {
+      const a = song({ msg_id: 'a', song_name: 'A' });
+      const b = song({ msg_id: 'b', song_name: 'B' });
+      useAppStore.getState().addPlayed(a);
+      // Small delay so timestamps differ
+      useAppStore.getState().addPlayed(b);
+      const played = useAppStore.getState().played;
+      expect(played[0].msg_id).toBe('b');
+      expect(played[1].msg_id).toBe('a');
+    });
+
+    it('clearPlayed empties played list', () => {
+      useAppStore.getState().addPlayed(song({ msg_id: 'a', song_name: 'A' }));
+      useAppStore.getState().clearPlayed();
+      expect(useAppStore.getState().played).toHaveLength(0);
+    });
+  });
+
+  describe('blacklist', () => {
+    const songEntry = (
+      over?: Partial<{ id: number; songName: string; singerName: string; createdAt: number }>,
+    ) => ({
+      id: over?.id ?? 1,
+      entryType: 'song' as const,
+      songName: over?.songName ?? 'bad song',
+      singerName: over?.singerName ?? 'Test Singer',
+      createdAt: over?.createdAt ?? 123,
+    });
+
+    const singerEntry = (
+      over?: Partial<{ id: number; singerName: string; createdAt: number }>,
+    ) => ({
+      id: over?.id ?? 1,
+      entryType: 'singer' as const,
+      songName: '',
+      singerName: over?.singerName ?? 'Blocked Singer',
+      createdAt: over?.createdAt ?? 123,
+    });
+
+    it('addSongToBlacklist prepends item and updates blockedSongKeys', () => {
+      const item = songEntry({ songName: 'bad', singerName: 'S' });
+      useAppStore.getState().addSongToBlacklist(item);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].songName).toBe('bad');
+      expect(useAppStore.getState().blockedSongKeys.has('bad|S')).toBe(true);
+    });
+
+    it('addSingerToBlacklist prepends item and updates blockedSingers', () => {
+      const item = singerEntry({ singerName: 'Blocked' });
+      useAppStore.getState().addSingerToBlacklist(item);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].entryType).toBe('singer');
+      expect(useAppStore.getState().blockedSingers.has('Blocked')).toBe(true);
+    });
+
+    it('removeFromBlacklist removes by id and rebuilds sets', () => {
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 1, songName: 'a', singerName: 'SA' }));
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 2, songName: 'b', singerName: 'SB' }));
+      useAppStore.getState().removeFromBlacklist(1);
+      expect(useAppStore.getState().blacklist).toHaveLength(1);
+      expect(useAppStore.getState().blacklist[0].id).toBe(2);
+      expect(useAppStore.getState().blockedSongKeys.has('a|SA')).toBe(false);
+      expect(useAppStore.getState().blockedSongKeys.has('b|SB')).toBe(true);
+    });
+
+    it('hydrateBlacklist builds array and both sets', () => {
+      useAppStore.getState().hydrateBlacklist([
+        { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
+        { id: 2, entry_type: 'singer', song_name: '', singer_name: 'SY', created_at: 2 },
+      ]);
+      expect(useAppStore.getState().blacklist).toHaveLength(2);
+      expect(useAppStore.getState().blacklist[0].entryType).toBe('song');
+      expect(useAppStore.getState().blacklist[1].entryType).toBe('singer');
+      expect(useAppStore.getState().blockedSongKeys.has('x|SX')).toBe(true);
+      expect(useAppStore.getState().blockedSingers.has('SY')).toBe(true);
+    });
+
+    it('blockedSongKeys is independent per add (no mutation of previous)', () => {
+      useAppStore
+        .getState()
+        .hydrateBlacklist([
+          { id: 1, entry_type: 'song', song_name: 'x', singer_name: 'SX', created_at: 1 },
+        ]);
+      const first = useAppStore.getState().blockedSongKeys;
+      useAppStore
+        .getState()
+        .addSongToBlacklist(songEntry({ id: 2, songName: 'y', singerName: 'SY' }));
+      expect(first.has('y|SY')).toBe(false);
+    });
+  });
+
+  describe('logs', () => {
+    beforeEach(() => {
+      useAppStore.setState({ logs: [] });
+    });
+
+    it('pushLog keeps max 500 entries', () => {
+      const state = useAppStore.getState();
+      for (let i = 0; i < 510; i++) {
+        state.pushLog(`line ${i}`);
+      }
+      expect(useAppStore.getState().logs).toHaveLength(500);
+    });
+
+    it('clearLogs resets to empty array', () => {
+      useAppStore.getState().pushLog('a');
+      useAppStore.getState().pushLog('b');
+      useAppStore.getState().clearLogs();
+      expect(useAppStore.getState().logs).toEqual([]);
+    });
+  });
+
+  describe('autoSync', () => {
+    it('defaults to false', () => {
+      expect(useAppStore.getState().autoSync).toBe(false);
+    });
+
+    it('setAutoSync toggles value', () => {
+      useAppStore.getState().setAutoSync(true);
+      expect(useAppStore.getState().autoSync).toBe(true);
+      useAppStore.getState().setAutoSync(false);
+      expect(useAppStore.getState().autoSync).toBe(false);
+    });
   });
 });

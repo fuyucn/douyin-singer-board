@@ -12,11 +12,12 @@
 
 import readline from 'node:readline';
 import { Matcher } from './matcher.js';
-import type { Config, SidecarCmd, SidecarEvent } from './types.js';
+import { SidecarCmdSchema, type Config, type SidecarCmd, type SidecarEvent } from './types.js';
 
 let DouYinDanmaClient: any = null;
 let listener: any = null;
 let matcher: Matcher | null = null;
+let companionPid: number | null = null;
 
 function emit(ev: SidecarEvent): void {
   process.stdout.write(JSON.stringify(ev) + '\n');
@@ -33,14 +34,31 @@ function log(level: 'debug' | 'info' | 'warn' | 'error', msg: string): void {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
+const FETCH_TIMEOUT_MS = 10_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} (${url})`);
+    return res;
+  } catch (e: any) {
+    if (e?.name === 'AbortError') throw new Error(`request timed out after ${FETCH_TIMEOUT_MS / 1000}s (${url})`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getTtwid(): Promise<string> {
-  const res = await fetch('https://live.douyin.com/', {
+  const res = await fetchWithTimeout('https://live.douyin.com/', {
     method: 'GET',
     headers: { 'User-Agent': UA },
   });
   const setCookie = res.headers.get('set-cookie') ?? '';
   const m = setCookie.match(/ttwid=([^;,\s]+)/);
-  if (!m) throw new Error('no ttwid in response');
+  if (!m) throw new Error('no ttwid in response — Douyin may have changed their cookie format');
   return m[1];
 }
 
@@ -50,18 +68,18 @@ async function resolveIdStr(input: string): Promise<string> {
 
   log('info', `resolving web_rid ${input} -> id_str ...`);
   const ttwid = await getTtwid();
-  const html = await fetch(`https://live.douyin.com/${encodeURIComponent(input)}`, {
+  const res = await fetchWithTimeout(`https://live.douyin.com/${encodeURIComponent(input)}`, {
     headers: {
       'User-Agent': UA,
       Cookie: `ttwid=${ttwid}; __ac_nonce=0123407cc00a9e438deb4`,
       'Accept-Encoding': 'gzip, deflate',
     },
-  }).then((r) => r.text());
+  });
+  const html = await res.text();
 
   const m = html.match(/roomId\\":\\"(\d+)\\"/);
   if (!m) {
-    log('warn', `no roomId match in HTML, use input ${input} as-is`);
-    return input;
+    throw new Error(`room not found or page structure changed for web_rid: ${input} — check that the room ID is correct and the room is live`);
   }
   log('info', `id_str = ${m[1]}`);
   return m[1];
@@ -182,24 +200,126 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
         if (matcher) matcher.reload(cmd.config);
         else log('warn', 'reload_config before start, ignored');
         break;
+      case 'set_companion_pid':
+        companionPid = cmd.pid ?? null;
+        if (cmd.pid) log('info', `companion pid set: ${cmd.pid}`);
+        else log('info', 'companion pid cleared');
+        break;
     }
   } catch (e) {
     emit({ event: 'error', msg: String((e as Error)?.message ?? e) });
   }
 }
 
+// Unified shutdown: kill the companion kugou-api, best-effort stop the
+// listener, then exit. Never blocks on stop() — a hung close() must not keep
+// the process (and its child) alive. Idempotent.
+let shuttingDown = false;
+function shutdown(reason: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    log('info', `shutting down: ${reason}`);
+  } catch {
+    /* stdout may be gone if the parent already died */
+  }
+  if (companionPid) {
+    try {
+      if (process.platform === 'win32') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { execSync } = require('node:child_process') as typeof import('node:child_process');
+        execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
+      } else {
+        process.kill(companionPid, 'SIGKILL');
+      }
+    } catch {
+      /* already gone */
+    }
+  }
+  void stop(); // closes the listener synchronously; do not await
+  process.exit(0);
+}
+
 const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', (line) => {
   if (!line.trim()) return;
+  let parsed: unknown;
   try {
-    const cmd = JSON.parse(line) as SidecarCmd;
-    void handleCmd(cmd);
-  } catch {
-    emit({ event: 'error', msg: `invalid cmd: ${line}` });
+    parsed = JSON.parse(line);
+  } catch (e) {
+    emit({ event: 'error', msg: `invalid JSON cmd: ${(e as Error).message}` });
+    return;
   }
+  const result = SidecarCmdSchema.safeParse(parsed);
+  if (!result.success) {
+    emit({ event: 'error', msg: `cmd schema violation: ${result.error.message}` });
+    return;
+  }
+  void handleCmd(result.data);
 });
 
-process.on('SIGTERM', () => void stop().then(() => process.exit(0)));
-process.on('SIGINT', () => void stop().then(() => process.exit(0)));
+// Primary parent-death signal: when the Tauri parent dies, the stdin pipe's
+// write end closes and we get EOF here. Far more reliable than polling ppid
+// (which can be cached / defeated by PID reuse on macOS). Covers force-quit
+// and crashes where the Rust-side cleanup never runs.
+rl.on('close', () => shutdown('stdin closed (parent gone)'));
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Survive late events from douyin-danma-listener after close()
+// (e.g. queued WS frames decoded after the listener is null'd).
+// Without these, an unhandled 'error' or rejection crashes the process and
+// the Tauri side sees a stderr stack and process exit.
+process.on('uncaughtException', (err) => {
+  log('warn', `uncaughtException: ${(err as Error)?.message ?? err}`);
+});
+process.on('unhandledRejection', (reason) => {
+  log('warn', `unhandledRejection: ${(reason as Error)?.message ?? String(reason)}`);
+});
+
+// Dev hot-reload: when esbuild --watch rewrites our own bundled file,
+// exit so the Tauri-side recovery hook respawns us with the new code.
+if (process.env.SIDECAR_DEV) {
+  void (async () => {
+    try {
+      const { watch } = await import('node:fs');
+      const watcher = watch(__filename, { persistent: false }, () => {
+        log('info', '[dev] source rebuilt — exiting for restart');
+        watcher.close();
+        setTimeout(() => process.exit(0), 200);
+      });
+    } catch {
+      /* fs.watch may be unavailable on some platforms */
+    }
+  })();
+}
+
+// Parent process watchdog — exit if the Tauri parent disappears.
+// Also kills the companion kugou-api process if one was registered.
+//
+// We use TWO checks to be robust against macOS PID reuse:
+//  1. process.ppid changed (becomes 1 / launchd when reparented to init).
+//     On Unix, an orphan is reparented; ppid reflects the new parent.
+//  2. process.kill(originalPpid, 0) → ESRCH. Belt-and-suspenders for
+//     systems where ppid doesn't update reliably.
+const originalParentPid = process.ppid;
+setInterval(() => {
+  const currentPpid = process.ppid;
+  let parentGone = false;
+  if (currentPpid !== originalParentPid) {
+    parentGone = true;
+  } else {
+    try {
+      process.kill(originalParentPid, 0);
+    } catch (e: any) {
+      if (e?.code === 'ESRCH') parentGone = true;
+    }
+  }
+  if (parentGone) {
+    // Belt-and-suspenders behind the stdin-EOF handler above.
+    shutdown(`parent process gone (ppid was ${originalParentPid}, now ${currentPpid})`);
+  }
+}, 2000);
 
 log('info', 'sidecar ready');
