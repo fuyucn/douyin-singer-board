@@ -30,6 +30,7 @@ export function AboutModal({ onClose }: Props) {
   const config = useAppStore((s) => s.config);
   const setConfig = useAppStore((s) => s.setConfig);
   const setAutoSync = useAppStore((s) => s.setAutoSync);
+  const logs = useAppStore((s) => s.logs);
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
   const [telemetryOn, setTelemetryOn] = useState(false);
@@ -53,9 +54,9 @@ export function AboutModal({ onClose }: Props) {
 
   const onExportTelemetry = async () => {
     try {
-      const jsonl = await exportTelemetry(CURRENT_VERSION);
+      const jsonl = await exportTelemetry(CURRENT_VERSION, logs);
       await navigator.clipboard.writeText(jsonl);
-      toast.success('诊断数据已复制到剪贴板');
+      toast.success(`诊断数据已复制到剪贴板 (${logs.length} 条日志)`);
     } catch (e) {
       toast.error(`导出失败: ${e}`);
     }

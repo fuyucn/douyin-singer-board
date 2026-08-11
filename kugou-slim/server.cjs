@@ -14,6 +14,19 @@ const { createRequest } = require('../kugou-api/util/request');
 const guid = cryptoMd5(getGuid());
 const serverDev = randomString(10).toUpperCase();
 
+// Upstream modules often throw with Error instances nested in the response
+// body. Normalize them before logging/sending so the UI shows a real message
+// instead of `[object Object]`.
+function normalizeErrorBody(body) {
+  if (body instanceof Error) return { msg: body.message };
+  if (body && typeof body === 'object') {
+    for (const key of Object.keys(body)) {
+      if (body[key] instanceof Error) body[key] = body[key].message;
+    }
+  }
+  return body;
+}
+
 const routes = [
   ['/login/qr/key', require('../kugou-api/module/login_qr_key')],
   ['/login/qr/create', require('../kugou-api/module/login_qr_create')],
@@ -140,10 +153,10 @@ function constructServer() {
         res.header(moduleResponse.headers).status(moduleResponse.status).send(moduleResponse.body);
       } catch (e) {
         const moduleResponse = e;
-        console.log('[ERR]', decode(req.originalUrl), {
-          status: moduleResponse.status,
-          body: moduleResponse.body,
-        });
+        if (moduleResponse.body) moduleResponse.body = normalizeErrorBody(moduleResponse.body);
+        const body = moduleResponse.body;
+        const msg = body && typeof body === 'object' ? JSON.stringify(body) : String(body ?? moduleResponse);
+        console.log('[ERR]', decode(req.originalUrl), `status=${moduleResponse.status} body=${msg}`);
 
         if (!moduleResponse.body) {
           res.status(404).send({
