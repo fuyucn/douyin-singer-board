@@ -58,9 +58,12 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
           placeholder="输入歌手名…"
         />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton disabled={!input.trim()} onClick={handleAdd}>
+          <InputGroupButton
+            disabled={!input.trim()}
+            onClick={handleAdd}
+            aria-label="添加歌手"
+          >
             <Plus className="size-4" />
-            添加
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>

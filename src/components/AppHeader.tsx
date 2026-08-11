@@ -1,5 +1,4 @@
 import { Moon, Sun, Play, Square } from 'lucide-react';
-import { useWindowWidth } from '@/hooks/useWindowWidth';
 import { GearIcon, InfoCircledIcon } from '@radix-ui/react-icons';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from './AppLogo';
@@ -32,8 +31,6 @@ export function AppHeader({
   onStop,
 }: Props) {
   const isDark = theme === 'dark';
-  const windowWidth = useWindowWidth();
-  const isNarrow = windowWidth < 720;
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--border-soft)] bg-[var(--bg-elev)] px-4">
@@ -92,7 +89,7 @@ export function AppHeader({
         <Button
           variant="ghost"
           size="icon"
-          className="text-fg-muted hover:text-fg-base size-8"
+          className="size-8 text-[var(--fg-muted)] hover:text-[var(--fg-base)]"
           onClick={onShowAbout}
           title="关于 / 检查更新"
         >
@@ -102,24 +99,22 @@ export function AppHeader({
         {/* Start / Stop — primary action */}
         {!running ? (
           <Button
-            size={isNarrow ? 'icon' : 'sm'}
-            className={isNarrow ? 'ml-2 size-8' : 'ml-2 h-8 gap-1.5 px-4'}
+            size="icon"
+            className="ml-2 size-8"
             onClick={onStart}
             title="开始"
           >
             <Play className="size-4" />
-            {!isNarrow && '开始'}
           </Button>
         ) : (
           <Button
-            size={isNarrow ? 'icon' : 'sm'}
+            size="icon"
             variant="destructive"
-            className={isNarrow ? 'ml-2 size-8' : 'ml-2 h-8 px-4'}
+            className="ml-2 size-8"
             onClick={onStop}
             title="停止"
           >
             <Square className="size-3.5 fill-current" />
-            {!isNarrow && '停止'}
           </Button>
         )}
       </div>
