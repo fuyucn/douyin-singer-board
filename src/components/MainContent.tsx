@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useWindowWidth } from '@/hooks/useWindowWidth';
-import { Trash2, Music, Search, X } from 'lucide-react';
+import { Trash2, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -461,9 +461,6 @@ export function MainContent({
 function EmptyState({ running }: { running: boolean }) {
   return (
     <div className="text-fg-faint flex flex-1 flex-col items-center justify-center gap-3 py-16">
-      <div className="bg-bg-soft flex size-16 items-center justify-center rounded-md">
-        <Music className="text-fg-faint size-8" />
-      </div>
       <div className="text-center">
         <div className="text-fg-muted font-medium">
           {running ? '等待点歌...' : '当前点歌列表为空'}

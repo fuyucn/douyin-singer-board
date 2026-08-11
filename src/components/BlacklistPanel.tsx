@@ -8,7 +8,7 @@ import {
   InputGroupInput,
 } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { X, ShieldOff, Plus } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 
 export interface BlacklistItemUI {
   id: number;
@@ -72,7 +72,6 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
       <div className="flex min-h-0 flex-1 flex-col">
         {addBar}
         <div className="text-fg-faint flex flex-1 flex-col items-center justify-center gap-2">
-          <ShieldOff className="size-8 opacity-30" />
           <p className="text-sm">黑名单为空</p>
           <p className="text-xs">右键点歌列表可添加歌曲/歌手</p>
         </div>

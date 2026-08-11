@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Props {
   children: React.ReactNode;
@@ -14,7 +14,6 @@ export function CollapsiblePanel({ children }: Props) {
         className="flex w-full items-center gap-2 px-4 py-2 text-[13px] font-medium text-[var(--fg-base)] hover:bg-[var(--bg-soft)]"
         onClick={() => setExpanded(!expanded)}
       >
-        <Settings className="text-fg-faint size-4" />
         <span>配置</span>
         {expanded ? (
           <ChevronUp className="ml-auto size-4" />
