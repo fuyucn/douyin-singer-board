@@ -15,11 +15,12 @@ use process_wrap::tokio::*;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
-use tokio::sync::Mutex;
+use tokio::sync::{watch, Mutex};
 
 use crate::kugou_api::KugouApiState;
 
@@ -39,13 +40,20 @@ fn sha256_hex(data: &[u8]) -> String {
 pub struct SidecarHandle {
     stdin: Mutex<Option<ChildStdin>>,
     child: Mutex<Option<Box<dyn ChildWrapper>>>,
+    ready_tx: watch::Sender<bool>,
+    ready_rx: watch::Receiver<bool>,
+    generation: AtomicU64,
 }
 
 impl SidecarHandle {
     pub fn new() -> Self {
+        let (ready_tx, ready_rx) = watch::channel(false);
         Self {
             stdin: Mutex::new(None),
             child: Mutex::new(None),
+            ready_tx,
+            ready_rx,
+            generation: AtomicU64::new(0),
         }
     }
 
@@ -54,6 +62,28 @@ impl SidecarHandle {
     /// treat "not running" as an already-stopped state.
     pub async fn is_running(&self) -> bool {
         self.stdin.lock().await.is_some()
+    }
+
+    /// Wait until `spawn()` has made stdin writable, or until `timeout`
+    /// elapses. Only commands that must reach a live sidecar should call this;
+    /// `stop`/`reload_config` are expected to tolerate "not running".
+    pub async fn wait_ready(&self, timeout: std::time::Duration) -> Result<(), String> {
+        if self.stdin.lock().await.is_some() {
+            return Ok(());
+        }
+        let mut ready = self.ready_rx.clone();
+        loop {
+            if self.stdin.lock().await.is_some() {
+                return Ok(());
+            }
+            if *ready.borrow() {
+                return Ok(());
+            }
+            tokio::time::timeout(timeout, ready.changed())
+                .await
+                .map_err(|_| format!("sidecar not ready within {}s", timeout.as_secs()))?
+                .map_err(|_| "sidecar readiness channel closed".to_string())?;
+        }
     }
 
     /// Explicitly kill the child process, then drop the wrapper.
@@ -157,6 +187,7 @@ impl SidecarHandle {
         if self.stdin.lock().await.is_some() {
             return Ok(());
         }
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
 
         // Dev hot-reload: if SIDECAR_DEV_PATH is set, spawn `node <path>`
         // directly instead of extracting the embedded binary. The script
@@ -206,10 +237,12 @@ impl SidecarHandle {
         let stdin = child.stdin().take().ok_or("no stdin")?;
 
         *self.stdin.lock().await = Some(stdin);
+        let _ = self.ready_tx.send(true);
 
         // stdout: parse JSON, forward as sidecar-event.
         // On EOF (process exit), reset state and emit crash event for frontend recovery.
         let app_out = app.clone();
+        let state_gen = generation;
         tauri::async_runtime::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
@@ -218,15 +251,18 @@ impl SidecarHandle {
                 }
             }
             // EOF: sidecar process exited
-            log_to_ui(&app_out, "warn", "[sidecar] process exited (stdout EOF)");
             if let Some(state) = app_out.try_state::<SidecarState>() {
-                *state.stdin.lock().await = None;
-                *state.child.lock().await = None;
+                if state.generation.load(Ordering::SeqCst) == state_gen {
+                    log_to_ui(&app_out, "warn", "[sidecar] process exited (stdout EOF)");
+                    *state.stdin.lock().await = None;
+                    *state.child.lock().await = None;
+                    let _ = state.ready_tx.send(false);
+                    if let Some(kugou) = app_out.try_state::<KugouApiState>() {
+                        kugou.reset().await;
+                    }
+                    let _ = app_out.emit("sidecar-event", json!({ "event": "crashed" }));
+                }
             }
-            if let Some(kugou) = app_out.try_state::<KugouApiState>() {
-                kugou.reset().await;
-            }
-            let _ = app_out.emit("sidecar-event", json!({ "event": "crashed" }));
         });
 
         // stderr: each line surfaces in the UI log panel.
@@ -245,6 +281,13 @@ impl SidecarHandle {
     }
 
     pub async fn send(&self, cmd: Value) -> Result<(), String> {
+        let needs_ready = matches!(
+            cmd.get("cmd").and_then(Value::as_str),
+            Some("start") | Some("kugou_start")
+        );
+        if needs_ready {
+            self.wait_ready(std::time::Duration::from_secs(8)).await?;
+        }
         let mut stdin_lock = self.stdin.lock().await;
         let stdin = stdin_lock.as_mut().ok_or("sidecar not running")?;
         let mut line = serde_json::to_string(&cmd).map_err(|e| e.to_string())?;
@@ -271,6 +314,13 @@ pub type SidecarState = Arc<SidecarHandle>;
 #[tauri::command]
 pub async fn sidecar_send(state: tauri::State<'_, SidecarState>, cmd: Value) -> Result<(), String> {
     state.send(cmd).await
+}
+
+#[tauri::command]
+pub async fn sidecar_wait_ready(state: tauri::State<'_, SidecarState>) -> Result<(), String> {
+    state
+        .wait_ready(std::time::Duration::from_secs(8))
+        .await
 }
 
 #[tauri::command]

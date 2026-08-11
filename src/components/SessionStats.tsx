@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { DanmuInfo } from '../types';
 
@@ -14,8 +14,6 @@ interface Props {
   running: boolean;
   steps: Step[];
 }
-
-const STEPS_FADE_DELAY = 1500;
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.floor(seconds)}秒`;
@@ -40,24 +38,8 @@ export function SessionStats({ songs, played, running, steps }: Props) {
     return () => window.clearInterval(t);
   }, [running]);
 
-  // Steps visibility: show while any pending; keep visible briefly after all-done, then hide.
-  const doneAll = steps.every((s) => s.status === 'done');
-  const [stepsVisible, setStepsVisible] = useState(!doneAll);
-  const prevDoneAll = useRef(doneAll);
-  useEffect(() => {
-    if (doneAll && !prevDoneAll.current) {
-      setStepsVisible(true);
-      const t = window.setTimeout(() => setStepsVisible(false), STEPS_FADE_DELAY);
-      return () => window.clearTimeout(t);
-    } else if (!doneAll) {
-      setStepsVisible(true);
-    }
-    prevDoneAll.current = doneAll;
-  }, [doneAll]);
-
   const total = songs.length + played.length;
   const showStats = total > 0 || running;
-  if (!showStats && !stepsVisible) return null;
 
   const allSongs = [...songs, ...played];
   const earliest = allSongs.reduce((min, s) => Math.min(min, s.send_time), Number.MAX_SAFE_INTEGER);
@@ -82,27 +64,25 @@ export function SessionStats({ songs, played, running, steps }: Props) {
         </>
       )}
 
-      {/* Startup checklist (right side) — visible while pending or briefly after all done */}
-      {stepsVisible && (
-        <div className="ml-auto flex items-center gap-4">
-          {steps.map((s) => (
-            <span
-              key={s.key}
-              className={cn(
-                'inline-flex items-center gap-1',
-                s.status === 'done' ? 'text-success' : 'text-fg-faint',
-              )}
-            >
-              {s.status === 'done' ? (
-                <span className="text-[11px]">✓</span>
-              ) : (
-                <span className="bg-fg-faint inline-block size-2 rounded-full" />
-              )}
-              {s.label}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Startup checklist (right side) — always visible */}
+      <div className="ml-auto flex items-center gap-4">
+        {steps.map((s) => (
+          <span
+            key={s.key}
+            className={cn(
+              'inline-flex items-center gap-1',
+              s.status === 'done' ? 'text-success' : 'text-fg-faint',
+            )}
+          >
+            {s.status === 'done' ? (
+              <span className="text-[11px]">✓</span>
+            ) : (
+              <span className="bg-fg-faint inline-block size-2 rounded-full" />
+            )}
+            {s.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

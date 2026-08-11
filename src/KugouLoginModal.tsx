@@ -199,6 +199,7 @@ export function KugouLoginModal({ onClose }: Props) {
               <Button
                 variant="destructive"
                 className="border-danger"
+                style={{ color: '#fff' }}
                 onClick={onLogout}
                 disabled={busy}
               >

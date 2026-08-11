@@ -315,6 +315,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             sidecar::sidecar_send,
+            sidecar::sidecar_wait_ready,
             sidecar::sidecar_respawn,
             kugou_set_enabled,
             kugou::kugou_search,

@@ -24,9 +24,10 @@ import { useAppStore } from './store';
 
 interface Props {
   onClose: () => void;
+  onOpenKgDebug?: () => void;
 }
 
-export function AboutModal({ onClose }: Props) {
+export function AboutModal({ onClose, onOpenKgDebug }: Props) {
   const config = useAppStore((s) => s.config);
   const setConfig = useAppStore((s) => s.setConfig);
   const setAutoSync = useAppStore((s) => s.setAutoSync);
@@ -205,6 +206,16 @@ export function AboutModal({ onClose }: Props) {
                 onCheckedChange={onToggleKugou}
               />
             </div>
+            {config.kugou_enabled && onOpenKgDebug && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2.5"
+                onClick={onOpenKgDebug}
+              >
+                打开 KuGou 调试面板
+              </Button>
+            )}
           </div>
         </div>
       </div>

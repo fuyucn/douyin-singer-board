@@ -1,9 +1,8 @@
-import { Bug, Info, Moon, Play, Square, Sun, Terminal } from 'lucide-react';
+import { Info, Moon, Play, Square, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from './AppLogo';
 import { ConnectionStatus } from './ConnectionStatus';
 import type { Theme } from '../theme';
-import { useShowLogs } from '../hooks/useShowLogs';
 
 interface Props {
   theme: Theme;
@@ -13,7 +12,6 @@ interface Props {
   onThemeChange: (t: Theme) => void;
   onShowKgLogin: () => void;
   onShowAbout: () => void;
-  onShowKgDebug?: () => void;
   onStart: () => void;
   onStop: () => void;
 }
@@ -26,20 +24,18 @@ export function AppHeader({
   onThemeChange,
   onShowKgLogin,
   onShowAbout,
-  onShowKgDebug,
   onStart,
   onStop,
 }: Props) {
   const isDark = theme === 'dark';
-  const [showLogs, setShowLogs] = useShowLogs();
 
   return (
     <header className="flex h-[52px] shrink-0 items-center gap-3 border-b border-[var(--border-soft)] bg-[var(--bg-elev)] px-4">
       {/* Logo + title */}
       <AppLogo />
-      <div className="flex items-baseline gap-2 whitespace-nowrap">
-        <span className="text-sm font-semibold text-[var(--fg-base)]">SUSUSongBoard</span>
-      </div>
+      <span className="text-sm font-semibold whitespace-nowrap text-[var(--fg-base)]">
+        SUSUSongBoard
+      </span>
       <ConnectionStatus />
 
       <div className="flex-1" />
@@ -74,30 +70,6 @@ export function AppHeader({
             />
           </Button>
         )}
-
-        {/* Settings / debug */}
-        {kugouEnabled && onShowKgDebug && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-[30px] rounded-[6px] text-[var(--fg-muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--fg-base)]"
-            onClick={onShowKgDebug}
-            title="KuGou API 调试面板"
-          >
-            <Bug className="size-[15px]" />
-          </Button>
-        )}
-
-        {/* Logs */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-[30px] rounded-[6px] text-[var(--fg-muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--fg-base)]"
-          onClick={() => setShowLogs(!showLogs)}
-          title="日志"
-        >
-          <Terminal className="size-[15px]" />
-        </Button>
 
         {/* About */}
         <Button
