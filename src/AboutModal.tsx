@@ -21,6 +21,7 @@ import { Switch } from './components/ui/switch';
 import { useShowLogs } from './hooks/useShowLogs';
 import { saveConfig } from './db';
 import { useAppStore } from './store';
+import { KUGOU_LOCKED_ENABLED } from './types';
 
 interface Props {
   onClose: () => void;
@@ -94,7 +95,7 @@ export function AboutModal({ onClose, onOpenKgDebug }: Props) {
   };
 
   const onToggleKugou = async (next: boolean) => {
-    if (kugouBusy) return;
+    if (kugouBusy || KUGOU_LOCKED_ENABLED) return;
     setKugouBusy(true);
     try {
       await invoke('kugou_set_enabled', { enabled: next });
@@ -201,8 +202,8 @@ export function AboutModal({ onClose, onOpenKgDebug }: Props) {
                 </div>
               </div>
               <Switch
-                checked={config.kugou_enabled}
-                disabled={kugouBusy}
+                checked={config.kugou_enabled || KUGOU_LOCKED_ENABLED}
+                disabled={kugouBusy || KUGOU_LOCKED_ENABLED}
                 onCheckedChange={onToggleKugou}
               />
             </div>

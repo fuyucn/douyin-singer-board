@@ -46,3 +46,6 @@ export type SidecarEvent = z.infer<typeof SidecarEventSchema>;
 export const DEFAULT_SING_PREFIX = '点歌[space][song]';
 
 export const DEFAULT_ROOM_ID = '767116735823';
+
+/** SUSU custom edition ships with Kugou locked on; the About toggle is disabled. */
+export const KUGOU_LOCKED_ENABLED = true;

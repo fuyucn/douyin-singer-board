@@ -1,6 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import type { Config, DanmuInfo } from './types';
-import { DEFAULT_ROOM_ID } from './types';
+import { DEFAULT_ROOM_ID, KUGOU_LOCKED_ENABLED } from './types';
 
 let _db: Database | null = null;
 
@@ -86,14 +86,14 @@ export async function loadConfig(): Promise<Config> {
       max_songs_per_user: 3,
       target_playlist_name: '',
       target_playlist_id: 0,
-      kugou_enabled: true,
+      kugou_enabled: KUGOU_LOCKED_ENABLED,
     };
   }
   const row = rows[0];
   return {
     ...row,
     room_id: row.room_id.trim() || DEFAULT_ROOM_ID,
-    kugou_enabled: Boolean(row.kugou_enabled),
+    kugou_enabled: KUGOU_LOCKED_ENABLED,
   };
 }
 
