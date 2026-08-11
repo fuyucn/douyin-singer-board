@@ -207,12 +207,7 @@ export function AboutModal({ onClose, onOpenKgDebug }: Props) {
               />
             </div>
             {config.kugou_enabled && onOpenKgDebug && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2.5"
-                onClick={onOpenKgDebug}
-              >
+              <Button variant="outline" size="sm" className="mt-2.5" onClick={onOpenKgDebug}>
                 打开 KuGou 调试面板
               </Button>
             )}

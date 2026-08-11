@@ -43,10 +43,9 @@ export async function setTelemetryOptIn(optIn: boolean): Promise<void> {
   if (optIn) {
     const row = await loadConfigRow();
     const deviceId = row.device_id || randomDeviceId();
-    await db.execute(
-      'UPDATE telemetry_config SET opt_in = 1, device_id = $1 WHERE id = 1',
-      [deviceId],
-    );
+    await db.execute('UPDATE telemetry_config SET opt_in = 1, device_id = $1 WHERE id = 1', [
+      deviceId,
+    ]);
     deviceIdCache = deviceId;
   } else {
     await db.execute('UPDATE telemetry_config SET opt_in = 0 WHERE id = 1');
@@ -65,10 +64,11 @@ export async function track(event: string, props?: Record<string, unknown>): Pro
   try {
     if (!(await isTelemetryOptedIn())) return;
     const db = await getDb();
-    await db.execute(
-      'INSERT INTO telemetry_events (ts, event, props_json) VALUES ($1, $2, $3)',
-      [Math.floor(Date.now() / 1000), event, JSON.stringify(props ?? {})],
-    );
+    await db.execute('INSERT INTO telemetry_events (ts, event, props_json) VALUES ($1, $2, $3)', [
+      Math.floor(Date.now() / 1000),
+      event,
+      JSON.stringify(props ?? {}),
+    ]);
   } catch {
     // Telemetry must never break the app.
   }

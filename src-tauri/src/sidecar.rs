@@ -318,9 +318,7 @@ pub async fn sidecar_send(state: tauri::State<'_, SidecarState>, cmd: Value) -> 
 
 #[tauri::command]
 pub async fn sidecar_wait_ready(state: tauri::State<'_, SidecarState>) -> Result<(), String> {
-    state
-        .wait_ready(std::time::Duration::from_secs(8))
-        .await
+    state.wait_ready(std::time::Duration::from_secs(8)).await
 }
 
 #[tauri::command]

@@ -20,9 +20,7 @@ export function ConnectionStatus() {
   }
 
   return (
-    <span
-      className="text-fg-muted inline-flex shrink-0 items-center gap-[7px] rounded-[6px] border border-[var(--border-soft)] bg-[var(--bg-soft)] px-[10px] py-[4px] text-[11px] whitespace-nowrap"
-    >
+    <span className="text-fg-muted inline-flex shrink-0 items-center gap-[7px] rounded-[6px] border border-[var(--border-soft)] bg-[var(--bg-soft)] px-[10px] py-[4px] text-[11px] whitespace-nowrap">
       <span className={`size-[7px] shrink-0 rounded-full ${dotClass}`} />
       {label}
     </span>
