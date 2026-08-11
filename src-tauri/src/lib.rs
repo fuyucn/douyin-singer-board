@@ -98,7 +98,8 @@ fn migrations() -> Vec<Migration> {
         },
         Migration {
             version: 6,
-            description: "config: max_songs_per_user (per-user per-session request limit, 0=unlimited)",
+            description:
+                "config: max_songs_per_user (per-user per-session request limit, 0=unlimited)",
             sql: "
                 ALTER TABLE config ADD COLUMN max_songs_per_user INTEGER NOT NULL DEFAULT 3;
             ",
@@ -126,7 +127,9 @@ fn show_window(window: tauri::WebviewWindow) {
 /// then prompt the user to restart).
 #[tauri::command]
 async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Result<(), String> {
-    let url: url::Url = manifest_url.parse().map_err(|e: url::ParseError| e.to_string())?;
+    let url: url::Url = manifest_url
+        .parse()
+        .map_err(|e: url::ParseError| e.to_string())?;
 
     let updater = app
         .updater_builder()
@@ -164,9 +167,7 @@ fn relaunch_app(app: tauri::AppHandle) {
     app.restart();
 }
 
-/// Start or stop the embedded kugou-api process. Enabling also registers the
-/// child PID with the sidecar watchdog; disabling kills the process and
-/// clears the watchdog's companion PID.
+/// Start or stop the kugou-api HTTP server hosted inside the Node sidecar.
 #[tauri::command]
 async fn kugou_set_enabled(
     app: tauri::AppHandle,
@@ -175,23 +176,11 @@ async fn kugou_set_enabled(
     sidecar: tauri::State<'_, sidecar::SidecarState>,
 ) -> Result<(), String> {
     if enabled {
-        kugou.spawn(app.clone()).await?;
-        if let Some(pid) = kugou.pid().await {
-            let cmd = serde_json::json!({ "cmd": "set_companion_pid", "pid": pid });
-            if let Err(e) = sidecar.send(cmd).await {
-                eprintln!("[tauri] set_companion_pid failed: {e}");
-            }
-        }
-        kugou.set_enabled(true);
+        kugou.spawn(app.clone(), sidecar.inner()).await?;
+        Ok(())
     } else {
-        kugou.set_enabled(false);
-        kugou.kill().await;
-        let cmd = serde_json::json!({ "cmd": "set_companion_pid" });
-        if let Err(e) = sidecar.send(cmd).await {
-            eprintln!("[tauri] clear companion pid failed: {e}");
-        }
+        kugou.kill(sidecar.inner()).await
     }
-    Ok(())
 }
 
 /// Download the new portable exe into the same directory as the current exe,
@@ -249,8 +238,6 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
     }
 }
 
-
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -279,7 +266,8 @@ pub fn run() {
 
             // Kill all child processes when the main window is destroyed.
             // Covers Alt+F4, taskbar close, OS shutdown on Windows where
-            // kill_on_drop is unreliable.
+            // kill_on_drop is unreliable. The kugou server lives inside the
+            // sidecar, so only the cached port needs clearing here.
             let win = app.get_webview_window("main").unwrap();
             let handle_exit = handle.clone();
             let kugou_exit = kugou_api_handle.clone();
@@ -302,9 +290,10 @@ pub fn run() {
                             let _ = h.send(serde_json::json!({ "cmd": "stop" })).await;
                             // 2. Grace period for clean disconnect.
                             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                            // 3. Kill both process trees.
+                            // 3. Forget the kugou port, then kill the sidecar
+                            // (which stops the in-process kugou server).
+                            k.reset().await;
                             h.kill().await;
-                            k.kill().await;
                             // 4. Now close the window.
                             let _ = w.close();
                         });
@@ -314,8 +303,8 @@ pub fn run() {
                         let h = handle_exit.clone();
                         let k = kugou_exit.clone();
                         tauri::async_runtime::spawn(async move {
+                            k.reset().await;
                             h.kill().await;
-                            k.kill().await;
                         });
                     }
                     _ => {}
@@ -326,6 +315,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             sidecar::sidecar_send,
+            sidecar::sidecar_wait_ready,
             sidecar::sidecar_respawn,
             kugou_set_enabled,
             kugou::kugou_search,

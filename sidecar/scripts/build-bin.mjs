@@ -52,18 +52,16 @@ const outPath = join(binariesDir, outName);
 mkdirSync(binariesDir, { recursive: true });
 mkdirSync(join(sidecarDir, 'build'), { recursive: true });
 
-// 1) esbuild bundle (mirror of the `build` script; re-run to ensure freshness)
+// 1) esbuild bundle (shared wrapper resolves kugou-api deps; re-run to ensure
+//    freshness)
 console.log('[bundle] esbuild');
-execSync(
-  'npx esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs',
-  { cwd: sidecarDir, stdio: 'inherit' },
-);
+execSync('node scripts/bundle.mjs', { cwd: sidecarDir, stdio: 'inherit' });
 
 // 2) pkg compile
 console.log(`[pkg] target=${target} -> ${outPath}`);
 const tmp = join(sidecarDir, 'build', `sidecar${ext}`);
 try { rmSync(tmp); } catch {}
-execSync(`npx @yao-pkg/pkg build/index.cjs --target ${target} --output ${tmp}`, {
+execSync(`npx @yao-pkg/pkg build/index.cjs --target ${target} --output ${tmp} -C GZip`, {
   cwd: sidecarDir,
   stdio: 'inherit',
 });

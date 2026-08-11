@@ -14,7 +14,7 @@ export function CollapsiblePanel({ children }: Props) {
         className="flex w-full items-center gap-2 px-4 py-2 text-[13px] font-medium text-[var(--fg-base)] hover:bg-[var(--bg-soft)]"
         onClick={() => setExpanded(!expanded)}
       >
-        <span>⚙ 配置</span>
+        <span>配置</span>
         {expanded ? (
           <ChevronUp className="ml-auto size-4" />
         ) : (

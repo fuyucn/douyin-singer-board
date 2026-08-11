@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Tv2, Shield, Music2, Plus, RefreshCw, HelpCircle, Trash2 } from 'lucide-react';
+import { RefreshCw, HelpCircle, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DouyinRoomInfo {
@@ -96,10 +96,7 @@ export function LeftPanel({
     >
       {/* 直播间配置 */}
       <div className="p-4">
-        <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Tv2 className="size-4 text-blue-500" />
-          直播间配置
-        </div>
+        <div className="mb-3 text-[13px] font-medium text-[var(--fg-base)]">直播间配置</div>
         <div className="space-y-3">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -188,10 +185,7 @@ export function LeftPanel({
 
       {/* 点歌规则 */}
       <div className="p-4">
-        <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Shield className="size-4 text-green-500" />
-          点歌规则
-        </div>
+        <div className="mb-3 text-[13px] font-medium text-[var(--fg-base)]">点歌规则</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs text-[var(--fg-muted)]">最低粉丝团等级</Label>
@@ -255,10 +249,7 @@ export function LeftPanel({
         <>
           <Separator className="bg-[var(--border-soft)]" />
           <div className="p-4">
-            <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-              <Music2 className="size-4 text-orange-400" />
-              Kugou 歌单
-            </div>
+            <div className="mb-3 text-[13px] font-medium text-[var(--fg-base)]">Kugou 歌单</div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-[var(--fg-muted)]">歌单名称</Label>
@@ -308,10 +299,7 @@ export function LeftPanel({
 
       {/* 手动点歌 */}
       <div className="p-4">
-        <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Plus className="size-4 text-purple-500" />
-          手动点歌
-        </div>
+        <div className="mb-3 text-[13px] font-medium text-[var(--fg-base)]">手动点歌</div>
         <div className="flex gap-2">
           <Input
             className="h-8 flex-1 bg-[var(--bg-base)] text-sm"

@@ -17,7 +17,6 @@ import { SidecarCmdSchema, type Config, type SidecarCmd, type SidecarEvent } fro
 let DouYinDanmaClient: any = null;
 let listener: any = null;
 let matcher: Matcher | null = null;
-let companionPid: number | null = null;
 
 function emit(ev: SidecarEvent): void {
   process.stdout.write(JSON.stringify(ev) + '\n');
@@ -26,6 +25,16 @@ function emit(ev: SidecarEvent): void {
 function log(level: 'debug' | 'info' | 'warn' | 'error', msg: string): void {
   emit({ event: 'log', level, msg });
 }
+
+// The kugou server and its upstream modules log through console.*. Route those
+// lines into the JSON protocol instead of letting them corrupt stdout, and
+// redact credentials before they reach the UI log panel.
+const redactSensitive = (msg: string): string =>
+  msg.replace(/(cookie|token|userid|dfid)=[^&\s]*/gi, '$1=***');
+
+console.log = (...args: unknown[]) => log('info', redactSensitive(args.map(String).join(' ')));
+console.warn = (...args: unknown[]) => log('warn', redactSensitive(args.map(String).join(' ')));
+console.error = (...args: unknown[]) => log('error', redactSensitive(args.map(String).join(' ')));
 
 // URL short code (web_rid) → real id_str.
 // The number in the live URL https://live.douyin.com/{web_rid} is the web_rid,
@@ -187,6 +196,18 @@ async function stop(): Promise<void> {
   matcher = null;
 }
 
+async function kugouStart(port: number): Promise<void> {
+  const { startKugouServer } = await import('../../kugou-slim/server.cjs');
+  await startKugouServer({ port, host: '127.0.0.1' });
+  log('info', `kugou server ready on :${port}`);
+}
+
+async function kugouStop(): Promise<void> {
+  const { stopKugouServer } = await import('../../kugou-slim/server.cjs');
+  await stopKugouServer();
+  log('info', 'kugou server stopped');
+}
+
 async function handleCmd(cmd: SidecarCmd): Promise<void> {
   try {
     switch (cmd.cmd) {
@@ -200,10 +221,11 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
         if (matcher) matcher.reload(cmd.config);
         else log('warn', 'reload_config before start, ignored');
         break;
-      case 'set_companion_pid':
-        companionPid = cmd.pid ?? null;
-        if (cmd.pid) log('info', `companion pid set: ${cmd.pid}`);
-        else log('info', 'companion pid cleared');
+      case 'kugou_start':
+        await kugouStart(cmd.port);
+        break;
+      case 'kugou_stop':
+        await kugouStop();
         break;
     }
   } catch (e) {
@@ -211,9 +233,9 @@ async function handleCmd(cmd: SidecarCmd): Promise<void> {
   }
 }
 
-// Unified shutdown: kill the companion kugou-api, best-effort stop the
+// Unified shutdown: best-effort stop the kugou server and the live-room
 // listener, then exit. Never blocks on stop() — a hung close() must not keep
-// the process (and its child) alive. Idempotent.
+// the process alive. Idempotent.
 let shuttingDown = false;
 function shutdown(reason: string): void {
   if (shuttingDown) return;
@@ -223,19 +245,7 @@ function shutdown(reason: string): void {
   } catch {
     /* stdout may be gone if the parent already died */
   }
-  if (companionPid) {
-    try {
-      if (process.platform === 'win32') {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { execSync } = require('node:child_process') as typeof import('node:child_process');
-        execSync(`taskkill /F /T /PID ${companionPid}`, { stdio: 'ignore' });
-      } else {
-        process.kill(companionPid, 'SIGKILL');
-      }
-    } catch {
-      /* already gone */
-    }
-  }
+  void kugouStop().catch(() => {});
   void stop(); // closes the listener synchronously; do not await
   process.exit(0);
 }
@@ -296,7 +306,6 @@ if (process.env.SIDECAR_DEV) {
 }
 
 // Parent process watchdog — exit if the Tauri parent disappears.
-// Also kills the companion kugou-api process if one was registered.
 //
 // We use TWO checks to be robust against macOS PID reuse:
 //  1. process.ppid changed (becomes 1 / launchd when reparented to init).

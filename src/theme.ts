@@ -7,8 +7,8 @@ export type Theme = 'system' | 'light' | 'dark';
 
 const KEY = 'sususongboard.theme';
 
-const LIGHT = '#ffffff';
-const DARK = '#1a1a1a';
+const LIGHT = '#f4f6f8';
+const DARK = '#17191b';
 
 function resolveOsTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

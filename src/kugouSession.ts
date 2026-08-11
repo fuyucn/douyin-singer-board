@@ -359,9 +359,7 @@ export async function clearPlaylistByName(
   if (found && found.listid) {
     const del = await call('GET', `/playlist/del?listid=${found.listid}`, cookie);
     if (del.body?.status !== 1) {
-      throw new Error(
-        `playlist/del failed: status=${del.status} body=${JSON.stringify(del.body)}`,
-      );
+      throw new Error(`playlist/del failed: status=${del.status} body=${JSON.stringify(del.body)}`);
     }
   }
 

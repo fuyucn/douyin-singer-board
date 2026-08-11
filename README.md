@@ -11,7 +11,7 @@ When a streamer goes live, viewers type things like `点歌 周杰伦` in chat. 
 - Tauri 2 (Rust shell + WebView frontend)
 - React + Vite + TypeScript + Zustand
 - SQLite via `tauri-plugin-sql` (config + history persistence)
-- Node sidecar running [`douyin-danma-listener`](https://www.npmjs.com/package/douyin-danma-listener) for Douyin WSS / signature / protobuf
+- Node sidecar running [`douyin-danma-listener`](https://www.npmjs.com/package/douyin-danma-listener) for Douyin WSS / signature / protobuf, plus the slim KuGou API server
 
 ## Run (dev)
 
@@ -83,7 +83,7 @@ Click **Start** to connect, **Stop** to disconnect. Each Start clears the on-scr
 ## Bundled third-party
 
 - [`douyin-danma-listener`](https://www.npmjs.com/package/douyin-danma-listener) — Douyin live-room WebSocket / signature / protobuf (GPLv3, makes this project GPLv3 transitively).
-- [`MakcRe/KuGouMusicApi`](https://github.com/MakcRe/KuGouMusicApi) — KuGou client API server vendored as a git submodule under `kugou-api/`, built into a sidecar binary. MIT.
+- [`MakcRe/KuGouMusicApi`](https://github.com/MakcRe/KuGouMusicApi) — KuGou client API source vendored as a git submodule under `kugou-api/`, bundled into the Node sidecar binary. MIT.
 
 ## License
 

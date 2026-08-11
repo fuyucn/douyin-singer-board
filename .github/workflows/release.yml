@@ -40,6 +40,8 @@ jobs:
     needs: read-version
     name: Build (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -88,19 +90,27 @@ jobs:
       - name: Build sidecar binary
         run: pnpm sidecar:build:bin
 
-      - name: Build kugou-api sidecar binary
-        run: pnpm kugou-api:build:bin
-
       - name: Clean stale bundle artifacts
         # The cached target dir would otherwise carry forward .dmg/.msi/.exe
         # files from previous version builds; we'd then accidentally upload them.
         shell: bash
         run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
 
+      - name: Enable signed updater artifacts (signing key present)
+        if: env.HAS_SIGNING_KEY == 'true'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json src-tauri/tauri.conf.json
+          echo "createUpdaterArtifacts=true (signed release)"
+
       - name: Build Tauri app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_UPDATER_ENABLED: ${{ env.HAS_SIGNING_KEY == 'true' }}
         run: pnpm exec tauri build --target ${{ matrix.rust_target }}
 
       - name: Collect artifact (macOS)
