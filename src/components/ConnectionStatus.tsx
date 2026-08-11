@@ -6,28 +6,24 @@ export function ConnectionStatus() {
   const connecting = running && !connected;
 
   let dotClass: string;
-  let textClass: string;
   let label: string;
 
   if (connecting) {
     dotClass = 'bg-amber-400';
-    textClass = 'text-amber-500';
     label = '连接中';
   } else if (connected) {
-    dotClass = 'bg-success border-success border';
-    textClass = 'text-success';
+    dotClass = 'bg-success';
     label = '已连接';
   } else {
-    dotClass = 'border-border-strong border bg-transparent';
-    textClass = 'text-fg-faint';
+    dotClass = 'border border-[var(--border-strong)] bg-transparent';
     label = '未连接';
   }
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 text-xs whitespace-nowrap ${textClass}`}
+      className="text-fg-muted inline-flex shrink-0 items-center gap-[7px] rounded-[6px] border border-[var(--border-soft)] bg-[var(--bg-soft)] px-[10px] py-[4px] text-[11px] whitespace-nowrap"
     >
-      <div className={`${dotClass} size-2.5 rounded-full`} />
+      <span className={`size-[7px] shrink-0 rounded-full ${dotClass}`} />
       {label}
     </span>
   );
