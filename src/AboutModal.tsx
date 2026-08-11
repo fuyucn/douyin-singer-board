@@ -112,7 +112,7 @@ export function AboutModal({ onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[10px]"
+        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[8px]"
         style={{ boxShadow: 'var(--shadow-modal)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -145,11 +145,7 @@ export function AboutModal({ onClose }: Props) {
             </div>
           )}
           <div className="mt-4 flex gap-2.5">
-            <Button
-              className="bg-success hover:bg-success-hover text-white"
-              onClick={onCheck}
-              disabled={checking}
-            >
+            <Button className="bg-success text-white" onClick={onCheck} disabled={checking}>
               {checking ? '检查中…' : '检查更新'}
             </Button>
           </div>

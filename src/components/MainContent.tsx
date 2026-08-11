@@ -76,7 +76,7 @@ function renderUserCell(ctx: {
         <span
           className={cn(
             'shrink-0 rounded px-1 text-[10px] tabular-nums',
-            capped ? 'bg-red-500/15 text-red-400' : 'bg-border-softer text-fg-faint',
+            capped ? 'bg-danger-soft-bg text-danger-soft-fg' : 'bg-border-softer text-fg-faint',
           )}
           title={`本场已加入歌单 ${count}/${limit}`}
         >
@@ -124,8 +124,10 @@ function useSongsColumns() {
               {entry?.status === 'found' ? (
                 entry.blockedReason ? (
                   <>
-                    <div className="truncate text-[11px] text-red-500">{entry.track.filename}</div>
-                    <div className="truncate text-[11px] text-red-400">
+                    <div className="text-danger-soft-fg truncate text-[11px]">
+                      {entry.track.filename}
+                    </div>
+                    <div className="text-danger-soft-fg truncate text-[11px]">
                       {entry.blockedReason === 'singer'
                         ? `黑名单歌手: ${entry.track.singer_name}`
                         : '黑名单歌曲'}
@@ -133,7 +135,7 @@ function useSongsColumns() {
                   </>
                 ) : (
                   <>
-                    <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                    <div className="text-fg-muted truncate text-[11px]">{entry.track.filename}</div>
                     {(() => {
                       const secs = meta?.cooldownRemaining(song.song_name);
                       if (!secs) return null;
@@ -151,7 +153,7 @@ function useSongsColumns() {
               ) : entry?.status === 'not_found' ? (
                 <div className="text-fg-faint text-[11px]">未找到</div>
               ) : entry?.status === 'error' ? (
-                <div className="text-[11px] text-orange-400">搜索失败</div>
+                <div className="text-destructive text-[11px]">搜索失败</div>
               ) : null}
             </div>
           );
@@ -232,7 +234,7 @@ function usePlayedColumns() {
             >
               <div className="text-fg-base truncate text-[13px] font-medium">{song.song_name}</div>
               {entry?.status === 'found' && (
-                <div className="truncate text-[11px] text-blue-500">{entry.track.filename}</div>
+                <div className="text-fg-muted truncate text-[11px]">{entry.track.filename}</div>
               )}
             </div>
           );
@@ -295,9 +297,7 @@ export function MainContent({
     const q = playedQuery.trim().toLowerCase();
     if (!q) return played;
     return played.filter(
-      (s) =>
-        s.song_name.toLowerCase().includes(q) ||
-        s.uname.toLowerCase().includes(q),
+      (s) => s.song_name.toLowerCase().includes(q) || s.uname.toLowerCase().includes(q),
     );
   }, [played, playedQuery]);
 
@@ -355,17 +355,17 @@ export function MainContent({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Tab area */}
-      <div className="border-border-soft bg-bg-elev mx-3 mt-2 mb-2 flex flex-1 flex-col overflow-hidden rounded-lg border">
+      <div className="bg-bg-elev flex min-h-0 flex-1 flex-col overflow-hidden">
         <Tabs
           value={activeTab}
           onValueChange={(v) => onTabChange(v as 'songs' | 'played' | 'blacklist')}
           className="flex min-h-0 flex-1 flex-col gap-y-0"
         >
           {/* Tab bar */}
-          <div className="flex shrink-0 items-center justify-between px-3 py-1">
+          <div className="border-border-soft flex shrink-0 items-center justify-between border-b px-3 py-1">
             <TabsList variant={'line'} className="">
               {tabDefs.map((t) => (
-                <TabsTrigger className={'after:opacity-0!'} key={t.key} value={t.key}>
+                <TabsTrigger key={t.key} value={t.key}>
                   {t.label}
                 </TabsTrigger>
               ))}
@@ -374,7 +374,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-fg-muted h-7 gap-1 text-xs hover:text-red-500"
+                className="text-fg-muted hover:text-danger-soft-fg h-7 gap-1 text-xs"
                 onClick={onClearList}
               >
                 <Trash2 className="size-3.5" />
@@ -385,7 +385,7 @@ export function MainContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-fg-muted h-7 gap-1 text-xs hover:text-red-500"
+                className="text-fg-muted hover:text-danger-soft-fg h-7 gap-1 text-xs"
                 onClick={onClearPlayed}
               >
                 <Trash2 className="size-3.5" />
@@ -453,11 +453,7 @@ export function MainContent({
       </div>
 
       {/* Log panel — gated by user preference */}
-      {showLogs && (
-        <div className="mx-3 mb-2 shrink-0">
-          <LogPanel logs={logs} onClear={onClearLogs} />
-        </div>
-      )}
+      {showLogs && <LogPanel logs={logs} onClear={onClearLogs} />}
     </div>
   );
 }
@@ -465,7 +461,7 @@ export function MainContent({
 function EmptyState({ running }: { running: boolean }) {
   return (
     <div className="text-fg-faint flex flex-1 flex-col items-center justify-center gap-3 py-16">
-      <div className="bg-bg-soft flex size-16 items-center justify-center rounded-2xl">
+      <div className="bg-bg-soft flex size-16 items-center justify-center rounded-md">
         <Music className="text-fg-faint size-8" />
       </div>
       <div className="text-center">

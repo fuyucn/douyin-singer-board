@@ -103,11 +103,7 @@ export function AppHeader({
         {!running ? (
           <Button
             size={isNarrow ? 'icon' : 'sm'}
-            className={
-              isNarrow
-                ? 'ml-2 size-8 bg-blue-500 text-white hover:bg-blue-600'
-                : 'ml-2 h-8 gap-1.5 bg-blue-500 px-4 text-white hover:bg-blue-600'
-            }
+            className={isNarrow ? 'ml-2 size-8' : 'ml-2 h-8 gap-1.5 px-4'}
             onClick={onStart}
             title="开始"
           >

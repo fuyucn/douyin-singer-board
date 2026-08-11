@@ -159,7 +159,7 @@ export function KugouLoginModal({ onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[10px]"
+        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[8px]"
         style={{ boxShadow: 'var(--shadow-modal)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -212,11 +212,7 @@ export function KugouLoginModal({ onClose }: Props) {
                   <p className="text-fg-muted m-0 max-w-[280px] text-sm">
                     使用酷狗音乐 App 扫码登录后，可自动将点歌加入酷狗歌单
                   </p>
-                  <Button
-                    variant={'default'}
-                    className={'hover:bg-blue-600'}
-                    onClick={startQrLogin}
-                  >
+                  <Button variant={'default'} onClick={startQrLogin}>
                     扫码登录
                   </Button>
                 </div>

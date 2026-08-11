@@ -110,13 +110,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                 style={{ transform: `translateY(${vRow.start}px)`, height: ROW_HEIGHT }}
               >
                 <span className="w-12 shrink-0">
-                  <span
-                    className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                      entryType === 'singer'
-                        ? 'bg-purple-500/10 text-purple-400'
-                        : 'bg-blue-500/10 text-blue-400'
-                    }`}
-                  >
+                  <span className="bg-bg-softer text-fg-muted inline-block rounded px-1.5 py-0.5 text-[11px] font-medium">
                     {entryType === 'singer' ? '歌手' : '歌曲'}
                   </span>
                 </span>
@@ -132,7 +126,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="text-fg-faint size-7 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                      className="text-fg-faint hover:text-danger-soft-fg size-7 opacity-0 transition-opacity group-hover:opacity-100"
                       onClick={() => onRemove(id)}
                     >
                       <X className="size-3.5" />

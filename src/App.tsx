@@ -450,7 +450,7 @@ export default function App() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-7 text-[var(--fg-muted)] hover:text-blue-500"
+                className="hover:text-accent-soft-fg size-7 text-[var(--fg-muted)]"
                 disabled={!enabled}
                 onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
               >
@@ -486,7 +486,7 @@ export default function App() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-7 text-[var(--fg-muted)] hover:text-red-500"
+              className="hover:text-danger-soft-fg size-7 text-[var(--fg-muted)]"
               onClick={() => onRemoveOne(s.msg_id, s.song_name)}
             >
               <Trash2 className="size-3.5" />
@@ -642,7 +642,8 @@ export default function App() {
                 <>
                   {isWindows() ? (
                     <span>
-                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-{update.tag.replace(/^v/, '')}.exe），请手动启动
+                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-
+                      {update.tag.replace(/^v/, '')}.exe），请手动启动
                     </span>
                   ) : (
                     <>

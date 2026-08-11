@@ -60,10 +60,7 @@ export function SessionStats({ songs, played, running, steps }: Props) {
   if (!showStats && !stepsVisible) return null;
 
   const allSongs = [...songs, ...played];
-  const earliest = allSongs.reduce(
-    (min, s) => Math.min(min, s.send_time),
-    Number.MAX_SAFE_INTEGER,
-  );
+  const earliest = allSongs.reduce((min, s) => Math.min(min, s.send_time), Number.MAX_SAFE_INTEGER);
   const elapsed = earliest === Number.MAX_SAFE_INTEGER ? 0 : Math.max(0, now - earliest);
 
   const avgProcessing =
@@ -99,7 +96,7 @@ export function SessionStats({ songs, played, running, steps }: Props) {
               {s.status === 'done' ? (
                 <span className="text-[11px]">✓</span>
               ) : (
-                <span className="inline-block size-2 animate-pulse rounded-full bg-amber-400" />
+                <span className="bg-fg-faint inline-block size-2 rounded-full" />
               )}
               {s.label}
             </span>

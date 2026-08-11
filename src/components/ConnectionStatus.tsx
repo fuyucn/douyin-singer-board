@@ -10,7 +10,7 @@ export function ConnectionStatus() {
   let label: string;
 
   if (connecting) {
-    dotClass = 'bg-amber-400 border-amber-400 border animate-pulse';
+    dotClass = 'bg-amber-400';
     textClass = 'text-amber-500';
     label = '连接中';
   } else if (connected) {

@@ -97,7 +97,7 @@ export function LeftPanel({
       {/* 直播间配置 */}
       <div className="p-4">
         <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Tv2 className="size-4 text-blue-500" />
+          <Tv2 className="text-fg-faint size-4" />
           直播间配置
         </div>
         <div className="space-y-3">
@@ -189,7 +189,7 @@ export function LeftPanel({
       {/* 点歌规则 */}
       <div className="p-4">
         <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Shield className="size-4 text-green-500" />
+          <Shield className="text-fg-faint size-4" />
           点歌规则
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -256,7 +256,7 @@ export function LeftPanel({
           <Separator className="bg-[var(--border-soft)]" />
           <div className="p-4">
             <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-              <Music2 className="size-4 text-orange-400" />
+              <Music2 className="text-accent-soft-fg size-4" />
               Kugou 歌单
             </div>
             <div className="space-y-2">
@@ -278,7 +278,7 @@ export function LeftPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 flex-1 border-red-400 text-red-500 hover:bg-red-50 hover:text-red-600"
+                  className="h-8 flex-1 border-[var(--border-strong)] text-[var(--fg-muted)]"
                   onClick={handleClearPlaylist}
                   title="清空并重建歌单"
                 >
@@ -309,7 +309,7 @@ export function LeftPanel({
       {/* 手动点歌 */}
       <div className="p-4">
         <div className="mb-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--fg-base)]">
-          <Plus className="size-4 text-purple-500" />
+          <Plus className="text-fg-faint size-4" />
           手动点歌
         </div>
         <div className="flex gap-2">
