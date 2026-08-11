@@ -2,8 +2,10 @@
 //
 // kugou-slim/server.cjs imports modules from the kugou-api submodule, and those
 // modules use bare dependencies (express, axios, qrcode, ...) that live in
-// kugou-api/node_modules. esbuild resolves them via NODE_PATH; the wrapper
-// installs them on first use so this works in a fresh checkout and in CI.
+// kugou-api/node_modules. Resolve from that store explicitly; walking up to the
+// root node_modules can pull a different major version (e.g. Express 5) into
+// the sidecar bundle and change request behavior. The wrapper installs the
+// dependencies on first use so this works in a fresh checkout and in CI.
 //
 // Usage:
 //   node scripts/bundle.mjs            (one-shot build)
@@ -13,6 +15,7 @@ import { execSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build, context } from 'esbuild';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sidecarDir = resolve(__dirname, '..');
@@ -35,20 +38,20 @@ if (!existsSync(join(kugouDir, 'node_modules', 'express'))) {
 }
 
 const watch = process.argv.includes('--watch');
-const args = [
-  'npx',
-  'esbuild',
-  'src/index.ts',
-  '--bundle',
-  '--platform=node',
-  '--target=node20',
-  '--format=cjs',
-  '--outfile=build/index.cjs',
-];
-if (watch) args.push('--watch=forever');
+const options = {
+  entryPoints: [join(sidecarDir, 'src/index.ts')],
+  bundle: true,
+  platform: 'node',
+  target: 'node20',
+  format: 'cjs',
+  outfile: join(sidecarDir, 'build/index.cjs'),
+  nodePaths: [join(kugouDir, 'node_modules')],
+  logLevel: 'info',
+};
 
-execSync(args.join(' '), {
-  cwd: sidecarDir,
-  stdio: 'inherit',
-  env: { ...process.env, NODE_PATH: join(kugouDir, 'node_modules') },
-});
+if (watch) {
+  const ctx = await context(options);
+  await ctx.watch();
+} else {
+  await build(options);
+}
