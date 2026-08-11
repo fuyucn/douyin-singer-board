@@ -92,11 +92,11 @@ pub async fn kugou_search(
         .await
         .map_err(|e| format!("decode: {e}"))?;
 
-    let lists = body
-        .pointer("/data/lists")
-        .and_then(|v| v.as_array());
+    let lists = body.pointer("/data/lists").and_then(|v| v.as_array());
     let Some(lists) = lists else { return Ok(None) };
-    let Some(top) = lists.first() else { return Ok(None) };
+    let Some(top) = lists.first() else {
+        return Ok(None);
+    };
 
     let filename_raw = pick(top, &["FileName", "filename"]);
     let hash = pick(top, &["FileHash", "hash"]).to_uppercase();

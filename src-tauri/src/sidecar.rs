@@ -11,17 +11,30 @@
 // - When the child exits, the exit status is forwarded as a 'log' event so the
 //   user can diagnose crashes from the UI without a terminal.
 
+use process_wrap::tokio::*;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
-use process_wrap::tokio::*;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex;
 
+use crate::kugou_api::KugouApiState;
+
 const SIDECAR_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sidecar.bin"));
+
+fn sha256_hex(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
 
 pub struct SidecarHandle {
     stdin: Mutex<Option<ChildStdin>>,
@@ -30,7 +43,10 @@ pub struct SidecarHandle {
 
 impl SidecarHandle {
     pub fn new() -> Self {
-        Self { stdin: Mutex::new(None), child: Mutex::new(None) }
+        Self {
+            stdin: Mutex::new(None),
+            child: Mutex::new(None),
+        }
     }
 
     /// Explicitly kill the child process, then drop the wrapper.
@@ -41,11 +57,7 @@ impl SidecarHandle {
         if let Some(mut child) = child_opt.take() {
             let _ = child.start_kill();
             // Best-effort wait so the OS reaps the child before we return.
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_millis(500),
-                child.wait(),
-            )
-            .await;
+            let _ = tokio::time::timeout(std::time::Duration::from_millis(500), child.wait()).await;
         }
     }
 
@@ -66,14 +78,49 @@ impl SidecarHandle {
             .map_err(|e| format!("app_local_data_dir: {e}"))?;
         let dir = data_dir.join(version).join("sidecar");
         let path = dir.join(format!("bin{ext}"));
+        let stamp_path = dir.join(format!("bin{ext}.sha256"));
+        let expected_stamp = sha256_hex(SIDECAR_BIN);
 
-        // Stale version cleanup is handled by kugou_api on startup.
+        // Clean up stale version directories from older releases.
+        if let Ok(entries) = std::fs::read_dir(&data_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if entry.path().is_dir() {
+                    if name != version {
+                        let _ = std::fs::remove_dir_all(entry.path());
+                    } else if entry.path().join("kugou-api").exists() {
+                        // Old releases extracted a separate kugou-api binary into
+                        // <version>/kugou-api; the server now lives inside the
+                        // sidecar, so remove the dead ~55MB binary.
+                        let _ = std::fs::remove_dir_all(entry.path().join("kugou-api"));
+                    }
+                } else if name.starts_with("kugou-api-") {
+                    // Even older releases extracted kugou-api into the data dir root.
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
         std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir sidecar: {}", e))?;
 
-        let needs_extract = !path.exists();
+        // Re-extract when the embedded binary changed even if the path exists,
+        // so a same-version upgrade does not keep running a stale sidecar.
+        let needs_extract = {
+            let stamp_matches = std::fs::read_to_string(&stamp_path)
+                .map(|s| s.trim() == expected_stamp)
+                .unwrap_or(false);
+            !stamp_matches
+        };
         if needs_extract {
-            log_to_ui(app, "info", &format!("extracting sidecar to {}", path.display()));
+            let msg = if path.exists() {
+                "sidecar binary changed, re-extracting".to_string()
+            } else {
+                format!("extracting sidecar to {}", path.display())
+            };
+            log_to_ui(app, "info", &msg);
             std::fs::write(&path, SIDECAR_BIN).map_err(|e| format!("write sidecar: {}", e))?;
+            std::fs::write(&stamp_path, &expected_stamp)
+                .map_err(|e| format!("write sidecar stamp: {}", e))?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -82,7 +129,18 @@ impl SidecarHandle {
             }
             #[cfg(target_os = "macos")]
             {
-                let _ = std::process::Command::new("xattr").args(["-cr"]).arg(&path).output();
+                let _ = std::process::Command::new("xattr")
+                    .args(["-cr"])
+                    .arg(&path)
+                    .output();
+            }
+        } else {
+            // Ensure the extracted file is still executable even when it was
+            // copied by a non-unix extraction path.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
             }
         }
         Ok(path)
@@ -105,7 +163,11 @@ impl SidecarHandle {
             c
         } else {
             let path = Self::extract_to_temp(&app)?;
-            log_to_ui(&app, "info", &format!("spawning sidecar: {}", path.display()));
+            log_to_ui(
+                &app,
+                "info",
+                &format!("spawning sidecar: {}", path.display()),
+            );
             Command::new(&path)
         };
         cmd.stdin(Stdio::piped())
@@ -154,6 +216,9 @@ impl SidecarHandle {
                 *state.stdin.lock().await = None;
                 *state.child.lock().await = None;
             }
+            if let Some(kugou) = app_out.try_state::<KugouApiState>() {
+                kugou.reset().await;
+            }
             let _ = app_out.emit("sidecar-event", json!({ "event": "crashed" }));
         });
 
@@ -181,7 +246,10 @@ impl SidecarHandle {
             .write_all(line.as_bytes())
             .await
             .map_err(|e| format!("write stdin: {}", e))?;
-        stdin.flush().await.map_err(|e| format!("flush stdin: {}", e))?;
+        stdin
+            .flush()
+            .await
+            .map_err(|e| format!("flush stdin: {}", e))?;
         Ok(())
     }
 }
@@ -194,17 +262,19 @@ fn log_to_ui(app: &AppHandle, level: &str, msg: &str) {
 pub type SidecarState = Arc<SidecarHandle>;
 
 #[tauri::command]
-pub async fn sidecar_send(
-    state: tauri::State<'_, SidecarState>,
-    cmd: Value,
-) -> Result<(), String> {
+pub async fn sidecar_send(state: tauri::State<'_, SidecarState>, cmd: Value) -> Result<(), String> {
     state.send(cmd).await
 }
 
 #[tauri::command]
 pub async fn sidecar_respawn(
     state: tauri::State<'_, SidecarState>,
+    kugou: tauri::State<'_, KugouApiState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    state.spawn(app).await
+    state.spawn(app.clone()).await?;
+    if kugou.is_enabled() {
+        kugou.spawn(app, state.inner()).await?;
+    }
+    Ok(())
 }

@@ -1,35 +1,26 @@
-// KuGouMusicApi sidecar — bundled HTTP API for KuGou (login, search, playlist
-// add/remove, etc). The binary is built from the upstream submodule by
-// `pnpm kugou-api:build:bin` and embedded at compile time. At first run we
-// extract it to the temp dir, pick a free local port, spawn it, and poll
-// until the Express server is accepting connections. Other Rust modules call
-// it via `http://127.0.0.1:<port>/...` through `KugouApiHandle::api_url()`.
+// KuGouMusicApi HTTP server hosted inside the Node sidecar process. The
+// sidecar is built from `sidecar/` (which bundles the slim kugou server), so
+// no separate kugou-api binary is embedded or spawned. Enabling Kugou asks
+// the sidecar to start the Express server on a local port; disabling asks it
+// to stop. Other Rust modules call it via
+// `http://127.0.0.1:<port>/...` through `KugouApiHandle::api_url()`.
 
-use process_wrap::tokio::*;
-use std::path::PathBuf;
-use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
-const KUGOU_API_BIN: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/kugou-api.bin"));
+use crate::sidecar::SidecarState;
 
 pub struct KugouApiHandle {
-    child: Mutex<Option<Box<dyn ChildWrapper>>>,
     port: Mutex<Option<u16>>,
-    pid: Mutex<Option<u32>>,
     enabled: AtomicBool,
 }
 
 impl KugouApiHandle {
     pub fn new() -> Self {
         Self {
-            child: Mutex::new(None),
             port: Mutex::new(None),
-            pid: Mutex::new(None),
             enabled: AtomicBool::new(false),
         }
     }
@@ -42,25 +33,10 @@ impl KugouApiHandle {
         self.enabled.store(enabled, Ordering::SeqCst);
     }
 
-    /// Explicitly kill the child process, then drop the wrapper.
-    /// On Windows the Job Object terminates the whole tree; on Unix
-    /// start_kill + KillOnDrop ensure the leader (and group) dies.
-    pub async fn kill(&self) {
-        let mut child_opt = self.child.lock().await;
-        if let Some(mut child) = child_opt.take() {
-            let _ = child.start_kill();
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_millis(500),
-                child.wait(),
-            )
-            .await;
-        }
+    /// Clear the cached port after the sidecar has exited so a later respawn
+    /// can start the kugou server again. The enabled flag is left untouched.
+    pub async fn reset(&self) {
         *self.port.lock().await = None;
-        *self.pid.lock().await = None;
-    }
-
-    pub async fn pid(&self) -> Option<u32> {
-        *self.pid.lock().await
     }
 
     /// Returns the base URL of the running kugou-api server, or an error if
@@ -75,70 +51,12 @@ impl KugouApiHandle {
         }
     }
 
-    fn extract_to_temp(app: &AppHandle) -> Result<PathBuf, String> {
-        if KUGOU_API_BIN.len() < 1024 {
-            return Err(
-                "embedded kugou-api binary is empty/too small. Build was made without it; \
-                 run `pnpm kugou-api:build:bin` and rebuild."
-                    .to_string(),
-            );
-        }
-        let version = env!("CARGO_PKG_VERSION");
-        let ext = if cfg!(windows) { ".exe" } else { "" };
-        // Use app local data dir instead of temp — macOS may kill processes
-        // spawned from temp dirs under memory pressure.
-        // Layout: <app_local_data_dir>/<version>/kugou-api/bin[.exe]
-        // All binaries share the same versioned root; stale version dirs are
-        // cleaned up on startup by scanning app_local_data_dir for dirs that
-        // don't match the current version.
-        let data_dir = app
-            .path()
-            .app_local_data_dir()
-            .map_err(|e| format!("app_local_data_dir: {e}"))?;
-        let dir = data_dir.join(version).join("kugou-api");
-        let path = dir.join(format!("bin{ext}"));
-
-        // Clean up stale version directories.
-        if let Ok(entries) = std::fs::read_dir(&data_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if entry.path().is_dir() && name != version {
-                    let _ = std::fs::remove_dir_all(entry.path());
-                }
-            }
-        }
-        std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir kugou-api: {e}"))?;
-
-        let needs_extract = !path.exists()
-            || std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0)
-                != KUGOU_API_BIN.len() as u64;
-        if needs_extract {
-            log_to_ui(app, "info", &format!("extracting kugou-api to {}", path.display()));
-            std::fs::write(&path, KUGOU_API_BIN).map_err(|e| format!("write: {e}"))?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-                    .map_err(|e| format!("chmod: {e}"))?;
-            }
-            #[cfg(target_os = "macos")]
-            {
-                let _ = std::process::Command::new("xattr")
-                    .args(["-cr"])
-                    .arg(&path)
-                    .output();
-            }
-        }
-        Ok(path)
-    }
-
     /// Bind 127.0.0.1:0 to let the OS pick an unused port, drop the listener
     /// to free the port, then return the chosen number. There's a short race
     /// window before the kugou-api server claims it, but it's microseconds.
     fn pick_free_port() -> Result<u16, String> {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0")
-            .map_err(|e| format!("bind 0: {e}"))?;
+        let listener =
+            std::net::TcpListener::bind("127.0.0.1:0").map_err(|e| format!("bind 0: {e}"))?;
         let port = listener
             .local_addr()
             .map_err(|e| format!("local_addr: {e}"))?
@@ -147,84 +65,25 @@ impl KugouApiHandle {
         Ok(port)
     }
 
-    pub async fn spawn(&self, app: AppHandle) -> Result<(), String> {
+    pub async fn spawn(&self, app: AppHandle, sidecar: &SidecarState) -> Result<(), String> {
         if self.port.lock().await.is_some() {
             return Ok(());
         }
 
-        let path = Self::extract_to_temp(&app)?;
         let port = Self::pick_free_port()?;
         log_to_ui(
             &app,
             "info",
-            &format!("spawning kugou-api on 127.0.0.1:{port}: {}", path.display()),
+            &format!("starting kugou-api on 127.0.0.1:{port}"),
         );
+        send_with_retry(
+            sidecar,
+            serde_json::json!({ "cmd": "kugou_start", "port": port }),
+        )
+        .await?;
 
-        let mut cmd = Command::new(&path);
-        cmd.stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .env("PORT", port.to_string())
-            .env("HOST", "127.0.0.1")
-            .env("NODE_OPTIONS", "--no-deprecation --no-warnings");
-
-        // Use process-wrap to bind the entire process tree to a Job Object on
-        // Windows (or a process group on Unix), and KillOnDrop to ensure the
-        // child is killed when the wrapper is dropped. Without KillOnDrop the
-        // group leader stays alive on macOS after Tauri exits.
-        //
-        // On Windows: CreationFlags MUST come before JobObject so JobObject's
-        // pre_spawn merges our CREATE_NO_WINDOW into its CREATE_SUSPENDED flag.
-        let mut wrap = CommandWrap::from(cmd);
-        #[cfg(windows)]
-        {
-            use windows::Win32::System::Threading::PROCESS_CREATION_FLAGS;
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            wrap.wrap(CreationFlags(PROCESS_CREATION_FLAGS(CREATE_NO_WINDOW)));
-            wrap.wrap(JobObject);
-        }
-        #[cfg(unix)]
-        wrap.wrap(ProcessGroup::leader());
-        wrap.wrap(KillOnDrop);
-
-        let mut child = wrap
-            .spawn()
-            .map_err(|e| format!("spawn {}: {e}", path.display()))?;
-
-        if let Some(pid) = child.id() {
-            *self.pid.lock().await = Some(pid);
-        }
-        let stdout = child.stdout().take().ok_or("no stdout")?;
-        let stderr = child.stderr().take().ok_or("no stderr")?;
-
-        // Forward stdout/stderr to the UI log panel so failures surface.
-        // Cookies/tokens are redacted before logging so users can safely share
-        // logs for diagnosis.
-        let app_out = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let mut reader = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                log_to_ui(&app_out, "info", &format!("[kugou-api] {}", redact_cookie(&line)));
-            }
-        });
-        let app_err = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                log_to_ui(
-                    &app_err,
-                    "error",
-                    &format!("[kugou-api stderr] {}", redact_cookie(&line)),
-                );
-            }
-        });
-
-        // Store child so the Job Object / process group handle stays alive
-        // until kill() is called (which drops it, releasing the OS binding).
-        *self.child.lock().await = Some(child);
-
-        // Poll until the Express server accepts a connection. Retry briefly
-        // because Node startup + module loading takes a couple seconds.
+        // Poll until the Express server accepts a connection. The sidecar has
+        // already loaded the modules, so this is usually quick.
         let url = format!("http://127.0.0.1:{port}/");
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(2))
@@ -245,13 +104,39 @@ impl KugouApiHandle {
             }
         }
         if !ready {
-            self.kill().await;
+            let _ = send_with_retry(sidecar, serde_json::json!({ "cmd": "kugou_stop" })).await;
+            *self.port.lock().await = None;
             return Err("kugou-api did not become ready within 15s".into());
         }
 
         *self.port.lock().await = Some(port);
         log_to_ui(&app, "info", &format!("kugou-api ready on :{port}"));
         Ok(())
+    }
+
+    /// Ask the sidecar to stop the kugou HTTP server and forget the port.
+    pub async fn kill(&self, sidecar: &SidecarState) {
+        let _ = sidecar
+            .send(serde_json::json!({ "cmd": "kugou_stop" }))
+            .await;
+        *self.port.lock().await = None;
+        self.set_enabled(false);
+    }
+}
+
+/// The sidecar is spawned asynchronously at startup, so a kugou enable that
+/// arrives first may briefly hit "sidecar not running". Retry only that case
+/// for a few seconds; real I/O errors fail immediately.
+async fn send_with_retry(sidecar: &SidecarState, cmd: serde_json::Value) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match sidecar.send(cmd.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(e) if e.contains("not running") && std::time::Instant::now() < deadline => {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            }
+            Err(e) => return Err(e),
+        }
     }
 }
 
@@ -263,53 +148,6 @@ fn log_to_ui(app: &AppHandle, level: &str, msg: &str) {
 /// Redact sensitive cookie/token data from log lines before surfacing to UI.
 /// Matches `cookie=`, `token=`, `userid=`, `dfid=` (case-insensitive) followed
 /// by their values up to the next `&` or end of string.
-fn redact_cookie(line: &str) -> String {
-    // Quick check: skip work if no sensitive patterns present.
-    let lower = line.to_ascii_lowercase();
-    if !lower.contains("cookie=")
-        && !lower.contains("token=")
-        && !lower.contains("userid=")
-        && !lower.contains("dfid=")
-    {
-        return line.to_string();
-    }
-    let mut out = String::with_capacity(line.len());
-    let bytes = line.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        let rest = &line[i..];
-        let lrest = &lower[i..];
-        let (matched_len, redact_to_end) = if lrest.starts_with("cookie=") {
-            (7, true) // cookie=... value extends to end (often whole tail)
-        } else if lrest.starts_with("token=") {
-            (6, false)
-        } else if lrest.starts_with("userid=") {
-            (7, false)
-        } else if lrest.starts_with("dfid=") {
-            (5, false)
-        } else {
-            out.push(rest.chars().next().unwrap());
-            i += rest.chars().next().unwrap().len_utf8();
-            continue;
-        };
-        out.push_str(&line[i..i + matched_len]);
-        let after = &line[i + matched_len..];
-        // Determine end of value: '&' separator, or for cookie=, end-of-string
-        // unless next pattern is found
-        let end = if redact_to_end {
-            // cookie=... can contain ; for sub-cookies — redact whole tail
-            after.len()
-        } else {
-            after.find('&').unwrap_or(after.len())
-        };
-        if end > 0 {
-            out.push_str("***");
-        }
-        i += matched_len + end;
-    }
-    out
-}
-
 #[allow(dead_code)]
 pub type KugouApiState = Arc<KugouApiHandle>;
 
@@ -327,7 +165,13 @@ pub type KugouApiState = Arc<KugouApiHandle>;
 fn sanitize_cookie(raw: &str) -> String {
     let cleaned: String = raw
         .chars()
-        .map(|c| if c == '\r' || c == '\n' || c == '\t' || c == '\0' { ' ' } else { c })
+        .map(|c| {
+            if c == '\r' || c == '\n' || c == '\t' || c == '\0' {
+                ' '
+            } else {
+                c
+            }
+        })
         .collect();
     let mut out = String::with_capacity(cleaned.len());
     let mut prev_space = false;
@@ -409,9 +253,7 @@ pub async fn kugou_api_request(
     // Materialize the request first so a builder error (bad URL / header /
     // serialization) surfaces with a real reason instead of opaque "builder
     // error" from send().
-    let request = req
-        .build()
-        .map_err(|e| format!("build {url}: {e}"))?;
+    let request = req.build().map_err(|e| format!("build {url}: {e}"))?;
 
     let resp = client
         .execute(request)
@@ -422,8 +264,8 @@ pub async fn kugou_api_request(
 
     // Best-effort JSON parse. If the response isn't JSON, return it as a
     // string under `_raw` so the dev panel can still show something.
-    let parsed: serde_json::Value = serde_json::from_str(&text)
-        .unwrap_or_else(|_| serde_json::json!({ "_raw": text }));
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({ "_raw": text }));
 
     Ok(serde_json::json!({
         "status": status,

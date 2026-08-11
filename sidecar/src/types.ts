@@ -25,7 +25,8 @@ export const SidecarCmdSchema = z.discriminatedUnion('cmd', [
   z.object({ cmd: z.literal('start'), config: ConfigSchema }),
   z.object({ cmd: z.literal('stop') }),
   z.object({ cmd: z.literal('reload_config'), config: ConfigSchema }),
-  z.object({ cmd: z.literal('set_companion_pid'), pid: z.number().optional() }),
+  z.object({ cmd: z.literal('kugou_start'), port: z.number().int().positive() }),
+  z.object({ cmd: z.literal('kugou_stop') }),
 ]);
 export type SidecarCmd = z.infer<typeof SidecarCmdSchema>;
 
