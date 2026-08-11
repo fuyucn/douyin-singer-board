@@ -8,6 +8,7 @@ import {
   checkForUpdate,
   clearSkippedVersion,
   getSkippedVersion,
+  updaterEnabled,
 } from './updater';
 import { Button } from './components/ui/button';
 import {
@@ -129,7 +130,7 @@ export function AboutModal({ onClose }: Props) {
             <span className="text-fg-muted min-w-[60px]">版本</span>
             <span className="text-fg-base">v{CURRENT_VERSION}</span>
           </div>
-          {skipped && (
+          {updaterEnabled && skipped && (
             <div className="mb-3.5 flex items-center gap-3 text-sm">
               <span className="text-fg-muted min-w-[60px]">已跳过</span>
               <span className="text-fg-base">
@@ -144,11 +145,13 @@ export function AboutModal({ onClose }: Props) {
               </span>
             </div>
           )}
-          <div className="mt-4 flex gap-2.5">
-            <Button className="bg-success text-white" onClick={onCheck} disabled={checking}>
-              {checking ? '检查中…' : '检查更新'}
-            </Button>
-          </div>
+          {updaterEnabled && (
+            <div className="mt-4 flex gap-2.5">
+              <Button className="bg-success text-white" onClick={onCheck} disabled={checking}>
+                {checking ? '检查中…' : '检查更新'}
+              </Button>
+            </div>
+          )}
 
           {/* Telemetry section */}
           <div className="border-border-soft mt-5 border-t pt-4">

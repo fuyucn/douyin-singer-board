@@ -97,10 +97,21 @@ jobs:
         shell: bash
         run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
 
+      - name: Enable signed updater artifacts (signing key present)
+        if: secrets.TAURI_SIGNING_PRIVATE_KEY != ''
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          jq '.bundle.createUpdaterArtifacts = true' src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json src-tauri/tauri.conf.json
+          echo "createUpdaterArtifacts=true (signed release)"
+
       - name: Build Tauri app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_UPDATER_ENABLED: 'true'
         run: pnpm exec tauri build --target ${{ matrix.rust_target }}
 
       - name: Collect artifact (macOS)

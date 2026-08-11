@@ -19,6 +19,13 @@ declare const __APP_VERSION__: string;
 const REPO = 'fuyucn/douyin-singer-board';
 const SKIP_KEY = 'sususongboard.skipped-update-tag';
 
+/**
+ * Release builds set VITE_UPDATER_ENABLED=true (with signing keys in CI).
+ * Local/unsigned builds keep the feature off so the UI never claims updates
+ * are available when no signed artifacts are produced.
+ */
+export const updaterEnabled = import.meta.env.VITE_UPDATER_ENABLED === 'true';
+
 export interface UpdateInfo {
   tag: string;
   htmlUrl: string;
@@ -52,6 +59,7 @@ export const isWindows = (): boolean =>
 const isPrerelease = (v: string): boolean => v.includes('-');
 
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
+  if (!updaterEnabled) return null;
   try {
     const currentPrerelease = isPrerelease(CURRENT_VERSION);
 
@@ -156,6 +164,7 @@ export async function installAppUpdate(
   onProgress?: (p: DownloadProgress) => void,
   onDiag?: (e: DiagEntry) => void,
 ): Promise<void> {
+  if (!updaterEnabled) throw new Error('自动更新未启用');
   const log = (msg: string) => {
     const e = diagEntry(msg);
     console.log(`[updater] ${e.ts} v${e.version}  ${msg}`);
