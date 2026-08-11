@@ -344,32 +344,62 @@
   }
 }
 
-/* ─── Auto-sync toggle ───────────────────────────────────────────── */
-.auto-sync-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--bg-elev);
-  color: var(--fg-muted);
-  font-size: 12px;
-  flex-shrink: 0;
-  transition:
-    background 0.1s,
-    color 0.1s,
-    border-color 0.1s;
+@keyframes auto-sync-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
 }
-.auto-sync-btn:active {
-  transform: translateY(1px);
+
+/* ─── Auto-sync rainbow border ───────────────────────────────────── */
+.auto-sync-btn {
+  position: relative;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: 4px;
+  background: var(--bg-elev);
+  color: var(--fg-base) !important;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 13px;
+  flex-shrink: 0;
+  z-index: 0;
+  overflow: hidden;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    opacity 0.2s;
+}
+.auto-sync-btn::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  border-radius: 7px;
+  background: conic-gradient(from 0deg, #00e676, #2979ff, #d500f9, #ff6d00, #00e676);
+  animation: auto-sync-rotate 2s linear infinite;
+  opacity: 0;
+  transition: opacity 0.25s;
+  filter: blur(2px);
+}
+.auto-sync-btn::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  z-index: -1;
+  border-radius: 3px;
+  background: var(--bg-elev);
 }
 .auto-sync-btn.active {
-  border-color: var(--accent-soft-border);
-  background: var(--accent-soft-bg);
-  color: var(--accent-soft-fg);
+  color: var(--fg-base);
   font-weight: 500;
+  border-color: transparent !important;
+  opacity: 1;
+  box-shadow:
+    0 0 12px rgba(100, 180, 255, 0.4),
+    0 0 24px rgba(100, 180, 255, 0.2);
+}
+.auto-sync-btn.active::before {
+  opacity: 1;
 }
 
 /* ─── logs <details> triangle ────────────────────────────────────── */

@@ -269,7 +269,7 @@ export function LeftPanel({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 flex-1 border-[var(--border-strong)] text-[var(--fg-muted)]"
+                  className="h-8 flex-1 border-red-400 text-red-500 hover:bg-red-50 hover:text-red-600"
                   onClick={handleClearPlaylist}
                   title="清空并重建歌单"
                 >
