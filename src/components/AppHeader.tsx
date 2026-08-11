@@ -109,8 +109,8 @@ export function AppHeader({
         ) : (
           <Button
             size="icon"
-            variant="destructive"
-            className="ml-2 size-8"
+            variant="outline"
+            className="ml-2 size-8 border-[var(--danger)] bg-transparent text-[var(--danger)] hover:bg-[var(--danger-soft-bg)] hover:text-[var(--danger)]"
             onClick={onStop}
             title="停止"
           >
