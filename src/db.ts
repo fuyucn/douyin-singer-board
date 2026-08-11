@@ -1,5 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import type { Config, DanmuInfo } from './types';
+import { DEFAULT_ROOM_ID } from './types';
 
 let _db: Database | null = null;
 
@@ -77,7 +78,7 @@ export async function loadConfig(): Promise<Config> {
     // The migration already inserts a row; this is a defensive fallback.
     await db.execute('INSERT OR IGNORE INTO config (id) VALUES (1)');
     return {
-      room_id: '',
+      room_id: DEFAULT_ROOM_ID,
       sing_prefix: '点歌[space][song]',
       fans_level: 0,
       sing_cd: 60,
@@ -89,7 +90,11 @@ export async function loadConfig(): Promise<Config> {
     };
   }
   const row = rows[0];
-  return { ...row, kugou_enabled: Boolean(row.kugou_enabled) };
+  return {
+    ...row,
+    room_id: row.room_id.trim() || DEFAULT_ROOM_ID,
+    kugou_enabled: Boolean(row.kugou_enabled),
+  };
 }
 
 export async function saveConfig(cfg: Config): Promise<void> {

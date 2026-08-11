@@ -44,3 +44,5 @@ export type SidecarEvent = z.infer<typeof SidecarEventSchema>;
 // Human-friendly template, not a regex.
 // Placeholders: [space] = whitespace, [song] = song-name capture.
 export const DEFAULT_SING_PREFIX = '点歌[space][song]';
+
+export const DEFAULT_ROOM_ID = '767116735823';
