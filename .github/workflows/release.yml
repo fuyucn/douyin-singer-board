@@ -40,6 +40,8 @@ jobs:
     needs: read-version
     name: Build (${{ matrix.os }} / ${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -95,7 +97,7 @@ jobs:
         run: rm -rf "src-tauri/target/${{ matrix.rust_target }}/release/bundle"
 
       - name: Enable signed updater artifacts (signing key present)
-        if: secrets.TAURI_SIGNING_PRIVATE_KEY != ''
+        if: env.HAS_SIGNING_KEY == 'true'
         shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
