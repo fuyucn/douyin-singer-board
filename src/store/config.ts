@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { AppStore } from './index';
 import type { Config } from '../types';
-import { DEFAULT_ROOM_ID, DEFAULT_SING_PREFIX } from '../types';
+import { DEFAULT_SING_PREFIX } from '../types';
 
 export interface ConfigSlice {
   config: Config;
@@ -11,7 +11,7 @@ export interface ConfigSlice {
 
 export const createConfigSlice: StateCreator<AppStore, [], [], ConfigSlice> = (set) => ({
   config: {
-    room_id: DEFAULT_ROOM_ID,
+    room_id: '',
     sing_prefix: DEFAULT_SING_PREFIX,
     fans_level: 0,
     sing_cd: 60,

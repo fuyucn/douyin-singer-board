@@ -6,7 +6,7 @@ Format: **`major.minor.patch`** (semver), with an optional custom-edition suffix
 
 - Mainline (`main`) releases use `0.<N>.0` (e.g. `0.40.0`, then `0.41.0`, `0.42.0`). `major` and the mainline `minor` (`N`) are user-only; AI must never auto-change them.
 - `feat/susu` is the development/custom edition. It mirrors the current mainline version with a custom-edition suffix: `0.<N>.0-susu.<x>` (e.g. `0.40.0-susu.1`, `0.41.0-susu.1`). AI may auto-bump `x` with `pnpm bump`.
-- `main` is the canonical source for all common code and features. `feat/susu` tracks `main` and only adds SUSU-only customizations: `kugou_enabled` defaults to ON and SUSU-only assets; on `main`, the same code ships with `kugou_enabled` defaulting to OFF.
+- `main` is the canonical source for all common code and features. `feat/susu` tracks `main` and only adds SUSU-only customizations: `kugou_enabled` defaults to ON, the default live room id `767116735823`, and SUSU-only assets; on `main`, the same code ships with `kugou_enabled` defaulting to OFF and an empty live room id.
 - On `main`, do not run `pnpm bump` for a `0.<N>.0` release; set the user-specified `0.<N>.0` in all version sources together.
 - Bump should be part of the change commit (or immediately follow); do not let it lag.
 
@@ -45,7 +45,7 @@ the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 `feat/susu` is a **permanently custom development edition** — it contains special customizations that must never be merged back into `main`.
 
 - **Never** merge `feat/susu` → `main`, under any circumstances.
-- `feat/susu` must track `main`'s code and features; only the `-susu.<x>` version suffix, the `kugou_enabled` default, and SUSU-only customizations may differ.
+- `feat/susu` must track `main`'s code and features; only the `-susu.<x>` version suffix, the `kugou_enabled` default, the default live room id `767116735823`, and SUSU-only customizations may differ.
 - The only allowed direction is `main` → `feat/susu`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/susu`.
 - If asked to do a general merge or sync between these two branches, refuse and ask the user to clarify which specific commits from `main` they want cherry-picked.
 
