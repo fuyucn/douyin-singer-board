@@ -48,7 +48,7 @@ pub async fn kugou_search(
     state: tauri::State<'_, KugouApiState>,
     keyword: String,
 ) -> Result<Option<KuGouSong>, String> {
-    if !state.is_enabled() {
+    if !state.is_enabled().await {
         return Err("Kugou features are disabled".to_string());
     }
 

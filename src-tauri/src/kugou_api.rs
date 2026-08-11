@@ -5,44 +5,55 @@
 // to stop. Other Rust modules call it via
 // `http://127.0.0.1:<port>/...` through `KugouApiHandle::api_url()`.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 
 use crate::sidecar::SidecarState;
 
+#[derive(Clone, Copy)]
+struct KugouApiStateInner {
+    port: Option<u16>,
+    enabled: bool,
+}
+
 pub struct KugouApiHandle {
-    port: Mutex<Option<u16>>,
-    enabled: AtomicBool,
+    state: Mutex<KugouApiStateInner>,
+    // Monotonic generation bumped whenever the running server is invalidated
+    // (stop or sidecar exit). An in-flight spawn checks it after its async
+    // readiness poll so a stale completion cannot resurrect the port after a
+    // user already toggled the feature off.
+    generation: AtomicU64,
 }
 
 impl KugouApiHandle {
     pub fn new() -> Self {
         Self {
-            port: Mutex::new(None),
-            enabled: AtomicBool::new(false),
+            state: Mutex::new(KugouApiStateInner {
+                port: None,
+                enabled: false,
+            }),
+            generation: AtomicU64::new(0),
         }
     }
 
-    pub fn is_enabled(&self) -> bool {
-        self.enabled.load(Ordering::SeqCst)
-    }
-
-    pub fn set_enabled(&self, enabled: bool) {
-        self.enabled.store(enabled, Ordering::SeqCst);
+    pub async fn is_enabled(&self) -> bool {
+        self.state.lock().await.enabled
     }
 
     /// Clear the cached port after the sidecar has exited so a later respawn
-    /// can start the kugou server again. The enabled flag is left untouched.
+    /// can start the kugou server again. The enabled flag is left untouched
+    /// (crash recovery uses it to decide whether to auto-restart kugou).
     pub async fn reset(&self) {
-        *self.port.lock().await = None;
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.state.lock().await.port = None;
     }
 
     /// Returns the base URL of the running kugou-api server, or an error if
     /// it is not currently running.
     pub async fn api_url(&self, path: &str) -> Result<String, String> {
-        let port = *self.port.lock().await;
+        let port = self.state.lock().await.port;
         let port = port.ok_or_else(|| "kugou-api not running".to_string())?;
         if path.starts_with('/') {
             Ok(format!("http://127.0.0.1:{port}{path}"))
@@ -66,9 +77,12 @@ impl KugouApiHandle {
     }
 
     pub async fn spawn(&self, app: AppHandle, sidecar: &SidecarState) -> Result<(), String> {
-        if self.port.lock().await.is_some() {
+        let generation = self.generation.load(Ordering::SeqCst);
+        let state = self.state.lock().await;
+        if state.port.is_some() && generation == self.generation.load(Ordering::SeqCst) {
             return Ok(());
         }
+        drop(state);
 
         let port = Self::pick_free_port()?;
         log_to_ui(
@@ -92,6 +106,9 @@ impl KugouApiHandle {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
         let mut ready = false;
         loop {
+            if self.generation.load(Ordering::SeqCst) != generation {
+                break;
+            }
             if std::time::Instant::now() > deadline {
                 break;
             }
@@ -103,24 +120,45 @@ impl KugouApiHandle {
                 Err(_) => tokio::time::sleep(std::time::Duration::from_millis(200)).await,
             }
         }
+
+        if self.generation.load(Ordering::SeqCst) != generation {
+            // A stop/reset happened while we were waiting. The kill path
+            // already sends kugou_stop, but the server may only just have come
+            // up (currentServer is set late), so stop again to close that gap.
+            let _ = send_with_retry(sidecar, serde_json::json!({ "cmd": "kugou_stop" })).await;
+            return Ok(());
+        }
+
         if !ready {
             let _ = send_with_retry(sidecar, serde_json::json!({ "cmd": "kugou_stop" })).await;
-            *self.port.lock().await = None;
+            self.state.lock().await.port = None;
             return Err("kugou-api did not become ready within 15s".into());
         }
 
-        *self.port.lock().await = Some(port);
+        let mut state = self.state.lock().await;
+        *state = KugouApiStateInner {
+            port: Some(port),
+            enabled: true,
+        };
+        drop(state);
         log_to_ui(&app, "info", &format!("kugou-api ready on :{port}"));
         Ok(())
     }
 
     /// Ask the sidecar to stop the kugou HTTP server and forget the port.
-    pub async fn kill(&self, sidecar: &SidecarState) {
-        let _ = sidecar
-            .send(serde_json::json!({ "cmd": "kugou_stop" }))
-            .await;
-        *self.port.lock().await = None;
-        self.set_enabled(false);
+    /// Returns an error when the sidecar is alive but the stop could not be
+    /// delivered; in that case the port/enabled state is left untouched so the
+    /// UI does not claim the feature is off while the server is still running.
+    pub async fn kill(&self, sidecar: &SidecarState) -> Result<(), String> {
+        if sidecar.is_running().await {
+            send_with_retry(sidecar, serde_json::json!({ "cmd": "kugou_stop" })).await?;
+        }
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        *self.state.lock().await = KugouApiStateInner {
+            port: None,
+            enabled: false,
+        };
+        Ok(())
     }
 }
 
@@ -197,7 +235,7 @@ pub async fn kugou_api_request(
     cookie: Option<String>,
     body: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
-    if !state.is_enabled() {
+    if !state.is_enabled().await {
         return Err("Kugou features are disabled".to_string());
     }
 
@@ -271,4 +309,32 @@ pub async fn kugou_api_request(
         "status": status,
         "body": parsed,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sidecar::SidecarHandle;
+
+    #[tokio::test]
+    async fn kill_without_sidecar_is_clean_noop() {
+        let kugou = KugouApiHandle::new();
+        let sidecar = std::sync::Arc::new(SidecarHandle::new());
+
+        assert!(!kugou.is_enabled().await);
+        assert!(kugou.kill(&sidecar).await.is_ok());
+        assert!(!kugou.is_enabled().await);
+        assert!(kugou.api_url("/x").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn reset_clears_port_only() {
+        let kugou = KugouApiHandle::new();
+        kugou.state.lock().await.port = Some(8080);
+
+        kugou.reset().await;
+
+        assert!(kugou.api_url("/x").await.is_err());
+        assert!(!kugou.is_enabled().await);
+    }
 }

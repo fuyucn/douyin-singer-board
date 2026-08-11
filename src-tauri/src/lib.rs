@@ -177,11 +177,10 @@ async fn kugou_set_enabled(
 ) -> Result<(), String> {
     if enabled {
         kugou.spawn(app.clone(), sidecar.inner()).await?;
-        kugou.set_enabled(true);
+        Ok(())
     } else {
-        kugou.kill(sidecar.inner()).await;
+        kugou.kill(sidecar.inner()).await
     }
-    Ok(())
 }
 
 /// Download the new portable exe into the same directory as the current exe,

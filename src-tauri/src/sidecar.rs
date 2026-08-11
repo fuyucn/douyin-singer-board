@@ -49,6 +49,13 @@ impl SidecarHandle {
         }
     }
 
+    /// True when the child process is still alive and stdin is writable.
+    /// A killed/exited sidecar cannot host the kugou server, so callers can
+    /// treat "not running" as an already-stopped state.
+    pub async fn is_running(&self) -> bool {
+        self.stdin.lock().await.is_some()
+    }
+
     /// Explicitly kill the child process, then drop the wrapper.
     /// On Windows the Job Object cleanup fires; on Unix KillOnDrop sends SIGKILL.
     /// We also briefly wait so the child is reaped before we return.
@@ -273,7 +280,7 @@ pub async fn sidecar_respawn(
     app: AppHandle,
 ) -> Result<(), String> {
     state.spawn(app.clone()).await?;
-    if kugou.is_enabled() {
+    if kugou.is_enabled().await {
         kugou.spawn(app, state.inner()).await?;
     }
     Ok(())
