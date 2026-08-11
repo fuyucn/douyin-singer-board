@@ -11,11 +11,7 @@ import { track } from '../telemetry';
  * If the user was running, re-sends the start command after respawn so the
  * live room reconnects automatically.
  */
-export function useSidecarRecovery({
-  syncBlacklist,
-}: {
-  syncBlacklist: () => void;
-}) {
+export function useSidecarRecovery({ syncBlacklist }: { syncBlacklist: () => void }) {
   const config = useAppStore((s) => s.config);
   const running = useAppStore((s) => s.running);
   const setRunning = useAppStore((s) => s.setRunning);

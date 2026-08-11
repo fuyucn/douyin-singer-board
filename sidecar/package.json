@@ -1,13 +1,13 @@
 {
   "name": "sidecar",
   "private": true,
-  "version": "0.41.0-susu.1",
+  "version": "0.42.0-susu.1",
   "type": "module",
   "main": "build/index.cjs",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "dev:watch": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs --watch=forever",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=build/index.cjs",
+    "dev:watch": "node scripts/bundle.mjs --watch",
+    "build": "node scripts/bundle.mjs",
     "build:bin": "node scripts/build-bin.mjs"
   },
   "dependencies": {

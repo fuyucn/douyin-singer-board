@@ -298,7 +298,7 @@ export function KugouDebugModal({ onClose }: Props) {
           </div>
 
           {qr.kind === 'waiting' && (
-            <div className="flex flex-col items-center gap-2 rounded-lg border p-4">
+            <div className="flex flex-col items-center gap-2 rounded-md border p-4">
               <img src={qr.image} alt="KuGou QR" className="h-40 w-40" />
               <Badge variant="secondary">
                 {qr.statusLabel}（已轮询 {qr.pollCount} 次）
@@ -492,7 +492,7 @@ export function KugouDebugModal({ onClose }: Props) {
 
           {/* Result */}
           {result && (
-            <details className="rounded-lg border" open>
+            <details className="rounded-md border" open>
               <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-medium select-none">
                 <span>
                   {result.label} → status {result.data.status}

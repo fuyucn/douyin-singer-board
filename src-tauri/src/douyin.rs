@@ -87,10 +87,7 @@ pub async fn douyin_room_info(web_rid: String) -> Result<Option<DouyinRoomInfo>,
     if !res.status().is_success() {
         return Err(format!("HTTP {} {}", res.status(), url));
     }
-    let html = res
-        .text()
-        .await
-        .map_err(|e| format!("body decode: {e}"))?;
+    let html = res.text().await.map_err(|e| format!("body decode: {e}"))?;
 
     let id_str = extract_field(&html, "roomId").unwrap_or_else(|| trimmed.clone());
     let nickname = extract_field(&html, "nickname").unwrap_or_default();

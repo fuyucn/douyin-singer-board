@@ -8,7 +8,7 @@ import {
   InputGroupInput,
 } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { X, ShieldOff, Plus } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 
 export interface BlacklistItemUI {
   id: number;
@@ -58,9 +58,8 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
           placeholder="输入歌手名…"
         />
         <InputGroupAddon align="inline-end">
-          <InputGroupButton disabled={!input.trim()} onClick={handleAdd}>
+          <InputGroupButton disabled={!input.trim()} onClick={handleAdd} aria-label="添加歌手">
             <Plus className="size-4" />
-            添加
           </InputGroupButton>
         </InputGroupAddon>
       </InputGroup>
@@ -72,7 +71,6 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
       <div className="flex min-h-0 flex-1 flex-col">
         {addBar}
         <div className="text-fg-faint flex flex-1 flex-col items-center justify-center gap-2">
-          <ShieldOff className="size-8 opacity-30" />
           <p className="text-sm">黑名单为空</p>
           <p className="text-xs">右键点歌列表可添加歌曲/歌手</p>
         </div>
@@ -110,13 +108,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                 style={{ transform: `translateY(${vRow.start}px)`, height: ROW_HEIGHT }}
               >
                 <span className="w-12 shrink-0">
-                  <span
-                    className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                      entryType === 'singer'
-                        ? 'bg-purple-500/10 text-purple-400'
-                        : 'bg-blue-500/10 text-blue-400'
-                    }`}
-                  >
+                  <span className="bg-bg-softer text-fg-muted inline-block rounded px-1.5 py-0.5 text-[11px] font-medium">
                     {entryType === 'singer' ? '歌手' : '歌曲'}
                   </span>
                 </span>
@@ -132,7 +124,7 @@ export function BlacklistPanel({ items, onRemove, onAddSinger }: Props) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="text-fg-faint size-7 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                      className="text-fg-faint hover:text-danger-soft-fg size-7 opacity-0 transition-opacity group-hover:opacity-100"
                       onClick={() => onRemove(id)}
                     >
                       <X className="size-3.5" />

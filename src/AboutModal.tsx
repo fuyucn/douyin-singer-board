@@ -8,6 +8,7 @@ import {
   checkForUpdate,
   clearSkippedVersion,
   getSkippedVersion,
+  updaterEnabled,
 } from './updater';
 import { Button } from './components/ui/button';
 import {
@@ -23,12 +24,14 @@ import { useAppStore } from './store';
 
 interface Props {
   onClose: () => void;
+  onOpenKgDebug?: () => void;
 }
 
-export function AboutModal({ onClose }: Props) {
+export function AboutModal({ onClose, onOpenKgDebug }: Props) {
   const config = useAppStore((s) => s.config);
   const setConfig = useAppStore((s) => s.setConfig);
   const setAutoSync = useAppStore((s) => s.setAutoSync);
+  const logs = useAppStore((s) => s.logs);
   const [skipped, setSkipped] = useState<string | null>(getSkippedVersion());
   const [checking, setChecking] = useState(false);
   const [telemetryOn, setTelemetryOn] = useState(false);
@@ -52,9 +55,9 @@ export function AboutModal({ onClose }: Props) {
 
   const onExportTelemetry = async () => {
     try {
-      const jsonl = await exportTelemetry(CURRENT_VERSION);
+      const jsonl = await exportTelemetry(CURRENT_VERSION, logs);
       await navigator.clipboard.writeText(jsonl);
-      toast.success('诊断数据已复制到剪贴板');
+      toast.success(`诊断数据已复制到剪贴板 (${logs.length} 条日志)`);
     } catch (e) {
       toast.error(`导出失败: ${e}`);
     }
@@ -112,7 +115,7 @@ export function AboutModal({ onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[10px]"
+        className="bg-bg-elev animate-scale-in w-[380px] max-w-[90vw] overflow-hidden rounded-[8px]"
         style={{ boxShadow: 'var(--shadow-modal)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -129,7 +132,7 @@ export function AboutModal({ onClose }: Props) {
             <span className="text-fg-muted min-w-[60px]">版本</span>
             <span className="text-fg-base">v{CURRENT_VERSION}</span>
           </div>
-          {skipped && (
+          {updaterEnabled && skipped && (
             <div className="mb-3.5 flex items-center gap-3 text-sm">
               <span className="text-fg-muted min-w-[60px]">已跳过</span>
               <span className="text-fg-base">
@@ -144,15 +147,13 @@ export function AboutModal({ onClose }: Props) {
               </span>
             </div>
           )}
-          <div className="mt-4 flex gap-2.5">
-            <Button
-              className="bg-success hover:bg-success-hover text-white"
-              onClick={onCheck}
-              disabled={checking}
-            >
-              {checking ? '检查中…' : '检查更新'}
-            </Button>
-          </div>
+          {updaterEnabled && (
+            <div className="mt-4 flex gap-2.5">
+              <Button className="bg-success text-white" onClick={onCheck} disabled={checking}>
+                {checking ? '检查中…' : '检查更新'}
+              </Button>
+            </div>
+          )}
 
           {/* Telemetry section */}
           <div className="border-border-soft mt-5 border-t pt-4">
@@ -205,6 +206,11 @@ export function AboutModal({ onClose }: Props) {
                 onCheckedChange={onToggleKugou}
               />
             </div>
+            {config.kugou_enabled && onOpenKgDebug && (
+              <Button variant="outline" size="sm" className="mt-2.5" onClick={onOpenKgDebug}>
+                打开 KuGou 调试面板
+              </Button>
+            )}
           </div>
         </div>
       </div>

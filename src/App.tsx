@@ -134,6 +134,7 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showKgDebug, setShowKgDebug] = useState(false);
   const [showKgLogin, setShowKgLogin] = useState(false);
+  const [sidecarStarting, setSidecarStarting] = useState(false);
   const [theme, setTheme] = useState<Theme>(loadTheme());
   const [activeTab, setActiveTab] = useState<'songs' | 'played' | 'blacklist'>('songs');
 
@@ -155,13 +156,26 @@ export default function App() {
     invoke('show_window').catch(() => {});
   }, []);
 
-  // Remove splash screen after first render.
+  // Show a lightweight loading veil only when the sidecar is still starting;
+  // hide it as soon as the sidecar is ready so normal launches have no flash.
   useEffect(() => {
-    const splash = document.getElementById('splash');
-    if (!splash) return;
-    splash.style.opacity = '0';
-    setTimeout(() => splash.remove(), 200);
-  }, []);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) setSidecarStarting(true);
+    }, 300);
+    invoke('sidecar_wait_ready')
+      .then(() => undefined)
+      .catch((e) => pushLog(`[sidecar] startup wait failed: ${e}`))
+      .finally(() => {
+        if (cancelled) return;
+        window.clearTimeout(timer);
+        setSidecarStarting(false);
+      });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [pushLog]);
 
   const display = useMemo(() => dedupedSongs(songs), [songs]);
   const visibleStartupSteps = useMemo(
@@ -450,7 +464,7 @@ export default function App() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="size-7 text-[var(--fg-muted)] hover:text-blue-500"
+                className="hover:text-accent-soft-fg size-7 text-[var(--fg-muted)]"
                 disabled={!enabled}
                 onClick={() => entry.status === 'found' && onAddToPlaylist(entry.track, s)}
               >
@@ -486,7 +500,7 @@ export default function App() {
             <Button
               size="icon"
               variant="ghost"
-              className="size-7 text-[var(--fg-muted)] hover:text-red-500"
+              className="hover:text-danger-soft-fg size-7 text-[var(--fg-muted)]"
               onClick={() => onRemoveOne(s.msg_id, s.song_name)}
             >
               <Trash2 className="size-3.5" />
@@ -590,11 +604,6 @@ export default function App() {
           }}
           onShowKgLogin={() => setShowKgLogin(true)}
           onShowAbout={() => setShowAbout(true)}
-          onShowKgDebug={
-            kugouEnabled && (import.meta.env.DEV || import.meta.env.VITE_DEBUG)
-              ? () => setShowKgDebug(true)
-              : undefined
-          }
           onStart={onStart}
           onStop={onStop}
         />
@@ -642,7 +651,8 @@ export default function App() {
                 <>
                   {isWindows() ? (
                     <span>
-                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-{update.tag.replace(/^v/, '')}.exe），请手动启动
+                      新版本已下载到当前目录（SUSUSongBoard-Windows-x64-
+                      {update.tag.replace(/^v/, '')}.exe），请手动启动
                     </span>
                   ) : (
                     <>
@@ -770,7 +780,29 @@ export default function App() {
 
         <Toaster position="bottom-right" richColors closeButton />
 
-        {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+        {sidecarStarting && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-base)]">
+            <div className="flex flex-col items-center gap-3">
+              <img
+                src="/logo.png"
+                className="size-10 rounded-[4px] object-contain"
+                alt=""
+                draggable={false}
+              />
+              <div className="text-sm text-[var(--fg-muted)]">正在启动服务…</div>
+            </div>
+          </div>
+        )}
+
+        {showAbout && (
+          <AboutModal
+            onClose={() => setShowAbout(false)}
+            onOpenKgDebug={() => {
+              setShowAbout(false);
+              setShowKgDebug(true);
+            }}
+          />
+        )}
         {kugouEnabled && showKgLogin && <KugouLoginModal onClose={() => setShowKgLogin(false)} />}
         {kugouEnabled && showKgDebug && <KugouDebugModal onClose={() => setShowKgDebug(false)} />}
       </div>

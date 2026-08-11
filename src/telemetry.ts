@@ -43,10 +43,9 @@ export async function setTelemetryOptIn(optIn: boolean): Promise<void> {
   if (optIn) {
     const row = await loadConfigRow();
     const deviceId = row.device_id || randomDeviceId();
-    await db.execute(
-      'UPDATE telemetry_config SET opt_in = 1, device_id = $1 WHERE id = 1',
-      [deviceId],
-    );
+    await db.execute('UPDATE telemetry_config SET opt_in = 1, device_id = $1 WHERE id = 1', [
+      deviceId,
+    ]);
     deviceIdCache = deviceId;
   } else {
     await db.execute('UPDATE telemetry_config SET opt_in = 0 WHERE id = 1');
@@ -65,10 +64,11 @@ export async function track(event: string, props?: Record<string, unknown>): Pro
   try {
     if (!(await isTelemetryOptedIn())) return;
     const db = await getDb();
-    await db.execute(
-      'INSERT INTO telemetry_events (ts, event, props_json) VALUES ($1, $2, $3)',
-      [Math.floor(Date.now() / 1000), event, JSON.stringify(props ?? {})],
-    );
+    await db.execute('INSERT INTO telemetry_events (ts, event, props_json) VALUES ($1, $2, $3)', [
+      Math.floor(Date.now() / 1000),
+      event,
+      JSON.stringify(props ?? {}),
+    ]);
   } catch {
     // Telemetry must never break the app.
   }
@@ -85,8 +85,12 @@ export async function pruneOldEvents(): Promise<void> {
   }
 }
 
-/** Export all events as JSONL string with header line including device_id + version. */
-export async function exportTelemetry(version: string): Promise<string> {
+/**
+ * Export all events as JSONL string with header line including device_id + version.
+ * `logs` are the current in-app log panel lines (timestamped) and are included
+ * as `type: "log"` records so diagnostics carry the full recent history.
+ */
+export async function exportTelemetry(version: string, logs: string[] = []): Promise<string> {
   const db = await getDb();
   const rows = await db.select<Array<{ ts: number; event: string; props_json: string }>>(
     'SELECT ts, event, props_json FROM telemetry_events ORDER BY ts ASC',
@@ -98,11 +102,13 @@ export async function exportTelemetry(version: string): Promise<string> {
     version,
     exported_at: Math.floor(Date.now() / 1000),
     count: rows.length,
+    log_count: logs.length,
   });
   const lines = rows.map((r) =>
     JSON.stringify({ ts: r.ts, event: r.event, props: JSON.parse(r.props_json) }),
   );
-  return [header, ...lines].join('\n');
+  const logLines = logs.map((line) => JSON.stringify({ type: 'log', line }));
+  return [header, ...lines, ...logLines].join('\n');
 }
 
 export async function clearTelemetry(): Promise<void> {

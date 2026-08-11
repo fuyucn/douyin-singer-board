@@ -38,8 +38,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           // Shrink toast to fit content (close button gets ~32px reserved space)
           toast: 'cn-toast !w-fit !min-w-[200px] !max-w-[420px] !pr-10',
           // Move close button to right side, vertically centered (default is top-left)
-          closeButton:
-            '!left-auto !-right-4 !top-2 !bottom-auto !translate-x-0 !-translate-y-1/2',
+          closeButton: '!left-auto !-right-4 !top-2 !bottom-auto !translate-x-0 !-translate-y-1/2',
         },
       }}
       {...props}
