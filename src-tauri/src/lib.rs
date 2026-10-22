@@ -1,10 +1,12 @@
 mod douyin;
+mod gh_mirror;
 mod kugou;
 mod kugou_api;
 mod sidecar;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::{Emitter, Manager};
 use tauri_plugin_sql::{Migration, MigrationKind};
 use tauri_plugin_updater::UpdaterExt;
@@ -129,44 +131,79 @@ fn show_window(window: tauri::WebviewWindow) {
     let _ = window.show();
 }
 
+/// Fetch the Tauri manifest, directly first and then through the mirror.
+async fn check_manifest(
+    app: &tauri::AppHandle,
+    manifest_url: &str,
+) -> Result<Option<tauri_plugin_updater::Update>, String> {
+    let mut last_err = String::new();
+    for route in [gh_mirror::Route::Direct, gh_mirror::Route::Proxy] {
+        let url: url::Url = route
+            .apply(manifest_url)
+            .parse()
+            .map_err(|e: url::ParseError| e.to_string())?;
+        let result = app
+            .updater_builder()
+            .endpoints(vec![url])
+            .map_err(|e| e.to_string())?
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| e.to_string())?
+            .check()
+            .await;
+        match result {
+            Ok(update) => return Ok(update),
+            Err(e) => last_err = format!("{} manifest: {e}", route.label()),
+        }
+    }
+    Err(last_err)
+}
+
 /// Download and install the update described by `manifest_url` (a URL pointing
 /// to a Tauri `latest.json` manifest).  Emits `updater://progress` events
-/// during download, then returns when installation is complete (caller should
-/// then prompt the user to restart).
+/// during download, then returns the download route used once installation is
+/// complete (caller should then prompt the user to restart).
+///
+/// The bundle is Ed25519-verified against the embedded pubkey, so serving it
+/// through the mirror cannot inject a tampered build.
 #[tauri::command]
-async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Result<(), String> {
-    let url: url::Url = manifest_url
-        .parse()
-        .map_err(|e: url::ParseError| e.to_string())?;
+async fn install_app_update(app: tauri::AppHandle, manifest_url: String) -> Result<String, String> {
+    let Some(mut update) = check_manifest(&app, &manifest_url).await? else {
+        return Ok("up-to-date".to_string());
+    };
+    // The manifest timeout must not cap the (much longer) bundle download.
+    update.timeout = None;
 
-    let updater = app
-        .updater_builder()
-        .endpoints(vec![url])
-        .map_err(|e| e.to_string())?
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let update = updater.check().await.map_err(|e| e.to_string())?;
-
-    if let Some(update) = update {
+    let direct_url = update.download_url.to_string();
+    let mut last_err = String::new();
+    for route in gh_mirror::ordered_routes(&direct_url).await {
+        update.download_url = route
+            .apply(&direct_url)
+            .parse()
+            .map_err(|e: url::ParseError| e.to_string())?;
         let app_progress = app.clone();
-        update
+        let mut downloaded: u64 = 0;
+        let result = update
             .download_and_install(
                 move |chunk_length, content_length| {
+                    downloaded += chunk_length as u64;
                     let _ = app_progress.emit(
                         "updater://progress",
                         serde_json::json!({
-                            "downloaded": chunk_length,
+                            "downloaded": downloaded,
                             "total": content_length
                         }),
                     );
                 },
                 || {},
             )
-            .await
-            .map_err(|e| e.to_string())?;
+            .await;
+        match result {
+            Ok(()) => return Ok(route.label().to_string()),
+            Err(e) => last_err = format!("{}: {e}", route.label()),
+        }
     }
-    Ok(())
+    Err(last_err)
 }
 
 /// Restart the application to apply a pending update (macOS / NSIS-installed).
@@ -192,20 +229,26 @@ async fn kugou_set_enabled(
 }
 
 /// Download the new portable exe into the same directory as the current exe,
-/// saved as `SUSUSongBoard_new.exe`.  Returns Ok when the download is complete.
-/// The user then manually launches the new exe from that folder.
+/// saved as `SUSUSongBoard_new.exe`.  Returns the download route used once the
+/// download is complete. The user then manually launches the new exe from
+/// that folder.
+///
+/// The exe is unsigned, so when `sha256` (the GitHub asset digest) is given the
+/// bytes are verified before being written; this guards the mirror route.
 #[tauri::command]
-async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Result<(), String> {
+async fn install_portable_update(
+    app: tauri::AppHandle,
+    exe_url: String,
+    sha256: Option<String>,
+) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (app, exe_url);
+        let _ = (app, exe_url, sha256);
         return Err("install_portable_update is only available on Windows".to_string());
     }
 
     #[cfg(target_os = "windows")]
     {
-        use futures_util::StreamExt;
-
         let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let dir = current_exe
             .parent()
@@ -219,31 +262,53 @@ async fn install_portable_update(app: tauri::AppHandle, exe_url: String) -> Resu
             .unwrap_or("SUSUSongBoard_new.exe");
         let new_exe = dir.join(file_name);
 
-        // Stream-download directly into the same directory.
-        let client = reqwest::Client::new();
-        let response = client
-            .get(&exe_url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        let total_size = response.content_length();
-        let mut downloaded: u64 = 0;
-        let mut buf: Vec<u8> = Vec::new();
-        let mut stream = response.bytes_stream();
-
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| e.to_string())?;
-            downloaded += chunk.len() as u64;
-            buf.extend_from_slice(&chunk);
-            let _ = app.emit(
-                "updater://progress",
-                serde_json::json!({ "downloaded": downloaded, "total": total_size }),
-            );
+        let mut last_err = String::new();
+        for route in gh_mirror::ordered_routes(&exe_url).await {
+            match download_bytes(&app, &route.apply(&exe_url)).await {
+                Ok(buf) => {
+                    if let Some(expected) = sha256.as_deref() {
+                        let actual = sidecar::sha256_hex(&buf);
+                        if !actual.eq_ignore_ascii_case(expected) {
+                            last_err = format!("{}: sha256 mismatch", route.label());
+                            continue;
+                        }
+                    }
+                    std::fs::write(&new_exe, &buf).map_err(|e| e.to_string())?;
+                    return Ok(route.label().to_string());
+                }
+                Err(e) => last_err = format!("{}: {e}", route.label()),
+            }
         }
-
-        std::fs::write(&new_exe, &buf).map_err(|e| e.to_string())?;
-        Ok(())
+        Err(last_err)
     }
+}
+
+/// Stream-download `url` into memory, emitting `updater://progress` events.
+#[cfg(target_os = "windows")]
+async fn download_bytes(app: &tauri::AppHandle, url: &str) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+
+    let response = reqwest::Client::new()
+        .get(url)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| e.to_string())?;
+    let total_size = response.content_length();
+    let mut downloaded: u64 = 0;
+    let mut buf: Vec<u8> = Vec::new();
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+        buf.extend_from_slice(&chunk);
+        let _ = app.emit(
+            "updater://progress",
+            serde_json::json!({ "downloaded": downloaded, "total": total_size }),
+        );
+    }
+    Ok(buf)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
