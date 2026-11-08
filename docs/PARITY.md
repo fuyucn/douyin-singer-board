@@ -1,7 +1,8 @@
-# NSH migration — parity plan
+# NSH migration — parity plan (Windows first)
 
 Target: match `douyin-singer-board` **main** (normal edition) in look and behavior,
-then bring `feat/susu` customizations back on top.
+then bring `feat/susu` customizations back on top. **Windows is the primary
+release target**; macOS is the development and secondary target.
 
 The old Tauri repo stays the shipping version until parity is signed off. This
 repo is the NSH rewrite; it is not merged into `main` of the old repo yet.
@@ -22,6 +23,31 @@ Branches:
   Node/express.
 - Old app's Kugou token still valid: 5 playlists incl. `测试4` (listid 27),
   so playlist APIs can be tested without scanning.
+
+>>> STATUS: P0 shell is built in `Board.tsx` (header, left settings, song table,
+> log, manual add, simulated request, matcher + listener wiring). macOS test
+> passes; Windows runtime is not yet verified.
+
+## Windows gate (must pass before calling anything done)
+
+- Windows 10 1809+ / Windows 11; native Direct2D window, no WebView2 needed for
+  this UI.
+- Build and UI-test on Windows only: `nsh package --target windows` on macOS
+  works with a downloaded Windows runtime, but the icon is not embedded and the
+  runtime cannot run here. Release builds run on `windows-latest`.
+- Nightly NSH is mandatory: stable 0.4.0 refuses the Douyin WebSocket `Cookie`
+  header; nightly 0.4.0 (`36b9168`) allows it on native hosts (same core on
+  Windows, still to be proven on a real Windows box).
+- Deliverable shape: directory + `.zip`, not a single `.exe`. Current Windows
+  users get one portable 52.6 MB exe, so a zip is a UX regression; an NSIS
+  installer to `%LOCALAPPDATA%\Programs\SUSUSongBoard` (writable, so
+  `nsh/updater` can replace it) plus a portable zip is the working proposal.
+- Auto-update: `nsh/updater` full package (~23 MB), no binary delta; install in
+  a user-writable directory, otherwise `canInstall` is false. Sign with
+  `signtool` to reduce SmartScreen friction.
+- Test matrix on Windows: WSS handshake with Cookie, chat frames, Chinese font
+  fallback, 100/125/150% DPI, proxy/offline errors, package extraction paths
+  with spaces/Chinese characters, updater replace-and-restart.
 
 ## P0 — style and layout (3–5 days)
 
@@ -60,9 +86,13 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 
 ## Known constraints
 
-- NSH nightly (0.4.0, `33f1015`) is required for WebSocket `Cookie` headers;
+- NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;
   stable 0.4.0 refuses them.
-- NSH has no dmg / portable single exe; packaging is `.app` (ad-hoc signed) and
-  Windows directory + zip. Release engineering is a later phase.
+- NSH has no dmg / portable single exe / installer; packaging is `.app`
+  (ad-hoc signed) and Windows directory + zip. Installer and signing are
+  release-engineering work, not optional polish for Windows.
+- Cross-packaging Windows on macOS works with `NSH_RUNTIME` pointing at the
+  Windows nightly runtime, but Embedding the Explorer icon and real runtime
+  tests need Windows.
 - Kugou `user_detail` / token refresh need RSA/AES; playlist add needs token
   and android signature. Old token can cover read-only tests now.

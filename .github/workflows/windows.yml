@@ -1,0 +1,38 @@
+name: Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NSH nightly
+        shell: pwsh
+        run: |
+          $env:NSH_VERSION = "nightly"
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Check NSH
+        run: nsh -V
+
+      - name: Unit tests
+        run: nsh test src/matcher.test.ts
+
+      - name: UI test
+        run: nsh test board.test.tsx
+        continue-on-error: true
+
+      - name: Package
+        run: nsh package Board.tsx --target windows --name SUSUSongBoard -o dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SUSUSongBoard-windows
+          path: dist/SUSUSongBoard.zip
+          if-no-files-found: error
