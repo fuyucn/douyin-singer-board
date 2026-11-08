@@ -26,7 +26,9 @@ Branches:
 
 >>> STATUS: P0 shell is built in `Board.tsx` (header, left settings, song table,
 > log, manual add, simulated request, matcher + listener wiring). macOS test
-> passes; Windows runtime is not yet verified.
+> passes. Windows CI is green: matcher unit test, UI test, Cookie handshake
+> (with WS write/read), packaging, NSIS installer, single-file portable exe,
+> and a smoke run that extracts and launches the app.
 
 ## Windows gate (must pass before calling anything done)
 
@@ -38,16 +40,23 @@ Branches:
 - Nightly NSH is mandatory: stable 0.4.0 refuses the Douyin WebSocket `Cookie`
   header; nightly 0.4.0 (`36b9168`) allows it on native hosts (same core on
   Windows, still to be proven on a real Windows box).
-- Deliverable shape: directory + `.zip`, not a single `.exe`. Current Windows
-  users get one portable 52.6 MB exe, so a zip is a UX regression; an NSIS
-  installer to `%LOCALAPPDATA%\Programs\SUSUSongBoard` (writable, so
-  `nsh/updater` can replace it) plus a portable zip is the working proposal.
+- Deliverable shape: a single-file portable exe is the chosen Windows form
+  factor. `installer/portable.nsi` wraps the NSH directory: first run extracts
+  to `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch it directly.
+  A registry build marker keeps an updated app from being overwritten by an
+  older launcher. Also build a per-user NSIS installer and the raw zip.
+  Measured: portable 15 MB, installer 15 MB, zip 22 MB (old single exe 52.6 MB).
 - Auto-update: `nsh/updater` full package (~23 MB), no binary delta; install in
   a user-writable directory, otherwise `canInstall` is false. Sign with
   `signtool` to reduce SmartScreen friction.
-- Test matrix on Windows: WSS handshake with Cookie, chat frames, Chinese font
-  fallback, 100/125/150% DPI, proxy/offline errors, package extraction paths
-  with spaces/Chinese characters, updater replace-and-restart.
+- Test matrix on Windows: WSS handshake with Cookie (green), WS write/read
+  (green), UI shell (green), portable extract/launch (green). Still to check:
+  full live Douyin chat frames, Chinese font fallback, 100/125/150% DPI,
+  proxy/offline errors, paths with spaces/Chinese characters, updater
+  replace-and-restart, code signing.
+- The code lives on branch `nsh` of `fuyucn/douyin-singer-board`, under `nsh/`;
+  `main` and `feat/susu` are untouched. Windows CI is
+  `.github/workflows/nsh-windows.yml`.
 
 ## P0 — style and layout (3–5 days)
 
