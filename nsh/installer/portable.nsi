@@ -12,7 +12,7 @@ Unicode true
 !define APP_EXE "SUSUSongBoard.exe"
 
 Name "${APP_NAME} Portable"
-OutFile "dist\${APP_NAME}-Portable-${APP_VERSION}.exe"
+OutFile "..\dist\${APP_NAME}-Portable-${APP_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
 RequestExecutionLevel user
 SilentInstall silent
@@ -32,7 +32,7 @@ Section "Run"
   IntCmp $1 ${APP_BUILD} run extract run
 extract:
   SetOutPath "$INSTDIR"
-  File /r "dist\${APP_NAME}\*.*"
+  File /r "..\dist\${APP_NAME}\*.*"
   WriteRegStr HKCU "Software\${APP_NAME}" "PortableBuild" "${APP_BUILD}"
 run:
   Exec "$INSTDIR\${APP_EXE}"
