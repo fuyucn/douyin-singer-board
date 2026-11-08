@@ -37,6 +37,10 @@ jobs:
       - name: WebSocket Cookie header
         run: nsh test ws-cookie.test.ts
 
+      - name: Live Douyin handshake (non-blocking)
+        run: nsh test live.test.tsx
+        continue-on-error: true
+
       - name: Package app
         run: nsh package Board.tsx --target windows --name SUSUSongBoard -o dist
 
