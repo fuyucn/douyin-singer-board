@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import pkg from './package.json' with { type: 'json' };
@@ -10,6 +10,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  test: {
+    // The NSH rewrite under nsh/ has its own test runner and generated types.
+    exclude: ['nsh/**', '**/node_modules/**', '**/dist/**'],
   },
   clearScreen: false,
   define: {

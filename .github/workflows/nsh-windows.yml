@@ -33,7 +33,9 @@ jobs:
 
       - name: UI test
         run: nsh test board.test.tsx
-        continue-on-error: true
+
+      - name: WebSocket Cookie header
+        run: nsh test ws-cookie.test.ts
 
       - name: Package app
         run: nsh package Board.tsx --target windows --name SUSUSongBoard -o dist

@@ -6,8 +6,14 @@
   "icon": "assets/icon.png",
   "window": {
     "title": "SUSUSongBoard",
-    "defaultSize": { "width": 900, "height": 700 },
-    "minSize": { "width": 720, "height": 560 }
+    "defaultSize": {
+      "width": 900,
+      "height": 700
+    },
+    "minSize": {
+      "width": 720,
+      "height": 560
+    }
   },
   "capabilities": {
     "network": {
@@ -16,7 +22,8 @@
         "*.douyin.com",
         "gateway.kugou.com",
         "login-user.kugou.com",
-        "cloudlist.service.kugou.com"
+        "cloudlist.service.kugou.com",
+        "ws.postman-echo.com"
       ]
     }
   }
