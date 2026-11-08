@@ -87,7 +87,7 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 - Theme (light/dark/system), about, telemetry opt-in, update check placeholder.
 - Keyboard shortcuts, responsive layout, empty/error states.
 
-## P3 — susu + Kugou + plugin host (1–2 weeks)
+## P3 — Kugou polish, susu + plugin host (1–2 weeks)
 
 - `feat/susu`: branding, default room `767116735823`, kugou enabled by default.
 - Kugou: token persistence, login QR, search, playlist picker, add to playlist,
