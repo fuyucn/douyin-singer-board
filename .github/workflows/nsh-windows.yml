@@ -51,6 +51,17 @@ jobs:
         shell: powershell
         run: '& "C:\Program Files (x86)\NSIS\makensis.exe" installer\portable.nsi'
 
+      - name: Smoke portable exe
+        shell: pwsh
+        run: |
+          Start-Process "dist\SUSUSongBoard-Portable-0.1.0.exe"
+          Start-Sleep -Seconds 10
+          $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
+          if (-not $app) { throw "portable exe did not start the app" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\Programs\SUSUSongBoard\nsh\bundle.nshc")) { throw "payload not extracted" }
+          $app | Select-Object Id, Path
+          Stop-Process -Name SUSUSongBoard -Force
+
       - uses: actions/upload-artifact@v4
         with:
           name: SUSUSongBoard-windows
