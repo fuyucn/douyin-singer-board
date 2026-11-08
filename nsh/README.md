@@ -49,10 +49,13 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
 
 ## Current state
 
-- P0 shell: header, room/settings panel, song table, log panel, manual add,
-  simulated request; config persisted with `Storage`.
+- P0/P1 shell: header, room/settings panel, tabs for 点歌 / 已点 / 黑名单,
+  song table, log panel, manual add, simulated request; config persisted with
+  `Storage`.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
+- 已点: select a row and mark it, or double-press it; copy/clear the played list.
+- 黑名单: add/remove exact song names in the UI; persisted in config.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - Windows CI: matcher, UI, Cookie header + WS write/read, live Douyin room
   handshake, package, installer, portable smoke.

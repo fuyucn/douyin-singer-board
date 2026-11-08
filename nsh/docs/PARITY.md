@@ -24,10 +24,12 @@ Branches:
 - Old app's Kugou token still valid: 5 playlists incl. `测试4` (listid 27),
   so playlist APIs can be tested without scanning.
 
->>> STATUS: P0 shell is built in `Board.tsx` (header, left settings, song table,
-> log, manual add, simulated request, matcher + listener wiring). macOS test
-> passes. Windows CI is green: matcher unit test, UI test, Cookie handshake
-> (with WS write/read), packaging, NSIS installer, single-file portable exe,
+>>> STATUS: P0 shell and P1 core are built in `Board.tsx`: header, settings,
+> tabs for 点歌 / 已点 / 黑名单, song table, log, manual add, simulated request,
+> mark-played/delete, blacklist add/remove, config persistence, matcher and
+> listener wiring. macOS test passes. Windows CI is green: matcher unit test,
+> UI test (tabs, mark-played, blacklist), Cookie handshake (with WS write/read),
+> live Douyin handshake, packaging, NSIS installer, single-file portable exe,
 > and a smoke run that extracts and launches the app.
 
 ## Windows gate (must pass before calling anything done)

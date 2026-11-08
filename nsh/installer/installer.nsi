@@ -5,7 +5,7 @@ Unicode true
 !include "LogicLib.nsh"
 
 !define APP_NAME "SUSUSongBoard"
-!define APP_VERSION "0.1.0"
+!define APP_VERSION "0.2.0"
 !define APP_PUBLISHER "SUSU"
 !define APP_EXE "SUSUSongBoard.exe"
 !define APP_ID "com.sususongboard.nsh"

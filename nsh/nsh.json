@@ -1,8 +1,8 @@
 {
   "name": "SUSUSongBoard",
   "id": "com.sususongboard.nsh",
-  "version": "0.1.0",
-  "build": 1,
+  "version": "0.2.0",
+  "build": 2,
   "icon": "assets/icon.png",
   "window": {
     "title": "SUSUSongBoard",
@@ -11,7 +11,7 @@
       "height": 700
     },
     "minSize": {
-      "width": 720,
+      "width": 880,
       "height": 560
     }
   },

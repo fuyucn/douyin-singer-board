@@ -26,6 +26,12 @@ test("rejects a missing prefix", () => {
   expect(r.kind).toBe("skip");
 });
 
+test("blacklisted song is skipped", () => {
+  const m = new Matcher({ ...config, blacklist: ["晴天"] });
+  const r = m.match({ uid: "u1", uname: "小苏", content: "点歌 晴天", medal_level: 0, medal_name: "" });
+  expect(r.kind).toBe("skip");
+});
+
 test("fans level filter and cancel", () => {
   const m = new Matcher({ ...config, fans_level: 5 });
   const low = m.match({ uid: "u1", uname: "小苏", content: "点歌 晴天", medal_level: 2, medal_name: "团" });

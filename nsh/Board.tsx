@@ -6,12 +6,23 @@ import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
-const columns: DataTableColumn[] = [
+type Tab = "songs" | "played" | "blacklist";
+type PlayedInfo = DanmuInfo & { played_at: number };
+
+const songColumns: DataTableColumn[] = [
   { key: "idx", title: "#", width: 40, align: "end" },
   { key: "user", title: "用户", width: 140 },
   { key: "song", title: "歌曲", width: 220 },
   { key: "medal", title: "粉丝团", width: 90 },
   { key: "time", title: "时间", width: 80 },
+];
+
+const playedColumns: DataTableColumn[] = [
+  { key: "idx", title: "#", width: 40, align: "end" },
+  { key: "user", title: "用户", width: 120 },
+  { key: "song", title: "歌曲", width: 200 },
+  { key: "time", title: "点歌时间", width: 90 },
+  { key: "played", title: "标记时间", width: 90 },
 ];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -31,12 +42,17 @@ function Board() {
     target_playlist_name: "",
     target_playlist_id: 0,
     kugou_enabled: false,
+    blacklist: [],
   });
   const status = signal("未连接");
   const roomName = signal("");
   const songs = signal<DanmuInfo[]>([]);
+  const played = signal<PlayedInfo[]>([]);
   const logs = signal<string[]>([]);
   const manual = signal("");
+  const blackInput = signal("");
+  const activeTab = signal<Tab>("songs");
+  const selectedRow = signal<number | null>(null);
 
   const matcher = new Matcher(config());
   effect(() => matcher.reload(config()));
@@ -45,7 +61,10 @@ function Board() {
   Storage.getItem("board.config")
     .then((raw) => {
       if (raw) {
-        try { config.set({ ...config(), ...JSON.parse(raw) }); } catch {}
+        try {
+          const saved = JSON.parse(raw);
+          config.set({ ...config(), ...saved, blacklist: Array.isArray(saved.blacklist) ? saved.blacklist : [] });
+        } catch {}
       }
     })
     .catch(() => {})
@@ -68,8 +87,9 @@ function Board() {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
   };
+  const bl = () => config().blacklist ?? [];
 
-  const rows = () =>
+  const songRows = () =>
     songs().map((s, i) => ({
       idx: String(i + 1),
       user: s.uname || "?",
@@ -78,14 +98,23 @@ function Board() {
       time: clock(s.send_time),
     }));
 
+  const playedRows = () =>
+    played().map((s, i) => ({
+      idx: String(i + 1),
+      user: s.uname || "?",
+      song: s.song_name,
+      time: clock(s.send_time),
+      played: clock(s.played_at),
+    }));
+
   const addSong = (danmu: DanmuInfo) => {
-    if (songs().some((s) => s.song_name === danmu.song_name)) {
+    if (songs().some((s) => s.song_name === danmu.song_name) || played().some((s) => s.song_name === danmu.song_name)) {
       log(`重复跳过: ${danmu.song_name}`);
       return;
     }
     const max = config().max_songs_per_user;
     if (max > 0 && danmu.uid !== "manual") {
-      const count = songs().filter((s) => s.uid === danmu.uid).length;
+      const count = played().filter((s) => s.uid === danmu.uid).length;
       if (count >= max) {
         log(`超过每人上限: ${danmu.uname} (${count}/${max})`);
         return;
@@ -183,10 +212,50 @@ function Board() {
     else log(`模拟未匹配: ${r.reason}`);
   };
 
-  const copyAll = () => {
-    Clipboard.writeText(songs().map((s) => s.song_name).join("\n"));
-    log(`已复制 ${songs().length} 首`);
+  const copyNames = (list: { song_name: string }[], label: string) => {
+    Clipboard.writeText(list.map((s) => s.song_name).join("\n"));
+    log(`已复制${label} ${list.length} 首`);
   };
+
+  const markPlayed = (index: number) => {
+    const song = songs()[index];
+    if (!song) return;
+    songs.update((v) => v.filter((_, i) => i !== index));
+    played.update((v) => [{ ...song, played_at: Math.floor(Date.now() / 1000) }, ...v]);
+    selectedRow.set(null);
+    log(`🎵 已点: ${song.uname} - ${song.song_name}`);
+  };
+
+  const removeSong = (index: number) => {
+    const song = songs()[index];
+    if (!song) return;
+    songs.update((v) => v.filter((_, i) => i !== index));
+    selectedRow.set(null);
+    log(`删除: ${song.uname} - ${song.song_name}`);
+  };
+
+  const addBlack = () => {
+    const name = blackInput().trim();
+    if (!name) return;
+    if (bl().includes(name)) { log(`黑名单已有: ${name}`); return; }
+    patch({ blacklist: [...bl(), name] });
+    blackInput.set("");
+    log(`加入黑名单: ${name}`);
+  };
+
+  const removeBlack = (name: string) => {
+    patch({ blacklist: bl().filter((s) => s !== name) });
+    log(`移出黑名单: ${name}`);
+  };
+
+  const tabButton = (key: Tab, label: string) => (
+    <Button
+      onPress={() => { activeTab.set(key); selectedRow.set(null); }}
+      class={`rounded-[6px] px-3 py-1 ${activeTab() === key ? "bg-[#2f6fb0]" : "border border-[#d7dce2] active:bg-[#f4f6f8]"}`}
+    >
+      <Text class={`text-[12px] ${activeTab() === key ? "text-white" : "text-[#191d24]"}`}>{label}</Text>
+    </Button>
+  );
 
   return (
     <View class="flex-1 bg-[#f4f6f8]">
@@ -197,7 +266,7 @@ function Board() {
         <Text class="text-xs text-[#59616e]">{status()}</Text>
         <Text class="text-xs text-[#88919f]">{roomName()}</Text>
         <View class="flex-1" />
-        <Text class="text-[11px] text-[#88919f]">0.1.0</Text>
+        <Text class="text-[11px] text-[#88919f]">0.2.0</Text>
       </View>
 
       <View class="flex-1 flex-row">
@@ -261,51 +330,129 @@ function Board() {
           <View class="h-px bg-[#e3e7ec]" />
           <Text class="text-[13px] font-semibold text-[#191d24]">本次会话</Text>
           <View class="gap-1">
-            <Text class="text-[12px] text-[#59616e]">已点歌曲：{songs().length}</Text>
+            <Text class="text-[12px] text-[#59616e]">待处理：{songs().length}</Text>
+            <Text class="text-[12px] text-[#59616e]">已点：{played().length}</Text>
+            <Text class="text-[12px] text-[#59616e]">黑名单：{bl().length}</Text>
             <Text class="text-[12px] text-[#59616e]">连接：{status()}</Text>
           </View>
         </View>
 
         <View class="flex-1 p-3 gap-2">
           <View class="flex-row items-center gap-2">
-            <Text class="text-[13px] font-semibold text-[#191d24]">点歌列表</Text>
-            <Text class="text-[11px] text-[#88919f]">{songs().length} 首</Text>
+            {tabButton("songs", `点歌 ${songs().length}`)}
+            {tabButton("played", `已点 ${played().length}`)}
+            {tabButton("blacklist", `黑名单 ${bl().length}`)}
             <View class="flex-1" />
-            <Input
-              value={manual()}
-              onChange={({ value }) => manual.set(value)}
-              onSubmit={addManual}
-              placeholder="手动添加歌曲"
-              class="w-40 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
-            />
-            <Button onPress={addManual} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
-              <Text class="text-[12px] text-white">添加</Text>
-            </Button>
-            <Button onPress={simulate} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-              <Text class="text-[12px] text-[#191d24]">模拟点歌</Text>
-            </Button>
-            <Button onPress={copyAll} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-              <Text class="text-[12px] text-[#191d24]">复制全部</Text>
-            </Button>
-            <Button onPress={() => songs.set([])} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-              <Text class="text-[12px] text-[#191d24]">清空</Text>
-            </Button>
+            <If when={activeTab() !== "blacklist"}>
+              <Input
+                value={manual()}
+                onChange={({ value }) => manual.set(value)}
+                onSubmit={addManual}
+                placeholder="手动添加歌曲"
+                class="w-36 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
+              />
+              <Button onPress={addManual} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
+                <Text class="text-[12px] text-white">添加</Text>
+              </Button>
+              <Button onPress={simulate} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">模拟</Text>
+              </Button>
+            </If>
+            <If when={activeTab() === "blacklist"}>
+              <Input
+                value={blackInput()}
+                onChange={({ value }) => blackInput.set(value)}
+                onSubmit={addBlack}
+                placeholder="歌曲名（精确匹配）"
+                class="w-44 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
+              />
+              <Button onPress={addBlack} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
+                <Text class="text-[12px] text-white">加入</Text>
+              </Button>
+            </If>
+          </View>
+
+          <View class="flex-row items-center gap-2">
+            <If when={activeTab() === "songs"}>
+              <Text class="text-[11px] text-[#88919f]">选中行后可标记已点/删除；双击行也可标记</Text>
+              <View class="flex-1" />
+              <Button
+                onPress={() => selectedRow() !== null && markPlayed(selectedRow()!)}
+                class={`rounded-[6px] px-3 py-1 ${selectedRow() !== null ? "bg-[#2f6fb0] active:opacity-80" : "bg-[#e3e7ec]"}`}
+              >
+                <Text class={`text-[12px] ${selectedRow() !== null ? "text-white" : "text-[#88919f]"}`}>标记已点</Text>
+              </Button>
+              <Button
+                onPress={() => selectedRow() !== null && removeSong(selectedRow()!)}
+                class={`rounded-[6px] border border-[#d7dce2] px-3 py-1 ${selectedRow() !== null ? "active:bg-[#f4f6f8]" : "opacity-50"}`}
+              >
+                <Text class="text-[12px] text-[#191d24]">删除</Text>
+              </Button>
+              <Button onPress={() => copyNames(songs(), "点歌")} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">复制全部</Text>
+              </Button>
+              <Button onPress={() => { songs.set([]); selectedRow.set(null); }} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">清空</Text>
+              </Button>
+            </If>
+            <If when={activeTab() === "played"}>
+              <Text class="text-[11px] text-[#88919f]">已点歌单（本次会话）</Text>
+              <View class="flex-1" />
+              <Button onPress={() => copyNames(played(), "已点")} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">复制已点</Text>
+              </Button>
+              <Button onPress={() => played.set([])} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">清空已点</Text>
+              </Button>
+            </If>
+            <If when={activeTab() === "blacklist"}>
+              <Text class="text-[11px] text-[#88919f]">精确匹配歌曲名；命中后不再进入点歌列表</Text>
+            </If>
           </View>
 
           <View class="flex-1 rounded-[8px] border border-[#e3e7ec] bg-white">
-            <DataTable
-              columns={columns}
-              data={rows()}
-              rowHeight={40}
-              class="flex-1"
-              empty={<Text class="text-[12px] text-[#88919f]">还没有点歌，连接直播间等待弹幕…</Text>}
-              classes={{
-                header: "bg-[#f0f2f5]",
-                headerCell: "text-[#59616e]",
-                cell: "text-[#191d24]",
-                rowHover: "bg-[#f4f6f8]",
-              }}
-            />
+            <If when={activeTab() === "songs"}>
+              <DataTable
+                columns={songColumns}
+                data={songRows()}
+                rowHeight={40}
+                class="flex-1"
+                empty={<Text class="text-[12px] text-[#88919f]">还没有点歌，连接直播间等待弹幕…</Text>}
+                onSelectionChange={({ selection }: any) => selectedRow.set(selection?.row ?? null)}
+                onDoublePress={({ target }: any) => { if (target?.row != null) markPlayed(target.row); }}
+                classes={{ header: "bg-[#f0f2f5]", headerCell: "text-[#59616e]", cell: "text-[#191d24]", rowHover: "bg-[#f4f6f8]" }}
+              />
+            </If>
+            <If when={activeTab() === "played"}>
+              <DataTable
+                columns={playedColumns}
+                data={playedRows()}
+                rowHeight={40}
+                class="flex-1"
+                empty={<Text class="text-[12px] text-[#88919f]">还没有已点歌曲</Text>}
+                classes={{ header: "bg-[#f0f2f5]", headerCell: "text-[#59616e]", cell: "text-[#191d24]", rowHover: "bg-[#f4f6f8]" }}
+              />
+            </If>
+            <If when={activeTab() === "blacklist"}>
+              <If when={bl().length === 0} else={
+                <Scroll class="flex-1 p-2">
+                  <View class="gap-1">
+                    <Each of={bl()} key={(s: string) => s}>
+                      {(item: any) => (
+                        <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] px-2 py-2">
+                          <Text class="flex-1 text-[13px] text-[#191d24]">{item()}</Text>
+                          <Button onPress={() => removeBlack(item())} class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]">
+                            <Text class="text-[11px] text-[#191d24]">移除</Text>
+                          </Button>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </Scroll>
+              }>
+                <Text class="p-4 text-[12px] text-[#88919f]">黑名单为空；命中的歌曲不会进入点歌列表</Text>
+              </If>
+            </If>
           </View>
 
           <View class="h-[96px] rounded-[8px] border border-[#e3e7ec] bg-white p-2">
