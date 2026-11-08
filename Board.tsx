@@ -1,4 +1,4 @@
-import { Clipboard, effect, mount, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, effect, mount, Scroll, signal, Storage, Text, View } from "nsh";
 import { Button, DataTable, Input, type DataTableColumn } from "nsh/base";
 import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
@@ -41,6 +41,20 @@ function Board() {
   const matcher = new Matcher(config());
   effect(() => matcher.reload(config()));
 
+  let configLoaded = false;
+  Storage.getItem("board.config")
+    .then((raw) => {
+      if (raw) {
+        try { config.set({ ...config(), ...JSON.parse(raw) }); } catch {}
+      }
+    })
+    .catch(() => {})
+    .finally(() => { configLoaded = true; });
+  effect(() => {
+    if (!configLoaded) return;
+    Storage.setItem("board.config", JSON.stringify(config())).catch(() => {});
+  });
+
   let client: any = null;
   let generation = 0;
 
@@ -68,6 +82,14 @@ function Board() {
     if (songs().some((s) => s.song_name === danmu.song_name)) {
       log(`重复跳过: ${danmu.song_name}`);
       return;
+    }
+    const max = config().max_songs_per_user;
+    if (max > 0 && danmu.uid !== "manual") {
+      const count = songs().filter((s) => s.uid === danmu.uid).length;
+      if (count >= max) {
+        log(`超过每人上限: ${danmu.uname} (${count}/${max})`);
+        return;
+      }
     }
     songs.update((v) => [danmu, ...v]);
     log(`✅ ${danmu.uname}: ${danmu.song_name}`);
@@ -171,7 +193,7 @@ function Board() {
       <View class="h-[52px] flex-row items-center gap-3 border-b border-[#e3e7ec] bg-white px-4">
         <Text class="text-sm font-semibold text-[#191d24]">SUSUSongBoard</Text>
         <Text class="text-[11px] text-[#88919f]">NSH 迁移版</Text>
-        <View class="h-2 w-2 rounded-full bg-[#2e8a66]" />
+        <View class={`h-2 w-2 rounded-full ${status() === "已连接" ? "bg-[#2e8a66]" : "bg-[#c2c8d0]"}`} />
         <Text class="text-xs text-[#59616e]">{status()}</Text>
         <Text class="text-xs text-[#88919f]">{roomName()}</Text>
         <View class="flex-1" />

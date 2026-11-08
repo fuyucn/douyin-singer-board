@@ -1,6 +1,6 @@
 {
   "name": "SUSUSongBoard",
-  "id": "com.sususongboard.app",
+  "id": "com.sususongboard.nsh",
   "version": "0.1.0",
   "build": 1,
   "icon": "assets/icon.png",

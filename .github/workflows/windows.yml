@@ -31,8 +31,17 @@ jobs:
       - name: Package
         run: nsh package Board.tsx --target windows --name SUSUSongBoard -o dist
 
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Build installer
+        shell: powershell
+        run: & "C:\Program Files (x86)\NSIS\makensis.exe" installer\installer.nsi
+
       - uses: actions/upload-artifact@v4
         with:
           name: SUSUSongBoard-windows
-          path: dist/SUSUSongBoard.zip
+          path: |
+            dist/SUSUSongBoard.zip
+            dist/SUSUSongBoard-Setup-0.1.0.exe
           if-no-files-found: error
