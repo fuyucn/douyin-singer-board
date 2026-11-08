@@ -50,10 +50,11 @@ Branches:
   a user-writable directory, otherwise `canInstall` is false. Sign with
   `signtool` to reduce SmartScreen friction.
 - Test matrix on Windows: WSS handshake with Cookie (green), WS write/read
-  (green), UI shell (green), portable extract/launch (green). Still to check:
-  full live Douyin chat frames, Chinese font fallback, 100/125/150% DPI,
-  proxy/offline errors, paths with spaces/Chinese characters, updater
-  replace-and-restart, code signing.
+  (green), UI shell (green), live Douyin room handshake (green), portable
+  extract/launch (green). Still to check: live chat frames/protobuf on a
+  Windows box, Chinese font fallback, 100/125/150% DPI, proxy/offline errors,
+  paths with spaces/Chinese characters, updater replace-and-restart, code
+  signing.
 - The code lives on branch `nsh` of `fuyucn/douyin-singer-board`, under `nsh/`;
   `main` and `feat/susu` are untouched. Windows CI is
   `.github/workflows/nsh-windows.yml`.

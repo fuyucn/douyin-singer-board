@@ -54,8 +54,8 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
-- Windows CI: matcher, UI, Cookie header + WS write/read, package, installer,
-  portable smoke.
+- Windows CI: matcher, UI, Cookie header + WS write/read, live Douyin room
+  handshake, package, installer, portable smoke.
 - Kugou adapter remains under `plugins/kugou/`; not wired into the board UI yet.
 - Auto-update is not configured yet; the portable wrapper can be replaced by a
   newer single file, which re-extracts its newer payload.
