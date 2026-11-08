@@ -17,6 +17,10 @@ test("board shell, simulated request and tabs", async () => {
   expect(app.texts()).toContain("已点 1");
   expect(app.texts()).toContain("点歌 0");
 
+  await app.press("酷狗");
+  expect(app.texts()).toContain("酷狗登录");
+  expect(app.texts()).toContain("生成登录二维码 / 刷新");
+
   await app.press("黑名单 0");
   expect(app.texts()).toContain("黑名单为空；命中的歌曲不会进入点歌列表");
 

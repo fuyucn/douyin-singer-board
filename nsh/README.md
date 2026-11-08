@@ -56,6 +56,9 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
   cancel, blacklist, per-user max.
 - 已点: select a row and mark it, or double-press it; copy/clear the played list.
 - 黑名单: add/remove exact song names in the UI; persisted in config.
+- 酷狗 tab: QR login, playlist picker, song search, add to playlist or to the
+  board, optional auto-sync (search + add) when a song is marked played.
+  Token/userid are kept in `Storage`, not in the repo.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - Windows CI: matcher, UI, Cookie header + WS write/read, live Douyin room
   handshake, package, installer, portable smoke.

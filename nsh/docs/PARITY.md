@@ -90,8 +90,10 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 ## P3 — susu + Kugou + plugin host (1–2 weeks)
 
 - `feat/susu`: branding, default room `767116735823`, kugou enabled by default.
-- Kugou: token persistence, user info, playlists, add to playlist, auto-sync,
-  login QR in-app.
+- Kugou: token persistence, login QR, search, playlist picker, add to playlist,
+  optional auto-sync on mark-played are in `Board.tsx` (`0.3.0`). Still missing:
+  token refresh, user info, history/listen bias, playlist clear/recreate,
+  in-app QR confirmation beyond status polling.
 - Plugin host: NSH hidden AppView + host.send/host.call RPC, manifest, install,
   per-plugin storage/permissions. Until then, Kugou is a directly imported
   module (`plugins/kugou/`), not an isolated plugin.

@@ -1,12 +1,22 @@
-import { Clipboard, effect, mount, Scroll, signal, Storage, Text, View } from "nsh";
+import { Clipboard, effect, Image, mount, Scroll, signal, Storage, Text, View } from "nsh";
 import { Button, DataTable, Input, type DataTableColumn } from "nsh/base";
 import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
+import {
+  addTrack,
+  playlists as fetchPlaylists,
+  qrCheck,
+  qrKey,
+  search,
+  type Playlist,
+  type Track,
+} from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
-type Tab = "songs" | "played" | "blacklist";
+type Tab = "songs" | "played" | "blacklist" | "kugou";
+type KugouSession = { token: string; userid: string; dfid?: string; nickname?: string };
 type PlayedInfo = DanmuInfo & { played_at: number };
 
 const songColumns: DataTableColumn[] = [
@@ -43,6 +53,7 @@ function Board() {
     target_playlist_id: 0,
     kugou_enabled: false,
     blacklist: [],
+    auto_sync: false,
   });
   const status = signal("未连接");
   const roomName = signal("");
@@ -53,6 +64,16 @@ function Board() {
   const blackInput = signal("");
   const activeTab = signal<Tab>("songs");
   const selectedRow = signal<number | null>(null);
+
+  const kugou = signal<KugouSession | null>(null);
+  const kgState = signal("idle");
+  const qr = signal<{ key: string; image: string } | null>(null);
+  const lists = signal<Playlist[]>([]);
+  const kgQuery = signal("");
+  const kgResults = signal<Track[]>([]);
+  const kgBusy = signal(false);
+  const kgMsg = signal("");
+  let loginGen = 0;
 
   const matcher = new Matcher(config());
   effect(() => matcher.reload(config()));
@@ -74,6 +95,151 @@ function Board() {
     Storage.setItem("board.config", JSON.stringify(config())).catch(() => {});
   });
 
+  const saveSession = (sess: KugouSession) => {
+    kugou.set(sess);
+    Storage.setItem("kugou.session", JSON.stringify(sess)).catch(() => {});
+  };
+
+  const loadLists = async (sess: KugouSession | null = kugou()) => {
+    if (!sess) return;
+    try {
+      const arr = await fetchPlaylists(sess.token, sess.userid, sess.dfid ?? "-");
+      lists.set(arr);
+      if (arr.length > 0) {
+        const wanted = arr.find((p) => p.listid === config().target_playlist_id);
+        const chosen = wanted ?? arr[0];
+        patch({ target_playlist_id: chosen.listid, target_playlist_name: chosen.name });
+      }
+      kgState.set("ok");
+      kgMsg.set("");
+    } catch (e: any) {
+      kgState.set("error");
+      kgMsg.set("歌单加载失败: " + String(e?.message ?? e));
+      log("酷狗歌单加载失败");
+    }
+  };
+
+  Storage.getItem("kugou.session")
+    .then((raw) => {
+      if (!raw) return;
+      try {
+        const sess = JSON.parse(raw) as KugouSession;
+        if (sess?.token && sess?.userid) {
+          kugou.set(sess);
+          loadLists(sess);
+        }
+      } catch {}
+    })
+    .catch(() => {});
+
+  const pollQr = async (key: string, gen: number) => {
+    if (gen !== loginGen) return;
+    try {
+      const r = await qrCheck(key);
+      if (gen !== loginGen) return;
+      if (r.status === 4 && r.token && r.userid) {
+        const sess: KugouSession = {
+          token: r.token,
+          userid: r.userid,
+          dfid: "-",
+          nickname: r.nickname,
+        };
+        saveSession(sess);
+        qr.set(null);
+        log(`酷狗登录成功: ${r.nickname ?? r.userid}`);
+        loadLists(sess);
+        return;
+      }
+      if (r.status === 0) { kgState.set("expired"); return; }
+      kgState.set(r.status === 2 ? "scanned" : "waiting");
+      setTimeout(() => pollQr(key, gen), 2000);
+    } catch (e: any) {
+      if (gen !== loginGen) return;
+      kgState.set("error");
+      kgMsg.set("扫码状态失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const startLogin = async () => {
+    const gen = (loginGen += 1);
+    kgState.set("loading");
+    kgMsg.set("");
+    qr.set(null);
+    try {
+      const r = await qrKey();
+      if (gen !== loginGen) return;
+      qr.set(r);
+      kgState.set("waiting");
+      pollQr(r.key, gen);
+    } catch (e: any) {
+      kgState.set("error");
+      kgMsg.set("二维码生成失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const logout = () => {
+    loginGen += 1;
+    kugou.set(null);
+    qr.set(null);
+    lists.set([]);
+    kgResults.set([]);
+    kgState.set("idle");
+    kgMsg.set("");
+    Storage.removeItem("kugou.session").catch(() => {});
+    log("酷狗已退出登录");
+  };
+
+  const doSearch = async () => {
+    const keyword = kgQuery().trim();
+    if (!keyword || !kugou()) return;
+    kgBusy.set(true);
+    kgMsg.set("");
+    try {
+      const arr = await search({ keyword, pagesize: 6 });
+      kgResults.set(arr);
+      kgMsg.set(arr.length === 0 ? "没有找到歌曲" : "");
+    } catch (e: any) {
+      kgMsg.set("搜索失败: " + String(e?.message ?? e));
+    } finally {
+      kgBusy.set(false);
+    }
+  };
+
+  const addToPlaylist = async (track: Track) => {
+    const sess = kugou();
+    const target = config().target_playlist_id;
+    if (!sess) { kgMsg.set("请先登录酷狗"); return; }
+    if (!target) { kgMsg.set("请先选择目标歌单"); return; }
+    kgBusy.set(true);
+    try {
+      const res = await addTrack(sess.token, sess.userid, target, track, sess.dfid ?? "-");
+      if (res.status === 1) {
+        kgMsg.set(`已加入 ${config().target_playlist_name || "歌单"}: ${track.name}`);
+        log(`酷狗已加入: ${track.name}`);
+      } else {
+        kgMsg.set(`加入失败 (status ${res.status}): ${res.msg ?? ""}`);
+        log(`酷狗加入失败: ${track.name}`);
+      }
+    } catch (e: any) {
+      kgMsg.set("加入失败: " + String(e?.message ?? e));
+    } finally {
+      kgBusy.set(false);
+    }
+  };
+
+  const addKugouToBoard = (track: Track) => {
+    addSong({
+      msg_id: `kugou_${track.hash}_${Date.now()}`,
+      uid: "manual",
+      uname: "主播",
+      song_name: track.name,
+      raw_msg: `${track.name} - ${track.artist}`,
+      medal_level: 0,
+      medal_name: "",
+      send_time: Math.floor(Date.now() / 1000),
+    });
+  };
+
   let client: any = null;
   let generation = 0;
 
@@ -88,6 +254,17 @@ function Board() {
     return Number.isFinite(n) ? n : fallback;
   };
   const bl = () => config().blacklist ?? [];
+  const kgLabel = () => {
+    switch (kgState()) {
+      case "loading": return "生成二维码…";
+      case "waiting": return "等待扫码";
+      case "scanned": return "已扫码，请在手机上确认";
+      case "expired": return "二维码已过期，重新生成";
+      case "error": return "登录失败";
+      case "ok": return "已登录";
+      default: return "未登录";
+    }
+  };
 
   const songRows = () =>
     songs().map((s, i) => ({
@@ -224,6 +401,20 @@ function Board() {
     played.update((v) => [{ ...song, played_at: Math.floor(Date.now() / 1000) }, ...v]);
     selectedRow.set(null);
     log(`🎵 已点: ${song.uname} - ${song.song_name}`);
+
+    const sess = kugou();
+    const target = config().target_playlist_id;
+    if ((config().auto_sync ?? false) && sess && target) {
+      search({ keyword: song.song_name, pagesize: 3 })
+        .then((tracks) => {
+          const track = tracks[0];
+          if (!track) { log(`酷狗未找到: ${song.song_name}`); return; }
+          return addTrack(sess.token, sess.userid, target, track, sess.dfid ?? "-").then((res) => {
+            log(res.status === 1 ? `酷狗自动加入: ${track.name}` : `酷狗自动加入失败: ${track.name} (${res.status})`);
+          });
+        })
+        .catch((e: any) => log("酷狗自动同步失败: " + String(e?.message ?? e)));
+    }
   };
 
   const removeSong = (index: number) => {
@@ -266,7 +457,7 @@ function Board() {
         <Text class="text-xs text-[#59616e]">{status()}</Text>
         <Text class="text-xs text-[#88919f]">{roomName()}</Text>
         <View class="flex-1" />
-        <Text class="text-[11px] text-[#88919f]">0.2.0</Text>
+        <Text class="text-[11px] text-[#88919f]">0.3.0</Text>
       </View>
 
       <View class="flex-1 flex-row">
@@ -342,8 +533,9 @@ function Board() {
             {tabButton("songs", `点歌 ${songs().length}`)}
             {tabButton("played", `已点 ${played().length}`)}
             {tabButton("blacklist", `黑名单 ${bl().length}`)}
+            {tabButton("kugou", kugou() ? "酷狗 ✓" : "酷狗")}
             <View class="flex-1" />
-            <If when={activeTab() !== "blacklist"}>
+            <If when={activeTab() === "songs"}>
               <Input
                 value={manual()}
                 onChange={({ value }) => manual.set(value)}
@@ -368,6 +560,18 @@ function Board() {
               />
               <Button onPress={addBlack} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
                 <Text class="text-[12px] text-white">加入</Text>
+              </Button>
+            </If>
+            <If when={activeTab() === "kugou" && kugou()}>
+              <Input
+                value={kgQuery()}
+                onChange={({ value }) => kgQuery.set(value)}
+                onSubmit={doSearch}
+                placeholder="搜索酷狗歌曲"
+                class="w-40 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
+              />
+              <Button onPress={doSearch} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
+                <Text class="text-[12px] text-white">搜索</Text>
               </Button>
             </If>
           </View>
@@ -407,6 +611,16 @@ function Board() {
             </If>
             <If when={activeTab() === "blacklist"}>
               <Text class="text-[11px] text-[#88919f]">精确匹配歌曲名；命中后不再进入点歌列表</Text>
+            </If>
+            <If when={activeTab() === "kugou"}>
+              <Text class="text-[11px] text-[#88919f]">账号只保存在本机；加歌单需要选目标歌单</Text>
+              <View class="flex-1" />
+              <Button onPress={() => loadLists()} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">刷新歌单</Text>
+              </Button>
+              <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                <Text class="text-[12px] text-[#191d24]">自动同步: {(config().auto_sync ?? false) ? "开" : "关"}</Text>
+              </Button>
             </If>
           </View>
 
@@ -452,6 +666,83 @@ function Board() {
               }>
                 <Text class="p-4 text-[12px] text-[#88919f]">黑名单为空；命中的歌曲不会进入点歌列表</Text>
               </If>
+            </If>
+            <If when={activeTab() === "kugou"}>
+              <Scroll class="flex-1 p-4">
+                <If when={!kugou()}>
+                  <View class="gap-3">
+                    <Text class="text-[13px] font-semibold text-[#191d24]">酷狗登录</Text>
+                    <Text class="text-[12px] text-[#59616e]">扫码登录后可以搜索歌曲、加入歌单；登录令牌只保存在本机。</Text>
+                    <Button onPress={startLogin} class="self-start rounded-[6px] bg-[#2f6fb0] px-3 py-2 active:opacity-80">
+                      <Text class="text-[12px] text-white">生成登录二维码 / 刷新</Text>
+                    </Button>
+                    <If when={qr()}>
+                      <Image src={qr()!.image} class="h-[180px] w-[180px] rounded-[6px] border border-[#e3e7ec]" />
+                    </If>
+                    <Text class="text-[12px] text-[#59616e]">状态：{kgLabel()}</Text>
+                    <Text class="text-[11px] text-[#88919f]">{kgMsg()}</Text>
+                  </View>
+                </If>
+                <If when={kugou()}>
+                  <View class="gap-3">
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[13px] font-semibold text-[#191d24]">酷狗账号</Text>
+                      <Text class="text-[12px] text-[#59616e]">{kugou()!.nickname ?? kugou()!.userid}</Text>
+                      <View class="flex-1" />
+                      <Button onPress={logout} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
+                        <Text class="text-[12px] text-[#191d24]">退出登录</Text>
+                      </Button>
+                    </View>
+
+                    <Text class="text-[12px] font-semibold text-[#191d24]">目标歌单</Text>
+                    <If when={lists().length === 0} else={
+                      <View class="gap-1">
+                        <Each of={lists()} key={(p: any) => p.listid}>
+                          {(item: any) => (
+                            <View class={`flex-row items-center gap-2 rounded-[6px] border px-2 py-2 ${config().target_playlist_id === item().listid ? "border-[#2f6fb0] bg-[#eef4fb]" : "border-[#e3e7ec]"}`}>
+                              <Text class="flex-1 text-[13px] text-[#191d24]">{item().name}</Text>
+                              <Text class="text-[11px] text-[#88919f]">{item().count} 首</Text>
+                              <Button
+                                onPress={() => { patch({ target_playlist_id: item().listid, target_playlist_name: item().name }); log(`目标歌单: ${item().name}`); }}
+                                class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]"
+                              >
+                                <Text class="text-[11px] text-[#191d24]">{config().target_playlist_id === item().listid ? "当前" : "设为目标"}</Text>
+                              </Button>
+                            </View>
+                          )}
+                        </Each>
+                      </View>
+                    }>
+                      <Text class="text-[12px] text-[#88919f]">暂无歌单，点上方“刷新歌单”重试</Text>
+                    </If>
+
+                    <Text class="text-[12px] font-semibold text-[#191d24]">搜索结果</Text>
+                    <If when={kgResults().length === 0} else={
+                      <View class="gap-1">
+                        <Each of={kgResults()} key={(t: any) => t.hash}>
+                          {(item: any) => (
+                            <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] px-1 py-2">
+                              <View class="flex-1">
+                                <Text class="text-[13px] text-[#191d24]">{item().name}</Text>
+                                <Text class="text-[11px] text-[#88919f]">{item().artist}</Text>
+                              </View>
+                              <Button onPress={() => addToPlaylist(item())} class="rounded-[6px] bg-[#2f6fb0] px-2 py-1 active:opacity-80">
+                                <Text class="text-[11px] text-white">加入歌单</Text>
+                              </Button>
+                              <Button onPress={() => addKugouToBoard(item())} class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]">
+                                <Text class="text-[11px] text-[#191d24]">加入列表</Text>
+                              </Button>
+                            </View>
+                          )}
+                        </Each>
+                      </View>
+                    }>
+                      <Text class="text-[12px] text-[#88919f]">在上方搜索框输入歌名</Text>
+                    </If>
+                    <Text class="text-[11px] text-[#88919f]">{kgMsg()}</Text>
+                  </View>
+                </If>
+              </Scroll>
             </If>
           </View>
 

@@ -11,6 +11,7 @@ export interface Config {
   target_playlist_id: number;
   kugou_enabled: boolean;
   blacklist?: string[];
+  auto_sync?: boolean;
 }
 
 export interface DanmuInfo {
