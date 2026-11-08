@@ -1,0 +1,16 @@
+{
+  "name": "douyin-singer-new",
+  "id": "com.example.douyinsingernew",
+  "version": "1.0.0",
+  "build": 1,
+  "capabilities": {
+    "network": {
+      "hosts": [
+        "live.douyin.com",
+        "*.douyin.com",
+        "gateway.kugou.com",
+        "login-user.kugou.com"
+      ]
+    }
+  }
+}
