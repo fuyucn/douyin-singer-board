@@ -1,4 +1,4 @@
-; Per-user installer for the NSH build. Installs under %LOCALAPPDATA% so the
+﻿; Per-user installer for the NSH build. Installs under %LOCALAPPDATA% so the
 ; app directory is writable and nsh/updater can replace it without elevation.
 Unicode true
 !include "MUI2.nsh"
@@ -18,8 +18,8 @@ InstallDirRegKey HKCU "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
-!define MUI_ICON "assets\icon.ico"
-!define MUI_UNICON "assets\icon.ico"
+!define MUI_ICON "..\assets\icon.ico"
+!define MUI_UNICON "..\assets\icon.ico"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "启动 ${APP_NAME}"
 

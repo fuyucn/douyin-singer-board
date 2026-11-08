@@ -1,4 +1,4 @@
-; Single-file portable launcher. First run extracts the NSH app to
+﻿; Single-file portable launcher. First run extracts the NSH app to
 ; %LOCALAPPDATA%\Programs\SUSUSongBoard and starts it; later runs launch the
 ; extracted app directly. The registry build marker survives nsh/updater
 ; replacing the app directory, so an updated app is never overwritten by an
@@ -17,6 +17,7 @@ InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
 RequestExecutionLevel user
 SilentInstall silent
 SetCompressor /SOLID lzma
+Icon "..\assets\icon.ico"
 
 VIProductVersion "0.1.0.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
