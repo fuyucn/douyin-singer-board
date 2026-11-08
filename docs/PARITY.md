@@ -92,7 +92,7 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
   (ad-hoc signed) and Windows directory + zip. Installer and signing are
   release-engineering work, not optional polish for Windows.
 - Cross-packaging Windows on macOS works with `NSH_RUNTIME` pointing at the
-  Windows nightly runtime, but Embedding the Explorer icon and real runtime
+  Windows nightly runtime, but embedding the Explorer icon and real runtime
   tests need Windows.
 - Kugou `user_detail` / token refresh need RSA/AES; playlist add needs token
   and android signature. Old token can cover read-only tests now.
