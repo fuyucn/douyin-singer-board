@@ -1,0 +1,59 @@
+name: NSH Windows
+
+on:
+  push:
+    branches: [nsh]
+    paths:
+      - "nsh/**"
+      - ".github/workflows/nsh-windows.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: nsh
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NSH nightly
+        shell: pwsh
+        run: |
+          $env:NSH_VERSION = "nightly"
+          irm https://nsh.dev/install.ps1 | iex
+          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Check NSH
+        run: nsh -V
+
+      - name: Unit tests
+        run: nsh test src/matcher.test.ts
+
+      - name: UI test
+        run: nsh test board.test.tsx
+        continue-on-error: true
+
+      - name: Package app
+        run: nsh package Board.tsx --target windows --name SUSUSongBoard -o dist
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Build installer
+        shell: powershell
+        run: '& "C:\Program Files (x86)\NSIS\makensis.exe" installer\installer.nsi'
+
+      - name: Build portable exe
+        shell: powershell
+        run: '& "C:\Program Files (x86)\NSIS\makensis.exe" installer\portable.nsi'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SUSUSongBoard-windows
+          path: |
+            nsh/dist/SUSUSongBoard.zip
+            nsh/dist/SUSUSongBoard-Setup-0.1.0.exe
+            nsh/dist/SUSUSongBoard-Portable-0.1.0.exe
+          if-no-files-found: error

@@ -1,0 +1,23 @@
+{
+  "name": "SUSUSongBoard",
+  "id": "com.sususongboard.nsh",
+  "version": "0.1.0",
+  "build": 1,
+  "icon": "assets/icon.png",
+  "window": {
+    "title": "SUSUSongBoard",
+    "defaultSize": { "width": 900, "height": 700 },
+    "minSize": { "width": 720, "height": 560 }
+  },
+  "capabilities": {
+    "network": {
+      "hosts": [
+        "live.douyin.com",
+        "*.douyin.com",
+        "gateway.kugou.com",
+        "login-user.kugou.com",
+        "cloudlist.service.kugou.com"
+      ]
+    }
+  }
+}
