@@ -140,3 +140,61 @@ test("manual mark during an in-flight worker write adds only once", async () => 
   await app.wait(10000);
   expect(adds).toBe(1);
 });
+
+test("worker restart during an in-flight write does not replay it", async () => {
+  let adds = 0;
+  const app = await open("./Board.tsx", {
+    width: 900,
+    height: 700,
+    clock: {},
+    storage: { "board.config": config, "kugou.session": session },
+    network: {
+      "POST https://gateway.kugou.com/v7/get_all_list*": { body: playlistsBody },
+      "GET https://gateway.kugou.com/v2/search/song*": { body: searchBody },
+      "POST https://gateway.kugou.com/cloudlist.service/v6/add_song*": () => {
+        adds += 1;
+        return { body: { status: 1 }, delay: 1500 };
+      },
+    },
+  });
+  await app.wait(200);
+  await app.type("输入歌曲名称...", "晴天");
+  await app.press("添加");
+  await app.wait(2100);
+  expect(adds).toBe(1);
+  await app.press("id:settings");
+  await app.press("id:kugou-toggle");
+  await app.press("id:kugou-toggle");
+  await app.press("关闭");
+  await app.wait(20000);
+  expect(adds).toBe(1);
+});
+
+test("a transient search failure is retried and the song still syncs", async () => {
+  let searches = 0;
+  let adds = 0;
+  const app = await open("./Board.tsx", {
+    width: 900,
+    height: 700,
+    clock: {},
+    storage: { "board.config": config, "kugou.session": session },
+    network: {
+      "POST https://gateway.kugou.com/v7/get_all_list*": { body: playlistsBody },
+      "GET https://gateway.kugou.com/v2/search/song*": () => {
+        searches += 1;
+        return searches === 1 ? { error: "temporary network failure" } : { body: searchBody };
+      },
+      "POST https://gateway.kugou.com/cloudlist.service/v6/add_song*": () => {
+        adds += 1;
+        return { body: { status: 1 } };
+      },
+    },
+  });
+  await app.wait(200);
+  await app.type("输入歌曲名称...", "晴天");
+  await app.press("添加");
+  await app.wait(12000);
+  expect(searches).toBe(2);
+  expect(adds).toBe(1);
+  expect(app.texts()).toContain("已点歌单 (1)");
+});

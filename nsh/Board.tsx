@@ -140,13 +140,18 @@ function Board() {
       if (raw) {
         try {
           const saved = JSON.parse(raw);
+          // 0.5.x persisted kugou_enabled=false as a default even though the
+          // flag was not wired up. Treat those configs as an upgrade and turn
+          // the service on once; from v2 on the user's choice is respected.
+          const legacy = saved.config_version !== 2;
           config.set({
             ...config(),
             ...saved,
             blacklist: Array.isArray(saved.blacklist) ? saved.blacklist : [],
             blacklist_singers: Array.isArray(saved.blacklist_singers) ? saved.blacklist_singers : [],
             blacklist_meta: saved.blacklist_meta && typeof saved.blacklist_meta === "object" ? saved.blacklist_meta : {},
-            kugou_enabled: saved.kugou_enabled !== false,
+            kugou_enabled: legacy || typeof saved.kugou_enabled !== "boolean" ? true : saved.kugou_enabled,
+            config_version: 2,
           });
         } catch {}
       }
@@ -368,6 +373,7 @@ function Board() {
   // --- Eager Kugou search cache --------------------------------------------
   const ledger = new SyncLedger();
   const startedSearches = new Set<string>();
+  const searchAttempts = new Map<string, number>();
   const searchQueue: string[] = [];
   let searchesInFlight = 0;
 
@@ -387,6 +393,15 @@ function Board() {
         })
         .catch((e: any) => {
           kgCache.update((c) => ({ ...c, [name]: { status: "error", msg: String(e?.message ?? e) } }));
+          // Retry transient failures; keep `startedSearches` so the effect
+          // cannot enqueue the same name twice.
+          const attempt = (searchAttempts.get(name) ?? 0) + 1;
+          searchAttempts.set(name, attempt);
+          if (attempt <= 3) {
+            setTimeout(() => { searchQueue.push(name); runSearchQueue(); }, 2000 * attempt);
+          } else {
+            log(`酷狗搜索放弃: ${name}`);
+          }
         })
         .finally(() => { searchesInFlight -= 1; runSearchQueue(); });
     }
@@ -436,13 +451,22 @@ function Board() {
     if (!sess || !target) { ledger.failed(key, "not logged in", 10); return false; }
     try {
       const res = await addTrack(sess.token, sess.userid, target, track as Track, sess.dfid ?? "-");
-      if (gen !== syncGen) return false;
       if (res.status === 1) {
+        // Record success even for an old generation: the write already
+        // happened upstream, so the new worker must never replay it.
         ledger.synced(key, track.hash);
+        if (gen !== syncGen) {
+          log(`酷狗自动加入 (切换前): ${track.name}`);
+          return true;
+        }
         syncFailures = 0;
         log(`酷狗自动加入: ${track.name}`);
         if (ledger.phase(key) === "synced") moveToPlayed(song);
         return true;
+      }
+      if (gen !== syncGen) {
+        ledger.failed(key, String(res.msg ?? res.status), 10);
+        return false;
       }
       const auth = isAuthFailure(res);
       syncFailures += 1;
@@ -456,7 +480,10 @@ function Board() {
       }
       return false;
     } catch (e: any) {
-      if (gen !== syncGen) return false;
+      if (gen !== syncGen) {
+        ledger.failed(key, String(e?.message ?? e), 10);
+        return false;
+      }
       syncFailures += 1;
       ledger.failed(key, String(e?.message ?? e), nextDelay(syncFailures) / 1000);
       log("酷狗自动同步失败: " + String(e?.message ?? e));
@@ -563,8 +590,9 @@ function Board() {
       return {
         idx: String(i + 1),
         user: s.uname || "?",
-        // The status suffix makes DataTable see a data change when the eager
-        // search resolves; renderCell draws the actual title and status.
+        // DataTable only redraws a cell when that column's text changes, so
+        // the status is suffixed here. renderCell draws the real title from
+        // songs(), copy uses song_name, and no column is sortable.
         song: `${s.song_name}|${sub}`,
         time: clock(s.send_time),
         actions: "",

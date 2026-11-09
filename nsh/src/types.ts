@@ -15,6 +15,7 @@ export interface Config {
   blacklist_meta?: Record<string, number>;
   auto_sync?: boolean;
   active_plugin?: "kugou" | "netease" | "";
+  config_version?: number;
 }
 
 export interface DanmuInfo {

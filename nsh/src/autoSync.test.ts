@@ -55,13 +55,35 @@ test("failed attempts retry only after their backoff", () => {
   expect(l.canAttempt("a")).toBe(true);
 });
 
-test("abortInFlight releases ownership on worker restart", () => {
-  const l = new SyncLedger(() => 0);
+test("abortInFlight holds ownership until a late result lands", () => {
+  let now = 0;
+  const l = new SyncLedger(() => now);
   l.claim("a");
   l.synced("b", track.hash);
   l.abortInFlight();
-  expect(l.claim("a")).toBe(true);
-  expect(l.claim("b")).toBe(false);
+  expect(l.phase("a")).toBe("aborted");
+  expect(l.canAttempt("a")).toBe(false);
+  expect(l.claim("a")).toBe(false);
+  l.synced("a", track.hash);
+  expect(l.phase("a")).toBe("synced");
+  expect(l.claim("a")).toBe(false);
+  // A response that never arrives is eventually abandoned and retried.
+  l.claim("c");
+  l.abortInFlight();
+  now = 121;
+  expect(l.canAttempt("c")).toBe(true);
+});
+
+test("a failed late result releases an aborted write for retry", () => {
+  let now = 0;
+  const l = new SyncLedger(() => now);
+  l.claim("a");
+  l.abortInFlight();
+  l.failed("a", "network", 5);
+  expect(l.phase("a")).toBe("failed");
+  expect(l.canAttempt("a")).toBe(false);
+  now = 6;
+  expect(l.canAttempt("a")).toBe(true);
 });
 
 test("pickNextSync skips blocked, over-limit, cooling, missing and owned songs", () => {

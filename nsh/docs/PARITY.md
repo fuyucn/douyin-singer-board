@@ -30,8 +30,9 @@ Branches:
 > config persistence. Kugou moved out of the main tabs into a Settings dialog (0.5.0), with the original shadcn tokens in `theme.json`
 > with a single active platform plugin (Kugou / NetEase placeholder). macOS test passes. Windows CI is green: matcher unit test,
 > UI test (tabs, mark-played, blacklist), Cookie handshake (with WS write/read),
-> live Douyin handshake, packaging, NSIS installer, single-file portable exe,
-> and a smoke run that extracts and launches the app.
+> packaging, NSIS installer, single-file portable exe, and a smoke run that
+> extracts and launches the app. Live Douyin handshake, QR login and Kugou
+> search API are non-blocking CI steps (external services), not guarantees.
 >
 > 0.6.0 adds the missing background half of Kugou: an eager per-song search
 > cache, singer blacklist entries, a `SyncLedger`-based auto-sync worker with
@@ -62,7 +63,8 @@ Branches:
   `signtool` to reduce SmartScreen friction.
 - Test matrix on Windows: WSS handshake with Cookie (green), WS write/read
   (green), UI shell + parity (green), auto-sync worker with stubbed Kugou
-  (green), live Douyin room handshake (green), portable extract/launch (green). Still to check: live chat frames/protobuf on a
+  (green), portable extract/launch (green). Live Douyin handshake, QR login
+  and Kugou search API are non-blocking. Still to check: live chat frames/protobuf on a
   Windows box, Chinese font fallback, 100/125/150% DPI, proxy/offline errors,
   paths with spaces/Chinese characters, updater replace-and-restart, code
   signing.

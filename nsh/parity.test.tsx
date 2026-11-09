@@ -33,3 +33,42 @@ test("blacklist accepts singer entries and the service toggle gates settings", a
   await app.press("关闭");
   expect(app.texts()).toContain("手动点歌");
 });
+
+const baseConfig = {
+  room_id: "145997388006",
+  sing_prefix: "点歌[space][song]",
+  fans_level: 0,
+  sing_cd: 0,
+  cooldown_seconds: 1800,
+  max_songs_per_user: 3,
+  target_playlist_name: "",
+  target_playlist_id: 0,
+  blacklist: [],
+  auto_sync: false,
+  active_plugin: "kugou",
+};
+
+test("0.5.x configs are upgraded with Kugou enabled", async () => {
+  const app = await open("./Board.tsx", {
+    width: 900,
+    height: 700,
+    storage: { "board.config": JSON.stringify({ ...baseConfig, kugou_enabled: false }) },
+  });
+  await app.press("id:settings");
+  expect(app.texts()).toContain("管理酷狗音乐");
+  await app.press("id:kugou-toggle");
+  expect(app.texts()).toContain("酷狗服务已停用，上方开关可重新启用。");
+});
+
+test("a v2 config respects an explicitly disabled Kugou service", async () => {
+  const app = await open("./Board.tsx", {
+    width: 900,
+    height: 700,
+    storage: {
+      "board.config": JSON.stringify({ ...baseConfig, kugou_enabled: false, config_version: 2 }),
+    },
+  });
+  await app.press("id:settings");
+  expect(app.texts()).not.toContain("管理酷狗音乐");
+  expect(app.texts()).toContain("酷狗服务已停用，上方开关可重新启用。");
+});

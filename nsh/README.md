@@ -75,8 +75,11 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
   function calls so their SVG colors follow theme changes.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - Windows CI: matcher + auto-sync unit tests, UI + parity + worker tests,
-  Cookie header + WS write/read, live Douyin room handshake, package,
-  installer, portable smoke.
+  Cookie header + WS write/read, package, installer, portable smoke. The
+  live Douyin handshake, QR login and Kugou search API steps are non-blocking
+  (they depend on external services), so a green run does not prove those
+  passed. Windows-side Chinese font fallback, DPI scaling and full chat-frame
+  decoding are still unverified.
 - The left panel shows only the active plugin's summary (Kugou playlist and
   auto-sync); management is in Settings. Token refresh/user info are still
   missing. The plugin is compiled in; there is no runtime plugin host yet.

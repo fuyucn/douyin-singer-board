@@ -9,7 +9,12 @@ export interface SyncRecord {
   retryAt: number;
   hash?: string;
   error?: string;
+  abortedAt?: number;
 }
+
+/** How long an aborted write stays owned while its late response may still
+ *  arrive. After this the request is assumed lost and may be retried. */
+const ABANDONED_AFTER_SECONDS = 120;
 
 export interface TrackLike {
   name: string;
@@ -49,11 +54,16 @@ export class SyncLedger {
     return this.records.get(key);
   }
 
-  /** True when this song may start a new sync attempt. */
+  /** True when this song may start a new sync attempt. An aborted write stays
+   *  owned until its late response can no longer arrive: replaying it too
+   *  early would duplicate a playlist add that already succeeded upstream. */
   canAttempt(key: string): boolean {
     const r = this.records.get(key);
     if (!r) return true;
-    if (r.phase === "idle" || r.phase === "aborted") return true;
+    if (r.phase === "idle") return true;
+    if (r.phase === "aborted") {
+      return this.clock() - (r.abortedAt ?? 0) >= ABANDONED_AFTER_SECONDS;
+    }
     if (r.phase === "failed") return this.clock() >= r.retryAt;
     return false;
   }
@@ -68,13 +78,13 @@ export class SyncLedger {
 
   synced(key: string, hash: string): void {
     const r = this.records.get(key);
-    if (r?.phase === "manual" || r?.phase === "aborted") return;
+    if (r?.phase === "manual") return;
     this.records.set(key, { phase: "synced", attempts: r?.attempts ?? 1, retryAt: 0, hash });
   }
 
   failed(key: string, error: string, retryAfterSeconds: number): void {
     const r = this.records.get(key);
-    if (r?.phase === "manual" || r?.phase === "aborted") return;
+    if (r?.phase === "manual") return;
     this.records.set(key, {
       phase: "failed",
       attempts: r?.attempts ?? 1,
@@ -91,12 +101,14 @@ export class SyncLedger {
     this.records.set(key, { phase: "manual", attempts: r?.attempts ?? 1, retryAt: 0 });
   }
 
-  /** On config / session / playlist changes, drop in-flight ownership so the
-   *  next generation can retry; completed records stay. */
+  /** On config / session / playlist changes, keep ownership of in-flight
+   *  writes until their late result lands. `synced`/`failed` still record it,
+   *  so a response that succeeded upstream is never replayed. */
   abortInFlight(): void {
+    const now = this.clock();
     for (const [key, r] of this.records) {
       if (r.phase === "in_flight") {
-        this.records.set(key, { phase: "idle", attempts: r.attempts, retryAt: 0 });
+        this.records.set(key, { phase: "aborted", attempts: r.attempts, retryAt: 0, abortedAt: now });
       }
     }
   }
