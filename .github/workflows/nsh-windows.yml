@@ -21,8 +21,20 @@ jobs:
       - name: Install NSH nightly
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $env:NSH_VERSION = "nightly"
-          irm https://nsh.dev/install.ps1 | iex
+          $ok = $false
+          for ($i = 1; $i -le 4 -and -not $ok; $i++) {
+            try {
+              $script = Invoke-WebRequest -UseBasicParsing -Uri "https://nsh.dev/install.ps1"
+              Invoke-Expression $script.Content
+              $ok = $true
+            } catch {
+              Write-Host "NSH install attempt $i failed: $_"
+              if ($i -lt 4) { Start-Sleep -Seconds (10 * $i) }
+            }
+          }
+          if (-not $ok) { throw "NSH nightly install failed after 4 attempts" }
           "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Check NSH
