@@ -486,6 +486,12 @@ function Board() {
 
   const running = () => ["解析房间...", "连接中...", "已连接"].includes(status());
 
+  const inputStyle = () => ({
+    color: token("foreground"),
+    placeholderColor: token("muted-foreground"),
+    caretColor: token("primary"),
+  });
+
   const tabButton = (key: Tab, label: string) => (
     <Button
       onPress={() => { activeTab.set(key); selectedRow.set(null); }}
@@ -540,7 +546,7 @@ function Board() {
                       </View>
                     </If>
                   </View>
-                  <Input
+                  <Input style={inputStyle()}
                     value={config().room_id}
                     onChange={({ value }) => patch({ room_id: value })}
                     onSubmit={start}
@@ -553,7 +559,7 @@ function Board() {
                     <Text class="text-xs text-muted-foreground">点歌指令模板</Text>
                     <Icon name="info" class="h-3 w-3" color="faint" />
                   </View>
-                  <Input
+                  <Input style={inputStyle()}
                     value={config().sing_prefix}
                     onChange={({ value }) => patch({ sing_prefix: value })}
                     placeholder="[song]"
@@ -571,7 +577,7 @@ function Board() {
                 <View class="flex-row gap-3">
                   <View class="flex-1 gap-1.5">
                     <Text class="text-xs text-muted-foreground">最低粉丝团等级</Text>
-                    <Input
+                    <Input style={inputStyle()}
                       value={String(config().fans_level)}
                       onChange={({ value }) => patch({ fans_level: num(value) })}
                       class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
@@ -579,7 +585,7 @@ function Board() {
                   </View>
                   <View class="flex-1 gap-1.5">
                     <Text class="text-xs text-muted-foreground">点歌冷却 (秒)</Text>
-                    <Input
+                    <Input style={inputStyle()}
                       value={String(config().sing_cd)}
                       onChange={({ value }) => patch({ sing_cd: num(value) })}
                       class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
@@ -588,7 +594,7 @@ function Board() {
                 </View>
                 <View class="gap-1.5">
                   <Text class="text-xs text-muted-foreground">重复点歌冷却 (秒)</Text>
-                  <Input
+                  <Input style={inputStyle()}
                     value={String(config().cooldown_seconds)}
                     onChange={({ value }) => patch({ cooldown_seconds: num(value) })}
                     class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
@@ -597,7 +603,7 @@ function Board() {
                 </View>
                 <View class="gap-1.5">
                   <Text class="text-xs text-muted-foreground">单人单场点歌上限</Text>
-                  <Input
+                  <Input style={inputStyle()}
                     value={String(config().max_songs_per_user)}
                     onChange={({ value }) => patch({ max_songs_per_user: num(value) })}
                     class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
@@ -618,7 +624,7 @@ function Board() {
                         <Text class="text-xs text-muted-foreground">歌单名称</Text>
                         <Text class="font-mono text-xs text-faint">id: {config().target_playlist_id || "—"}</Text>
                       </View>
-                      <Input
+                      <Input style={inputStyle()}
                         value={config().target_playlist_name}
                         onChange={({ value }) => patch({ target_playlist_name: value })}
                         placeholder="自动加入歌单的名字"
@@ -648,7 +654,7 @@ function Board() {
             <View class="p-4 pt-6">
               <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">手动点歌</Text>
               <View class="flex-row gap-2">
-                <Input
+                <Input style={inputStyle()}
                   value={manual()}
                   onChange={({ value }) => manual.set(value)}
                   onSubmit={addManual}
@@ -662,7 +668,7 @@ function Board() {
             </View>
 
             <View class="mt-auto p-4 text-[11px] text-faint">
-              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.2</Text>
+              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.3</Text>
             </View>
           </View>
         </Scroll>
@@ -703,7 +709,7 @@ function Board() {
                   classes={{ header: "bg-secondary border-b border-line", headerCell: "px-3 text-xs font-medium text-muted-foreground", cell: "px-2", row: "border-b border-line", rowHover: "bg-muted" }}
                   renderCell={(cell: any) => {
                     const song = songs()[cell.row];
-                    if (!song) return <Text class="text-sm">{cell.text}</Text>;
+                    if (!song) return <Text class="text-sm text-foreground">{cell.text}</Text>;
                     if (cell.key === "idx") return <Text class="text-xs text-faint">{cell.row + 1}</Text>;
                     if (cell.key === "user") {
                       const max = config().max_songs_per_user;
@@ -745,7 +751,7 @@ function Board() {
                         </View>
                       );
                     }
-                    return <Text class="text-sm">{cell.text}</Text>;
+                    return <Text class="text-sm text-foreground">{cell.text}</Text>;
                   }}
                   empty={<Text class="text-sm text-faint">等待点歌...</Text>}
                 />
@@ -764,7 +770,7 @@ function Board() {
                 <View class="shrink-0 border-b border-line px-3 py-1.5">
                   <View class="h-7 flex-row items-center gap-2 rounded-(--radius) border border-input bg-background px-2">
                     <Icon name="search" class="h-3.5 w-3.5" color="faint" />
-                    <Input
+                    <Input style={inputStyle()}
                       value={playedQuery()}
                       onChange={({ value }) => playedQuery.set(value)}
                       placeholder="搜索歌曲名或用户…"
@@ -787,7 +793,7 @@ function Board() {
                 classes={{ header: "bg-secondary border-b border-line", headerCell: "px-3 text-xs font-medium text-muted-foreground", cell: "px-2", row: "border-b border-line", rowHover: "bg-muted" }}
                 renderCell={(cell: any) => {
                   const song = filteredPlayed()[cell.row];
-                  if (!song) return <Text class="text-sm">{cell.text}</Text>;
+                  if (!song) return <Text class="text-sm text-foreground">{cell.text}</Text>;
                   if (cell.key === "idx") return <Text class="text-xs text-faint">{cell.row + 1}</Text>;
                   if (cell.key === "played") return <Text class="text-xs text-faint">{clock(song.played_at)}</Text>;
                   if (cell.key === "user") return <Text class="truncate text-xs text-muted-foreground">{song.uname}</Text>;
@@ -804,7 +810,7 @@ function Board() {
                       </Button>
                     </View>
                   );
-                  return <Text class="text-sm">{cell.text}</Text>;
+                  return <Text class="text-sm text-foreground">{cell.text}</Text>;
                 }}
                 empty={<Text class="text-sm text-faint">{playedQuery() ? "没有匹配的歌曲" : "暂无已点歌曲"}</Text>}
               />
@@ -813,7 +819,7 @@ function Board() {
             <If when={activeTab() === "blacklist"}>
               <View class="flex-1 flex-col min-h-0">
                 <View class="flex-row items-center gap-2 border-b border-line bg-card px-3 py-2 shrink-0">
-                  <Input
+                  <Input style={inputStyle()}
                     value={blackInput()}
                     onChange={({ value }) => blackInput.set(value)}
                     onSubmit={addBlack}
@@ -1045,7 +1051,7 @@ function Board() {
 
                     <Text class="text-[12px] font-semibold text-foreground">搜索并加入</Text>
                     <View class="flex-row gap-2">
-                      <Input
+                      <Input style={inputStyle()}
                         value={kgQuery()}
                         onChange={({ value }) => kgQuery.set(value)}
                         onSubmit={doSearch}
