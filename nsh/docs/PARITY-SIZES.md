@@ -27,6 +27,20 @@ text button carries `items-center justify-center`. Three guards keep it that way
   no raw `<Button>` may contain `Icon({`, and every raw `<Button>` must carry
   the centering classes.
 
+### Start button box (dark theme, 900x700)
+
+| Build | visible box | corner inset at top row |
+|---|---|---|
+| Original | x 853..882, y 11..40 (30x30) | 4.0pt |
+| 0.6.2 | x 852..883.5, y 9.5..41 (32x32) | 5.5pt |
+| **0.6.3** | **x 853..882.5, y 10.5..40 (30x30)** | **3.5pt** |
+
+The original's shadcn base class has `border border-transparent`, so a
+`size-8` (32px) button paints a 30x30 rounded box. 0.6.3 uses an explicit
+`h-[30px] w-[30px] rounded-[6px] mr-[1px]` to match it. The Stop button uses
+the same box and now draws a **white** filled square (`text-white` in the
+original), not the dark `destructive-foreground` token.
+
 ## Icon centering (start button, dark theme)
 
 | Build | dx | dy |
@@ -45,7 +59,7 @@ every icon-only size.
 | Slot | Original button | Original icon | NSH button | NSH icon |
 |---|---|---|---|---|
 | theme / about / kugou | 30x30 | 15x15 | 30x30 | 15x15 |
-| start / stop | 32x32 | 15x15 | 32x32 | 15x15 |
+| start / stop | outer 32x32 incl. 1px transparent border; **visible 30x30** | 15x15 | 30x30, rounded-[6px] | 15x15 |
 | table row actions | 28x28 | 14x14 | 28x28 | 14x14 |
 | played-search clear, log chevron | 24x24 | 12-14 | 24x24 | 14x14 |
 | blacklist add | 32x32 | 16x16 | 32x32 | 16x16 |
@@ -131,8 +145,9 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | About modal | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
 | Settings dialog | none (config in left panel) | appearance + platform plugin picker | Follows "plugins in Settings" |
 | Log panel visibility | toggled from About | shown automatically once logs exist | Simplified |
-| Stop icon | filled square (`fill-current`) | filled square from 0.6.2 | Fixed; verified in `final-stop.png` (connected state) |
+| Stop icon | white filled square (`fill-current text-white`) | white filled square from 0.6.3 | Fixed; verified in `final-stop.png` (connected state) |
 | Button labels | inline-flex centered | centered from 0.6.2 | Fixed |
+| Start/stop box | visible 30x30, radius 6px | 30x30, radius 6px from 0.6.3 | Fixed |
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
 

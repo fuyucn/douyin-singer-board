@@ -47,7 +47,7 @@ if "class={`${layout} ${props.class}`}" not in ui:
 #    icon-bearing call site must use one of these explicit sizes.
 ORIGINAL_SIZES = {
     "header": (30, 15),
-    "start": (32, 15),
+    "start": (30, 15),  # visible box; original's outer 32px includes a 1px border
     "row": (28, 14),
     "small": (24, 14),
     "add": (32, 16),
@@ -55,7 +55,7 @@ ORIGINAL_SIZES = {
 }
 sizes = {
     "header-30": (30, 15),
-    "start-32": (32, 15),
+    "start-30": (30, 15),
     "row-28": (28, 14),
     "small-24": (24, 14),
     "add-32": (32, 16),

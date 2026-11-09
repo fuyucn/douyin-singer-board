@@ -32,7 +32,9 @@ export function Icon(props: {
   onLayout?: (e: { bounds: any }) => void;
 }) {
   void props.scheme;
-  const c = token((props.color ?? "muted-foreground") as any);
+  const c = props.color && props.color.startsWith("#")
+    ? props.color
+    : token((props.color ?? "muted-foreground") as any);
   const svgFill = props.name === "square" ? c : "none";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${svgFill}" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[props.name] ?? ""}</svg>`;
   return (
