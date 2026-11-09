@@ -49,23 +49,23 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
 
 ## Current state
 
-- P0/P1 shell: header (logo, status, theme, settings, start/stop), left
-  settings panel, tabs for 点歌 / 已点歌单 / 黑名单, song table, log panel,
-  manual add; config persisted with `Storage`.
+- Original layout: header (logo, status, theme toggle, settings, start/stop),
+  left settings panel, 点歌 / 已点歌单 / 黑名单 tabs, song table, log, manual
+  add; config persisted with `Storage`; light/dark/system appearance.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
 - 已点: select a row and mark it, or double-press it; copy/clear the played list.
 - 黑名单: add/remove exact song names in the UI; persisted in config.
-- Settings dialog: platform plugin picker, one active at a time (Kugou, or the
-  NetEase placeholder); Kugou management (QR login, playlist picker, search,
-  add to playlist/list, auto-sync) lives there. Token/userid are kept in
-  `Storage`, not in the repo.
+- Settings dialog: appearance and a platform plugin picker with exactly one
+  active plugin (Kugou, or the NetEase placeholder). Kugou management (QR
+  login, playlist picker, search, add to playlist/list, auto-sync) lives there.
+  Token/userid are kept in `Storage`, not in the repo.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - Windows CI: matcher, UI, Cookie header + WS write/read, live Douyin room
   handshake, package, installer, portable smoke.
 - The left panel shows only the active plugin's summary (Kugou playlist and
   auto-sync); management is in Settings. Token refresh/user info are still
-  missing.
+  missing. The plugin is compiled in; there is no runtime plugin host yet.
 - Auto-update is not configured yet; the portable wrapper can be replaced by a
   newer single file, which re-extracts its newer payload.
 

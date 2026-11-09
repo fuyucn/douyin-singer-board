@@ -71,6 +71,7 @@ function Board() {
   const blackInput = signal("");
   const activeTab = signal<Tab>("songs");
   const settingsOpen = signal(false);
+  const themeMode = signal<"system" | "light" | "dark">("system");
   const selectedRow = signal<number | null>(null);
 
   const kugou = signal<KugouSession | null>(null);
@@ -103,16 +104,20 @@ function Board() {
     Storage.setItem("board.config", JSON.stringify(config())).catch(() => {});
   });
 
+  const applyTheme = (mode: "system" | "light" | "dark") => {
+    themeMode.set(mode);
+    setColorScheme(mode);
+    Storage.setItem("board.theme", mode).catch(() => {});
+  };
+
   Storage.getItem("board.theme")
     .then((raw) => {
-      if (raw === "light" || raw === "dark" || raw === "system") setColorScheme(raw);
+      if (raw === "light" || raw === "dark" || raw === "system") applyTheme(raw);
     })
     .catch(() => {});
 
   const toggleTheme = () => {
-    const next = colorScheme() === "dark" ? "light" : "dark";
-    setColorScheme(next);
-    Storage.setItem("board.theme", next).catch(() => {});
+    applyTheme(colorScheme() === "dark" ? "light" : "dark");
   };
 
   const saveSession = (sess: KugouSession) => {
@@ -727,6 +732,22 @@ function Board() {
           </View>
           <Scroll class="flex-1 p-4">
             <View class="gap-3">
+              <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">外观</Text>
+              <View class="flex-row gap-2">
+                <Each of={(["system", "light", "dark"] as const)} key={(m: any) => m}>
+                  {(mode: any) => (
+                    <Button
+                      onPress={() => applyTheme(mode())}
+                      class={`rounded-[6px] px-3 py-1 ${themeMode() === mode() ? "bg-[#2f6fb0] dark:bg-[#3d7fbe]" : "border border-[#d7dce2] dark:border-[#3a4048] active:bg-[#f4f6f8] dark:bg-[#17191b]"}`}
+                    >
+                      <Text class={`text-[11px] ${themeMode() === mode() ? "text-white" : "text-[#191d24] dark:text-[#e7e9ec]"}`}>
+                        {mode() === "system" ? "跟随系统" : mode() === "light" ? "亮色" : "暗色"}
+                      </Text>
+                    </Button>
+                  )}
+                </Each>
+              </View>
+              <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
               <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">平台插件</Text>
               <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">同一时间只启用一个平台插件；切换后另一个平台的登录与自动同步会停用。</Text>
               <View class="gap-1">

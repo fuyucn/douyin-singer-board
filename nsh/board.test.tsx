@@ -6,10 +6,9 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("抖音直播间 ID");
   expect(app.texts()).toContain("点歌 0");
 
-  await app.press("☾");
-  expect(app.texts()).toContain("☀");
-  await app.press("☀");
-  expect(app.texts()).toContain("☾");
+  const themeGlyph = app.texts().includes("☾") ? "☾" : "☀";
+  await app.press(themeGlyph);
+  expect(app.texts()).toContain(themeGlyph === "☾" ? "☀" : "☾");
 
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
