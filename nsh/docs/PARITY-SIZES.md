@@ -177,9 +177,12 @@ callback. The actions column shows a read-only selection hint.
 Copy/rename/delete/join/clear actions were only checked for appearance. The
 clipboard capability was undeclared, so `Clipboard.writeText` rejected silently;
 `log()` ran before the promise settled, which made the log claim a success that
-never happened. `actions.test.tsx` (8 cases, in CI) now asserts the clipboard
-contents, that the deleted row's text disappears, that clearing played resets
-the stale search filter, and that every button has a visible result.
+never happened. `actions.test.tsx` (8 cases) and `table-actions-target.test.tsx`
+(2 cases, also run with `--target macos`) assert the clipboard contents, that
+the deleted row's text disappears, that clearing played resets the stale search
+filter, and that a non-first row can be selected and acted on. Coverage is
+limited to the buttons named in those tests; the remaining "no visible change"
+paths (theme, log fold, playlist selection) are not asserted.
 
 ## 0.7.0 Settings tabs
 

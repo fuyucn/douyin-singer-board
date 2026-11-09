@@ -178,11 +178,14 @@ function Board() {
       }
       kgState.set("ok");
       kgMsg.set("");
-      showFlash(`已刷新 ${arr.length} 个歌单`);
+      const done = `已刷新 ${arr.length} 个歌单`;
+      showFlash(done);
+      kgMsg.set(done);
     } catch (e: any) {
       const auth = isAuthFailure({ status: 0 }, String(e?.message ?? e));
       kgState.set(auth ? "expired" : "error");
       kgMsg.set(auth ? "酷狗登录已失效，请重新扫码" : "歌单加载失败: " + String(e?.message ?? e));
+      showFlash(auth ? "酷狗登录已失效" : "歌单加载失败");
       log(auth ? "酷狗登录已失效" : "酷狗歌单加载失败");
     }
   };
@@ -255,12 +258,13 @@ function Board() {
     kgMsg.set("");
     Storage.removeItem("kugou.session").catch(() => {});
     log("酷狗已退出登录");
+    showFlash("酷狗已退出登录");
   };
 
   const doSearch = async () => {
     const keyword = kgQuery().trim();
-    if (!keyword) { showFlash("请先输入歌名"); return; }
-    if (!kugou()) { showFlash("请先登录酷狗"); return; }
+    if (!keyword) { showFlash("请先输入歌名"); kgMsg.set("请先输入歌名"); return; }
+    if (!kugou()) { showFlash("请先登录酷狗"); kgMsg.set("请先登录酷狗"); return; }
     kgBusy.set(true);
     kgMsg.set("");
     try {
@@ -602,6 +606,7 @@ function Board() {
   const addSong = (danmu: DanmuInfo) => {
     if (songs().some((s) => s.song_name === danmu.song_name) || played().some((s) => s.song_name === danmu.song_name)) {
       log(`重复跳过: ${danmu.song_name}`);
+      showFlash(`已在列表中：${danmu.song_name}`);
       return;
     }
     const max = config().max_songs_per_user;
@@ -609,6 +614,7 @@ function Board() {
       const count = played().filter((s) => s.uid === danmu.uid).length;
       if (count >= max) {
         log(`超过每人上限: ${danmu.uname} (${count}/${max})`);
+        showFlash(`已达每人上限 (${count}/${max})`);
         return;
       }
     }
@@ -678,7 +684,7 @@ function Board() {
 
   const addManual = () => {
     const name = manual().trim();
-    if (!name) return;
+    if (!name) { showFlash("请输入歌名"); return; }
     addSong({
       msg_id: `manual_${Date.now()}`,
       uid: "manual",
@@ -702,11 +708,15 @@ function Board() {
 
   // Clipboard.writeText returns a Promise. Log only after it resolves, and
   // always report failures: an ungranted capability used to fail silently.
+  let copySeq = 0;
   const copyText = (text: string, label: string) => {
+    const id = ++copySeq;
     let settled = false;
+    let timer: number | null = null;
     const finish = (ok: boolean, detail: string) => {
-      if (settled) return;
+      if (settled || id !== copySeq) return;
       settled = true;
+      if (timer !== null) clearTimeout(timer);
       if (ok) { showFlash(`已复制${label}`); log(`已复制${label}`); }
       else { showFlash(`复制失败：${detail}`); log(`复制失败：${detail}`); }
     };
@@ -716,8 +726,8 @@ function Board() {
       .then(() => finish(true, ""))
       .catch((e: any) => finish(false, String(e?.message ?? e)));
     // Some native hosts leave the clipboard promise pending while the window
-    // is inactive. Always settle so the user gets a result.
-    setTimeout(() => finish(false, "剪贴板无响应"), 2000);
+    // is inactive. Always settle, but never let an old call overwrite a newer one.
+    timer = setTimeout(() => finish(false, "剪贴板无响应"), 2000);
   };
 
   const clearList = () => {
@@ -747,6 +757,7 @@ function Board() {
     const claimed = ledger.claim(key);
     if (!claimed) ledger.manual(key);
     moveToPlayed(song);
+    showFlash(`已标记已点：${song.song_name}`);
 
     const sess = kugou();
     const target = config().target_playlist_id;
@@ -817,6 +828,11 @@ function Board() {
     return i !== null && i >= 0 && i < songs().length ? i : 0;
   };
   const pickedName = () => songs()[pickedRow()]?.song_name ?? "—";
+  const pickedPlayedRow = () => {
+    const i = selectedRow();
+    const list = filteredPlayed();
+    return i !== null && i >= 0 && i < list.length ? i : 0;
+  };
 
   const inputStyle = () => ({
     color: token("foreground"),
@@ -1117,9 +1133,9 @@ function Board() {
               </If>
               <If when={played().length > 0}>
                 <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-secondary px-3">
-                  <Text class="text-[11px] text-muted-foreground">选中：{filteredPlayed()[selectedRow() ?? 0]?.song_name ?? filteredPlayed()[0]?.song_name ?? "—"}</Text>
+                  <Text class="text-[11px] text-muted-foreground">选中：{filteredPlayed()[pickedPlayedRow()]?.song_name ?? "—"}</Text>
                   <View class="flex-1" />
-                  <Button testID="played-toolbar-copy" onPress={() => { const t = filteredPlayed()[selectedRow() ?? 0]?.song_name ?? filteredPlayed()[0]?.song_name; if (t) copyText(t, `歌名：${t}`); }} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
+                  <Button testID="played-toolbar-copy" onPress={() => { const t = filteredPlayed()[pickedPlayedRow()]?.song_name; if (t) copyText(t, `歌名：${t}`); }} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
                     <Text class="text-[11px] text-foreground">复制</Text>
                   </Button>
                 </View>
@@ -1149,7 +1165,7 @@ function Board() {
                   );
                   if (cell.key === "actions") return (
                     <View class="flex-row justify-end" style={{ pointerEvents: "none" }}>
-                      <Text class="text-[11px] text-faint">{(selectedRow() ?? 0) === cell.row ? "已选中" : "点击选择"}</Text>
+                      <Text class="text-[11px] text-faint">{pickedPlayedRow() === cell.row ? "已选中" : "点击选择"}</Text>
                     </View>
                   );
                   return <Text class="text-sm text-foreground">{String(cell.text).split("|")[0]}</Text>;
@@ -1223,7 +1239,7 @@ function Board() {
                   <Text class="ml-1 rounded bg-muted px-1.5 font-mono text-[10px] text-faint">{logs().length}</Text>
                 </Button>
                 {IconButton({ testID: "log-copy", name: "copy", label: "复制日志", text: "复制", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => copyText(logs().join("\n"), `日志 ${logs().length} 行`), class: "h-6 rounded px-1.5 bg-transparent active:bg-muted" })}
-                {IconButton({ testID: "log-clear", name: "trash", label: "清空日志", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => logs.set([]), class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
+                {IconButton({ testID: "log-clear", name: "trash", label: "清空日志", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => { logs.set([]); showFlash("日志已清空"); }, class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
                 {IconButton({ testID: "log-chevron", name: "chevron", label: "展开或收起日志", onPress: () => logOpen.update((v) => !v), class: "ml-1 h-6 w-6 rounded bg-transparent active:bg-muted", iconClass: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
               </View>
               <If when={logOpen()}>

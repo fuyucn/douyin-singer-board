@@ -19,3 +19,19 @@ test("table toolbar works on a real renderer", async () => {
   await app.press("id:played-toolbar-copy");
   expect(app.clipboard()).toBe("晴天");
 });
+
+test("onRowPress selects a non-first row on a real renderer", async () => {
+  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  for (const name of ["第一首", "第二首", "第三首"]) {
+    await app.type("输入歌曲名称...", name);
+    await app.press("添加");
+  }
+  expect(app.texts()).toContain("选中：第三首");
+  await app.press("text:第一首");
+  expect(app.texts()).toContain("选中：第一首");
+  await app.press("id:toolbar-delete");
+  expect(app.texts()).toContain("点歌列表 (2)");
+  expect(app.texts()).not.toContain("第一首");
+  expect(app.texts()).toContain("第三首");
+  expect(app.texts().some((t: string) => t.includes("已删除：第一首"))).toBe(true);
+});

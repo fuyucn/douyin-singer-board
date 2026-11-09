@@ -64,7 +64,8 @@ table, driven by the table's native `onRowPress` selection:
 `played-toolbar-copy` for the played list. The row's actions column now shows a
 read-only `已选中` / `点击选择` hint instead of unclickable icons.
 `table-actions-target.test.tsx` is also run with `--target macos` locally to
-verify presses on a real renderer; CI runs it headless.
+verify presses and non-first-row selection on a real renderer; CI runs it
+headless.
 
 ## Current state
 
@@ -73,7 +74,7 @@ verify presses on a real renderer; CI runs it headless.
   add; config persisted with `Storage`; light/dark/system appearance; colors use the original shadcn tokens from `theme.json`.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
-- 已点: select a row and mark it, or double-press it; copy/clear the played list.
+- Played list: select a row and copy it from the toolbar above the table.
 - 黑名单: song names and singer names (Kugou artist match), add/remove with
   timestamps; persisted in config with defaults for older configs.
 - Eager Kugou search cache (two concurrent lookups) shows the found artist,

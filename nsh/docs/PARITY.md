@@ -44,7 +44,7 @@ Branches:
 > renderer, so copy/mark/delete had been silent no-ops there even though
 > headless tests passed. The table now uses `onRowPress` selection.
 >
-> 0.7.1 fixes the silent buttons: `capabilities.clipboard` was missing, so
+> 0.7.1 fixes the silent clipboard and row-action buttons: `capabilities.clipboard` was missing, so
 > every copy button rejected with ERR_ACCESS_DENIED and the log claimed success
 > before the promise settled. All write calls now go through `copyText()` with
 > await/catch, a shared footer status line gives visible feedback, clear-list
