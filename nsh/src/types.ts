@@ -11,6 +11,8 @@ export interface Config {
   target_playlist_id: number;
   kugou_enabled: boolean;
   blacklist?: string[];
+  blacklist_singers?: string[];
+  blacklist_meta?: Record<string, number>;
   auto_sync?: boolean;
   active_plugin?: "kugou" | "netease" | "";
 }

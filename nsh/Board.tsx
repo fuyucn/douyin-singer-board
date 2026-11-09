@@ -2,8 +2,10 @@ import { Clipboard, colorScheme, effect, Image, mount, Scroll, setColorScheme, s
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
 import { Button, DataTable, Dialog, Input, type DataTableColumn } from "nsh/base";
+import { checkForUpdate } from "nsh/updater";
 import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
+import { SyncLedger, formatDuration, isAuthFailure, nextDelay, pickNextSync, type SearchState } from "./src/autoSync";
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
 import {
   addTrack,
@@ -16,6 +18,8 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+const APP_VERSION = "0.6.0";
+const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
 type PluginId = "kugou" | "netease";
@@ -59,7 +63,11 @@ const ICON_PATHS: Record<string, string> = {
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
 };
 
-function Icon(props: { name: string; class?: string; color?: string }) {
+// Called as a plain function (not a <Icon/> component): NSH keeps child
+// components' first render, which froze SVG colors across theme switches.
+// `scheme` makes the theme dependency explicit at each call site.
+function Icon(props: { name: string; class?: string; color?: string; scheme?: string }) {
+  void props.scheme;
   const c = token((props.color ?? "muted-foreground") as any);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[props.name] ?? ""}</svg>`;
   return <Image src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} class={props.class ?? "h-4 w-4"} />;
@@ -69,6 +77,11 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const clock = (ts: number) => {
   const d = new Date(ts * 1000);
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+const dateStamp = (ts: number) => {
+  if (!ts) return "—";
+  const d = new Date(ts * 1000);
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 function Board() {
@@ -81,8 +94,10 @@ function Board() {
     max_songs_per_user: 3,
     target_playlist_name: "",
     target_playlist_id: 0,
-    kugou_enabled: false,
+    kugou_enabled: true,
     blacklist: [],
+    blacklist_singers: [],
+    blacklist_meta: {},
     auto_sync: false,
     active_plugin: "kugou",
   });
@@ -108,6 +123,12 @@ function Board() {
   const kgResults = signal<Track[]>([]);
   const kgBusy = signal(false);
   const kgMsg = signal("");
+  const kgCache = signal<Record<string, SearchState>>({});
+  const blackType = signal<"song" | "singer">("song");
+  const aboutOpen = signal(false);
+  const aboutMsg = signal("");
+  const aboutBusy = signal(false);
+  const nowTick = signal(Math.floor(Date.now() / 1000));
   let loginGen = 0;
 
   const matcher = new Matcher(config());
@@ -119,7 +140,14 @@ function Board() {
       if (raw) {
         try {
           const saved = JSON.parse(raw);
-          config.set({ ...config(), ...saved, blacklist: Array.isArray(saved.blacklist) ? saved.blacklist : [] });
+          config.set({
+            ...config(),
+            ...saved,
+            blacklist: Array.isArray(saved.blacklist) ? saved.blacklist : [],
+            blacklist_singers: Array.isArray(saved.blacklist_singers) ? saved.blacklist_singers : [],
+            blacklist_meta: saved.blacklist_meta && typeof saved.blacklist_meta === "object" ? saved.blacklist_meta : {},
+            kugou_enabled: saved.kugou_enabled !== false,
+          });
         } catch {}
       }
     })
@@ -164,9 +192,10 @@ function Board() {
       kgState.set("ok");
       kgMsg.set("");
     } catch (e: any) {
-      kgState.set("error");
-      kgMsg.set("歌单加载失败: " + String(e?.message ?? e));
-      log("酷狗歌单加载失败");
+      const auth = isAuthFailure({ status: 0 }, String(e?.message ?? e));
+      kgState.set(auth ? "expired" : "error");
+      kgMsg.set(auth ? "酷狗登录已失效，请重新扫码" : "歌单加载失败: " + String(e?.message ?? e));
+      log(auth ? "酷狗登录已失效" : "酷狗歌单加载失败");
     }
   };
 
@@ -300,6 +329,202 @@ function Board() {
   };
 
   const patch = (p: Partial<Config>) => config.update((c) => ({ ...c, ...p }));
+
+  // --- Platform gating -----------------------------------------------------
+  const pluginEnabled = () => config().active_plugin === "kugou" && config().kugou_enabled !== false;
+  const singers = () => config().blacklist_singers ?? [];
+  const blockedReason = (track: { name: string; artist: string }): string | null => {
+    if (bl().includes(track.name)) return "song";
+    const artist = (track.artist ?? "").trim();
+    if (artist && singers().some((s) => s && (artist.includes(s) || s.includes(artist)))) return "singer";
+    return null;
+  };
+
+  const blackRows = () => {
+    const meta = config().blacklist_meta ?? {};
+    return [
+      ...bl().map((name) => ({ key: `song:${name}`, type: "song" as const, name, singer: "—", stamp: dateStamp(meta[`song:${name}`] ?? 0) })),
+      ...singers().map((name) => ({ key: `singer:${name}`, type: "singer" as const, name, singer: name, stamp: dateStamp(meta[`singer:${name}`] ?? 0) })),
+    ];
+  };
+
+  const isCoolingDown = (name: string) => {
+    const cd = config().cooldown_seconds;
+    if (cd <= 0) return false;
+    const now = Math.floor(Date.now() / 1000);
+    return played().some((p) => p.song_name === name && now - p.played_at < cd);
+  };
+
+  const overLimit = (s: DanmuInfo) => {
+    const max = config().max_songs_per_user;
+    return max > 0 && s.uid !== "manual" && played().filter((p) => p.uid === s.uid).length >= max;
+  };
+
+  const sessionStart = () => {
+    const all = [...songs(), ...played()];
+    return all.length ? Math.min(...all.map((s) => s.send_time)) : 0;
+  };
+
+  // --- Eager Kugou search cache --------------------------------------------
+  const ledger = new SyncLedger();
+  const startedSearches = new Set<string>();
+  const searchQueue: string[] = [];
+  let searchesInFlight = 0;
+
+  const runSearchQueue = () => {
+    while (searchesInFlight < 2 && searchQueue.length > 0) {
+      const name = searchQueue.shift()!;
+      searchesInFlight += 1;
+      kgCache.update((c) => ({ ...c, [name]: { status: "pending" } }));
+      search({ keyword: name, pagesize: 5 })
+        .then((tracks) => {
+          const t = tracks[0];
+          const entry: SearchState = t
+            ? { status: "found", track: { name: t.name, artist: t.artist, hash: t.hash, albumId: t.albumId, mixSongId: t.mixSongId, duration: t.duration } }
+            : { status: "not_found" };
+          kgCache.update((c) => ({ ...c, [name]: entry }));
+          if (t && blockedReason({ name: t.name, artist: t.artist })) log(`黑名单跳过: ${name}`);
+        })
+        .catch((e: any) => {
+          kgCache.update((c) => ({ ...c, [name]: { status: "error", msg: String(e?.message ?? e) } }));
+        })
+        .finally(() => { searchesInFlight -= 1; runSearchQueue(); });
+    }
+  };
+
+  const queueSearches = (list: DanmuInfo[]) => {
+    if (!pluginEnabled() || !kugou()) return;
+    for (const s of list) {
+      const name = s.song_name.trim();
+      if (!name || startedSearches.has(name)) continue;
+      startedSearches.add(name);
+      searchQueue.push(name);
+    }
+    runSearchQueue();
+  };
+  effect(() => queueSearches([...songs(), ...played()]));
+
+  // --- One sync entry point, shared by the worker and manual presses --------
+  let syncGen = 0;
+  let syncTimer: number | null = null;
+  let syncBusy = false;
+  let syncFailures = 0;
+
+  const stopWorker = () => {
+    syncGen += 1;
+    if (syncTimer !== null) { clearTimeout(syncTimer); syncTimer = null; }
+    syncBusy = false;
+    ledger.abortInFlight();
+  };
+
+  const moveToPlayed = (song: DanmuInfo) => {
+    if (played().some((p) => p.msg_id === song.msg_id)) return;
+    songs.update((v) => v.filter((s) => s.msg_id !== song.msg_id));
+    played.update((v) => [{ ...song, played_at: Math.floor(Date.now() / 1000) }, ...v]);
+    selectedRow.set(null);
+    log(`已点: ${song.uname} - ${song.song_name}`);
+  };
+
+  const performSync = async (
+    song: DanmuInfo,
+    track: { name: string; artist: string; hash: string; albumId?: string; mixSongId?: string; duration?: number },
+    key: string,
+    gen: number,
+  ): Promise<boolean> => {
+    const sess = kugou();
+    const target = config().target_playlist_id;
+    if (!sess || !target) { ledger.failed(key, "not logged in", 10); return false; }
+    try {
+      const res = await addTrack(sess.token, sess.userid, target, track as Track, sess.dfid ?? "-");
+      if (gen !== syncGen) return false;
+      if (res.status === 1) {
+        ledger.synced(key, track.hash);
+        syncFailures = 0;
+        log(`酷狗自动加入: ${track.name}`);
+        if (ledger.phase(key) === "synced") moveToPlayed(song);
+        return true;
+      }
+      const auth = isAuthFailure(res);
+      syncFailures += 1;
+      ledger.failed(key, String(res.msg ?? res.status), auth ? 3600 : nextDelay(syncFailures) / 1000);
+      log(`酷狗自动加入失败: ${track.name} (${res.status})`);
+      if (auth) {
+        kgState.set("expired");
+        kgMsg.set("酷狗登录已失效，请重新扫码");
+        log("酷狗登录已失效，自动同步已停止");
+        stopWorker();
+      }
+      return false;
+    } catch (e: any) {
+      if (gen !== syncGen) return false;
+      syncFailures += 1;
+      ledger.failed(key, String(e?.message ?? e), nextDelay(syncFailures) / 1000);
+      log("酷狗自动同步失败: " + String(e?.message ?? e));
+      return false;
+    }
+  };
+
+  effect(() => {
+    const enabled = pluginEnabled() && (config().auto_sync ?? false) && !!kugou() && !!config().target_playlist_id;
+    const sessionKey = kugou()?.token ?? "";
+    const target = config().target_playlist_id;
+    const expired = kgState() === "expired";
+    void sessionKey; void target;
+    stopWorker();
+    if (!enabled || expired) return;
+    const gen = syncGen;
+    let tick: () => Promise<void> = async () => {};
+    const schedule = (delay: number) => {
+      if (gen !== syncGen) return;
+      syncTimer = setTimeout(() => { void tick(); }, delay);
+    };
+    tick = async () => {
+      if (gen !== syncGen) return;
+      if (syncBusy) { schedule(1000); return; }
+      syncBusy = true;
+      try {
+        const picked = pickNextSync(songs(), {
+          cache: kgCache(),
+          ledger,
+          blocked: (t) => blockedReason(t),
+          overLimit,
+          coolingDown: isCoolingDown,
+        });
+        if (!picked) return;
+        if (!ledger.claim(picked.key)) return;
+        await performSync(picked.song, picked.track, picked.key, gen);
+      } finally {
+        syncBusy = false;
+        schedule(nextDelay(syncFailures));
+      }
+    };
+    schedule(2000);
+  });
+
+  // A one-second tick for the footer's elapsed-time stat.
+  let tickTimer: number | null = null;
+  effect(() => {
+    const on = ["解析房间...", "连接中...", "已连接"].includes(status());
+    if (on && tickTimer === null) {
+      tickTimer = setInterval(() => nowTick.set(Math.floor(Date.now() / 1000)), 1000);
+    } else if (!on && tickTimer !== null) {
+      clearInterval(tickTimer);
+      tickTimer = null;
+    }
+  });
+
+  const checkUpdate = async () => {
+    aboutBusy.set(true);
+    aboutMsg.set("正在检查…");
+    try {
+      const update = await checkForUpdate();
+      aboutMsg.set(update ? `发现新版本 ${update.version}` : "已是最新版本");
+    } catch (e: any) {
+      aboutMsg.set("暂无更新源：" + String(e?.message ?? e));
+    } finally {
+      aboutBusy.set(false);
+    }
+  };
   const num = (value: string, fallback = 0) => {
     const n = Number(value);
     return Number.isFinite(n) ? n : fallback;
@@ -323,14 +548,31 @@ function Board() {
     return played().filter((s) => s.song_name.toLowerCase().includes(q) || s.uname.toLowerCase().includes(q));
   };
 
-  const songRows = () =>
-    songs().map((s, i) => ({
-      idx: String(i + 1),
-      user: s.uname || "?",
-      song: s.song_name,
-      time: clock(s.send_time),
-      actions: "",
-    }));
+  const songRows = () => {
+    const cache = kgCache();
+    return songs().map((s, i) => {
+      const entry = pluginEnabled() ? cache[s.song_name.trim()] : undefined;
+      const blocked = entry?.status === "found" ? blockedReason(entry.track) : null;
+      const sub = blocked
+        ? `黑名单 (${blocked === "singer" ? "歌手" : "歌曲"})`
+        : entry?.status === "found" ? `酷狗: ${entry.track.artist || "未知歌手"}`
+        : entry?.status === "pending" ? "酷狗搜索中…"
+        : entry?.status === "not_found" ? "酷狗未找到"
+        : entry?.status === "error" ? "酷狗搜索失败"
+        : "手动添加";
+      return {
+        idx: String(i + 1),
+        user: s.uname || "?",
+        // The status suffix makes DataTable see a data change when the eager
+        // search resolves; renderCell draws the actual title and status.
+        song: `${s.song_name}|${sub}`,
+        time: clock(s.send_time),
+        actions: "",
+        sub,
+        blocked,
+      };
+    });
+  };
 
   const playedRows = () =>
     filteredPlayed().map((s, i) => ({
@@ -442,24 +684,38 @@ function Board() {
   const markPlayed = (index: number) => {
     const song = songs()[index];
     if (!song) return;
-    songs.update((v) => v.filter((_, i) => i !== index));
-    played.update((v) => [{ ...song, played_at: Math.floor(Date.now() / 1000) }, ...v]);
-    selectedRow.set(null);
-    log(`🎵 已点: ${song.uname} - ${song.song_name}`);
+    const key = song.msg_id;
+    const claimed = ledger.claim(key);
+    if (!claimed) ledger.manual(key);
+    moveToPlayed(song);
 
     const sess = kugou();
     const target = config().target_playlist_id;
-    if (config().active_plugin === "kugou" && (config().auto_sync ?? false) && sess && target) {
-      search({ keyword: song.song_name, pagesize: 3 })
-        .then((tracks) => {
-          const track = tracks[0];
-          if (!track) { log(`酷狗未找到: ${song.song_name}`); return; }
-          return addTrack(sess.token, sess.userid, target, track, sess.dfid ?? "-").then((res) => {
-            log(res.status === 1 ? `酷狗自动加入: ${track.name}` : `酷狗自动加入失败: ${track.name} (${res.status})`);
-          });
-        })
-        .catch((e: any) => log("酷狗自动同步失败: " + String(e?.message ?? e)));
+    const shouldSync = claimed && pluginEnabled() && (config().auto_sync ?? false) && !!sess && !!target;
+    if (!shouldSync) {
+      if (claimed) ledger.manual(key);
+      return;
     }
+    const gen = syncGen;
+    const entry = kgCache()[song.song_name.trim()];
+    const cached = entry?.status === "found" ? entry.track : null;
+    if (cached) {
+      if (blockedReason(cached)) { log(`黑名单跳过: ${song.song_name}`); ledger.manual(key); return; }
+      void performSync(song, cached, key, gen);
+      return;
+    }
+    search({ keyword: song.song_name, pagesize: 3 })
+      .then((tracks) => {
+        const t = tracks[0];
+        if (gen !== syncGen) return;
+        if (!t) { log(`酷狗未找到: ${song.song_name}`); ledger.failed(key, "not found", 30); return; }
+        void performSync(song, t, key, gen);
+      })
+      .catch((e: any) => {
+        if (gen !== syncGen) return;
+        ledger.failed(key, String(e?.message ?? e), 10);
+        log("酷狗自动同步失败: " + String(e?.message ?? e));
+      });
   };
 
   const removeSong = (index: number) => {
@@ -473,14 +729,23 @@ function Board() {
   const addBlack = () => {
     const name = blackInput().trim();
     if (!name) return;
-    if (bl().includes(name)) { log(`黑名单已有: ${name}`); return; }
-    patch({ blacklist: [...bl(), name] });
+    const type = blackType();
+    const key = `${type}:${name}`;
+    const existing = type === "song" ? bl() : singers();
+    if (existing.includes(name)) { log(`黑名单已有: ${name}`); return; }
+    const meta = { ...(config().blacklist_meta ?? {}), [key]: Math.floor(Date.now() / 1000) };
+    if (type === "song") patch({ blacklist: [...bl(), name], blacklist_meta: meta });
+    else patch({ blacklist_singers: [...singers(), name], blacklist_meta: meta });
     blackInput.set("");
-    log(`加入黑名单: ${name}`);
+    log(`加入黑名单 (${type === "song" ? "歌曲" : "歌手"}): ${name}`);
   };
 
-  const removeBlack = (name: string) => {
-    patch({ blacklist: bl().filter((s) => s !== name) });
+  const removeBlack = (key: string) => {
+    const colon = key.indexOf(":");
+    const type = key.slice(0, colon);
+    const name = key.slice(colon + 1);
+    if (type === "song") patch({ blacklist: bl().filter((s) => s !== name) });
+    else patch({ blacklist_singers: singers().filter((s) => s !== name) });
     log(`移出黑名单: ${name}`);
   };
 
@@ -514,18 +779,21 @@ function Board() {
         </View>
         <View class="flex-1" />
         <Button testID="theme" onPress={toggleTheme} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
-          <Icon name={colorScheme() === "dark" ? "sun" : "moon"} class="h-[15px] w-[15px]" />
+          {Icon({ scheme: colorScheme(), name: colorScheme() === "dark" ? "sun" : "moon", class: "h-[15px] w-[15px]" })}
         </Button>
         <Button testID="settings" onPress={() => settingsOpen.set(true)} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
-          <Icon name="settings" class="h-[15px] w-[15px]" />
+          {Icon({ scheme: colorScheme(), name: "settings", class: "h-[15px] w-[15px]" })}
+        </Button>
+        <Button testID="about" onPress={() => aboutOpen.set(true)} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
+          {Icon({ scheme: colorScheme(), name: "info", class: "h-[15px] w-[15px]" })}
         </Button>
         <If when={running()} else={
           <Button testID="start" onPress={start} class="ml-2 h-8 w-8 rounded-(--radius) bg-foreground">
-            <Icon name="play" class="h-[15px] w-[15px]" color="background" />
+            {Icon({ scheme: colorScheme(), name: "play", class: "h-[15px] w-[15px]", color: "background" })}
           </Button>
         }>
           <Button testID="stop" onPress={stop} class="ml-2 h-8 w-8 rounded-(--radius) bg-destructive">
-            <Icon name="square" class="h-[15px] w-[15px]" color="destructive-foreground" />
+            {Icon({ scheme: colorScheme(), name: "square", class: "h-[15px] w-[15px]", color: "destructive-foreground" })}
           </Button>
         </If>
       </View>
@@ -557,7 +825,7 @@ function Board() {
                 <View class="gap-1.5">
                   <View class="flex-row items-center gap-1">
                     <Text class="text-xs text-muted-foreground">点歌指令模板</Text>
-                    <Icon name="info" class="h-3 w-3" color="faint" />
+                    {Icon({ scheme: colorScheme(), name: "info", class: "h-3 w-3", color: "faint" })}
                   </View>
                   <Input style={inputStyle()}
                     value={config().sing_prefix}
@@ -613,7 +881,7 @@ function Board() {
               </View>
             </View>
 
-            <If when={config().active_plugin === "kugou" && kugou()}>
+            <If when={pluginEnabled() && kugou()}>
               <View class="h-px bg-line" />
               <View class="p-4">
                 <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">Kugou 歌单</Text>
@@ -668,7 +936,7 @@ function Board() {
             </View>
 
             <View class="mt-auto p-4 text-[11px] text-faint">
-              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.3</Text>
+              <Text class="text-[11px] text-faint">SUSUSongBoard v{APP_VERSION}</Text>
             </View>
           </View>
         </Scroll>
@@ -683,7 +951,7 @@ function Board() {
                 <Text class={`text-sm font-medium ${activeTab() === "played" ? "text-foreground" : "text-muted-foreground"}`}>已点歌单 ({played().length})</Text>
               </Button>
               <Button onPress={() => { activeTab.set("blacklist"); selectedRow.set(null); }} class={`h-9 items-center justify-center rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "blacklist" ? "border-foreground" : "border-transparent"}`}>
-                <Text class={`text-sm font-medium ${activeTab() === "blacklist" ? "text-foreground" : "text-muted-foreground"}`}>黑名单 ({bl().length})</Text>
+                <Text class={`text-sm font-medium ${activeTab() === "blacklist" ? "text-foreground" : "text-muted-foreground"}`}>黑名单 ({blackRows().length})</Text>
               </Button>
             </View>
             <If when={activeTab() !== "blacklist" && (activeTab() === "songs" ? songs().length : played().length) > 0}>
@@ -691,7 +959,7 @@ function Board() {
                 onPress={() => { if (activeTab() === "songs") { songs.set([]); selectedRow.set(null); } else { played.set([]); } }}
                 class="h-7 gap-1 rounded-(--radius) bg-transparent px-2.5 active:bg-muted"
               >
-                <Icon name="trash" class="h-3.5 w-3.5" color="muted-foreground" />
+                {Icon({ scheme: colorScheme(), name: "trash", class: "h-3.5 w-3.5", color: "muted-foreground" })}
                 <Text class="text-xs text-muted-foreground">清空列表</Text>
               </Button>
             </If>
@@ -725,13 +993,13 @@ function Board() {
                       );
                     }
                     if (cell.key === "song") {
-                      const sub = config().active_plugin === "kugou" && kugou()
-                        ? (config().target_playlist_id ? "待加入歌单" : "未选择歌单")
-                        : "手动添加";
+                      const row = songRows()[cell.row];
+                      const blocked = row?.blocked;
+                      const sub = row?.sub ?? "手动添加";
                       return (
                         <View class="leading-snug">
-                          <Text class="truncate text-[13px] font-medium text-foreground">{song.song_name}</Text>
-                          <Text class="truncate text-[11px] text-faint">{sub}</Text>
+                          <Text class={`truncate text-[13px] font-medium ${blocked ? "text-danger-soft-fg" : "text-foreground"}`}>{song.song_name}</Text>
+                          <Text class={`truncate text-[11px] ${blocked ? "text-danger-soft-fg" : "text-faint"}`}>{sub}</Text>
                         </View>
                       );
                     }
@@ -740,13 +1008,13 @@ function Board() {
                       return (
                         <View class="flex-row justify-end gap-1 opacity-60">
                           <Button onPress={() => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            <Icon name="copy" class="h-3.5 w-3.5" />
+                            {Icon({ scheme: colorScheme(), name: "copy", class: "h-3.5 w-3.5" })}
                           </Button>
                           <Button testID={`mark-${cell.row}`} onPress={() => markPlayed(cell.row)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            <Icon name="check" class="h-3.5 w-3.5" />
+                            {Icon({ scheme: colorScheme(), name: "check", class: "h-3.5 w-3.5" })}
                           </Button>
                           <Button testID={`delete-${cell.row}`} onPress={() => removeSong(cell.row)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            <Icon name="trash" class="h-3.5 w-3.5" color="danger-soft-fg" />
+                            {Icon({ scheme: colorScheme(), name: "trash", class: "h-3.5 w-3.5", color: "danger-soft-fg" })}
                           </Button>
                         </View>
                       );
@@ -769,7 +1037,7 @@ function Board() {
               <If when={played().length > 0}>
                 <View class="shrink-0 border-b border-line px-3 py-1.5">
                   <View class="h-7 flex-row items-center gap-2 rounded-(--radius) border border-input bg-background px-2">
-                    <Icon name="search" class="h-3.5 w-3.5" color="faint" />
+                    {Icon({ scheme: colorScheme(), name: "search", class: "h-3.5 w-3.5", color: "faint" })}
                     <Input style={inputStyle()}
                       value={playedQuery()}
                       onChange={({ value }) => playedQuery.set(value)}
@@ -778,7 +1046,7 @@ function Board() {
                     />
                     <If when={playedQuery()}>
                       <Button onPress={() => playedQuery.set("")} class="h-6 w-6 rounded-(--radius) bg-transparent active:bg-muted">
-                        <Icon name="x" class="h-3.5 w-3.5" color="faint" />
+                        {Icon({ scheme: colorScheme(), name: "x", class: "h-3.5 w-3.5", color: "faint" })}
                       </Button>
                     </If>
                   </View>
@@ -806,7 +1074,7 @@ function Board() {
                   if (cell.key === "actions") return (
                     <View class="flex-row justify-end">
                       <Button onPress={() => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                        <Icon name="copy" class="h-3.5 w-3.5" />
+                        {Icon({ scheme: colorScheme(), name: "copy", class: "h-3.5 w-3.5" })}
                       </Button>
                     </View>
                   );
@@ -819,18 +1087,26 @@ function Board() {
             <If when={activeTab() === "blacklist"}>
               <View class="flex-1 flex-col min-h-0">
                 <View class="flex-row items-center gap-2 border-b border-line bg-card px-3 py-2 shrink-0">
+                  <View class="flex-row gap-1">
+                    <Button testID="black-type-song" onPress={() => blackType.set("song")} class={`h-8 rounded-[6px] px-2 ${blackType() === "song" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
+                      <Text class={`text-[11px] ${blackType() === "song" ? "text-primary-foreground" : "text-foreground"}`}>歌曲</Text>
+                    </Button>
+                    <Button testID="black-type-singer" onPress={() => blackType.set("singer")} class={`h-8 rounded-[6px] px-2 ${blackType() === "singer" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
+                      <Text class={`text-[11px] ${blackType() === "singer" ? "text-primary-foreground" : "text-foreground"}`}>歌手</Text>
+                    </Button>
+                  </View>
                   <Input style={inputStyle()}
                     value={blackInput()}
                     onChange={({ value }) => blackInput.set(value)}
                     onSubmit={addBlack}
-                    placeholder="输入歌曲名…"
+                    placeholder={blackType() === "song" ? "输入歌曲名…" : "输入歌手名…"}
                     class="h-8 min-w-0 flex-1 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                   />
                   <Button testID="black-add" onPress={addBlack} class="h-8 w-8 rounded-(--radius) border border-line-strong bg-card active:bg-muted">
-                    <Icon name="plus" class="h-4 w-4" />
+                    {Icon({ scheme: colorScheme(), name: "plus", class: "h-4 w-4" })}
                   </Button>
                 </View>
-                <If when={bl().length === 0} else={
+                <If when={blackRows().length === 0} else={
                   <View class="flex-1 flex-col min-h-0">
                     <View class="flex-row items-center border-b border-line bg-secondary px-4 py-2 shrink-0">
                       <Text class="w-12 text-xs font-medium text-muted-foreground">类型</Text>
@@ -840,18 +1116,18 @@ function Board() {
                       <View class="w-10" />
                     </View>
                     <Scroll class="flex-1">
-                      <Each of={bl()} key={(s: string) => s}>
+                      <Each of={blackRows()} key={(r: any) => r.key}>
                         {(item: any, index: any) => (
                           <View class="group flex-row items-center border-b border-line px-4 py-2 hover:bg-muted">
                             <View class="w-12">
-                              <Text class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">歌曲</Text>
+                              <Text class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{item().type === "singer" ? "歌手" : "歌曲"}</Text>
                             </View>
-                            <Text class="flex-1 truncate text-sm text-foreground">{item()}</Text>
-                            <Text class="w-28 truncate text-xs text-muted-foreground">—</Text>
-                            <Text class="w-24 text-right text-xs text-faint">—</Text>
+                            <Text class="flex-1 truncate text-sm text-foreground">{item().type === "singer" ? "全部歌曲" : item().name}</Text>
+                            <Text class="w-28 truncate text-xs text-muted-foreground">{item().singer}</Text>
+                            <Text class="w-24 text-right text-xs text-faint">{item().stamp}</Text>
                             <View class="w-10 items-end">
-                              <Button testID={`black-remove-${index()}`} onPress={() => removeBlack(item())} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                                <Icon name="x" class="h-3.5 w-3.5" color="danger-soft-fg" />
+                              <Button testID={`black-remove-${index()}`} onPress={() => removeBlack(item().key)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
+                                {Icon({ scheme: colorScheme(), name: "x", class: "h-3.5 w-3.5", color: "danger-soft-fg" })}
                               </Button>
                             </View>
                           </View>
@@ -862,7 +1138,7 @@ function Board() {
                 }>
                   <View class="flex-1 items-center justify-center gap-2 py-16">
                     <Text class="text-sm text-faint">黑名单为空</Text>
-                    <Text class="text-xs text-faint">在上方输入歌曲名添加</Text>
+                    <Text class="text-xs text-faint">歌曲名精确屏蔽；歌手名屏蔽酷狗搜索到的所有歌曲</Text>
                   </View>
                 </If>
               </View>
@@ -877,15 +1153,15 @@ function Board() {
                   <Text class="ml-1 rounded bg-muted px-1.5 font-mono text-[10px] text-faint">{logs().length}</Text>
                 </Button>
                 <Button onPress={() => { Clipboard.writeText(logs().join("\n")); log("日志已复制"); }} class="h-6 flex-row items-center gap-1 rounded px-1.5 bg-transparent active:bg-muted">
-                  <Icon name="copy" class="h-3 w-3" color="faint" />
+                  {Icon({ scheme: colorScheme(), name: "copy", class: "h-3 w-3", color: "faint" })}
                   <Text class="text-[11px] text-faint">复制</Text>
                 </Button>
                 <Button onPress={() => logs.set([])} class="h-6 flex-row items-center gap-1 rounded px-1.5 bg-transparent active:bg-danger-soft-bg">
-                  <Icon name="trash" class="h-3 w-3" color="faint" />
+                  {Icon({ scheme: colorScheme(), name: "trash", class: "h-3 w-3", color: "faint" })}
                   <Text class="text-[11px] text-faint">清空</Text>
                 </Button>
                 <Button onPress={() => logOpen.update((v) => !v)} class="ml-1 h-6 w-6 rounded bg-transparent active:bg-muted">
-                  <Icon name="chevron" class={`h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`} color="faint" />
+                  {Icon({ scheme: colorScheme(), name: "chevron", class: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
                 </Button>
               </View>
               <If when={logOpen()}>
@@ -914,6 +1190,9 @@ function Board() {
             <If when={played().length > 0}>
               <View class="inline-flex items-baseline gap-1"><Text class="text-faint">平均处理</Text><Text class="tabular-nums text-foreground">{(played().reduce((sum, p) => sum + Math.max(0, p.played_at - p.send_time), 0) / played().length).toFixed(0)}秒</Text></View>
             </If>
+            <If when={sessionStart() > 0 && nowTick() >= sessionStart()}>
+              <View class="inline-flex items-baseline gap-1"><Text class="text-faint">时长</Text><Text class="tabular-nums text-foreground">{formatDuration(nowTick() - sessionStart())}</Text></View>
+            </If>
           </View>
         </If>
         <View class="ml-auto flex-row items-center gap-4">
@@ -924,7 +1203,7 @@ function Board() {
             <Text class="text-[11px] text-faint">连接抖音直播间</Text>
           </View>
           <View class="flex-row items-center gap-1">
-            <If when={config().active_plugin === "kugou" && kugou()} else={<View class="h-2 w-2 rounded-full bg-faint" />}>
+            <If when={pluginEnabled() && kugou()} else={<View class="h-2 w-2 rounded-full bg-faint" />}>
               <Text class="text-[11px] text-success">✓</Text>
             </If>
             <Text class="text-[11px] text-faint">酷狗服务就绪</Text>
@@ -966,6 +1245,15 @@ function Board() {
               <View class="h-px bg-muted" />
               <Text class="text-[13px] font-semibold text-foreground">平台插件</Text>
               <Text class="text-[11px] text-faint">同一时间只启用一个平台插件；切换后另一个平台的登录与自动同步会停用。</Text>
+              <View class="flex-row items-center gap-2 rounded-[6px] border border-line px-3 py-2">
+                <View class="flex-1">
+                  <Text class="text-[12px] text-foreground">启用酷狗服务</Text>
+                  <Text class="text-[11px] text-faint">停用后预搜索、歌单与后台自动同步全部停止</Text>
+                </View>
+                <Button testID="kugou-toggle" onPress={() => patch({ kugou_enabled: !config().kugou_enabled })} class={`rounded-[6px] px-3 py-1 ${config().kugou_enabled ? "bg-primary" : "border border-line-strong active:bg-background"}`}>
+                  <Text class={`text-[12px] ${config().kugou_enabled ? "text-primary-foreground" : "text-foreground"}`}>{config().kugou_enabled ? "已启用" : "已停用"}</Text>
+                </Button>
+              </View>
               <View class="gap-1">
                 <Each of={PLUGINS} key={(p: any) => p.id}>
                   {(item: any) => (
@@ -989,7 +1277,7 @@ function Board() {
               </View>
 
               <View class="h-px bg-muted" />
-              <If when={config().active_plugin === "kugou"}>
+              <If when={pluginEnabled()}>
                 <Text class="text-[13px] font-semibold text-foreground">管理酷狗音乐</Text>
                 <If when={!kugou()}>
                   <View class="gap-2">
@@ -1092,8 +1380,40 @@ function Board() {
                 <Text class="text-[13px] font-semibold text-foreground">网易云音乐</Text>
                 <Text class="text-[12px] text-faint">尚未接入。切换回酷狗即可继续管理歌单；同一时间只启用一个平台。</Text>
               </If>
+              <If when={config().active_plugin === "kugou" && !config().kugou_enabled}>
+                <Text class="text-[12px] text-faint">酷狗服务已停用，上方开关可重新启用。</Text>
+              </If>
             </View>
           </Scroll>
+        </View>
+      </Dialog>
+
+      <Dialog
+        open={aboutOpen()}
+        onOpenChange={({ open }: any) => aboutOpen.set(open)}
+        class="m-auto w-[400px] rounded-(--radius) border border-line bg-card shadow-2xl"
+        backdropClass="bg-overlay"
+      >
+        <View class="gap-3 p-5">
+          <View class="flex-row items-center gap-3">
+            <Image src={logo} class="h-10 w-10 rounded-[4px]" />
+            <View class="flex-1">
+              <Text class="text-[14px] font-semibold text-foreground">SUSUSongBoard</Text>
+              <Text class="text-[11px] text-faint">v{APP_VERSION} · NSH 原生版</Text>
+            </View>
+            <Button testID="about-close" onPress={() => aboutOpen.set(false)} class="rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
+              <Text class="text-[12px] text-foreground">关闭</Text>
+            </Button>
+          </View>
+          <View class="h-px bg-line" />
+          <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
+          <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
+          <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
+          <Button testID="about-update" onPress={checkUpdate} class="self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+            <Text class="text-[12px] text-primary-foreground">{aboutBusy() ? "检查中…" : "检查更新"}</Text>
+          </Button>
+          <Text class="text-[11px] text-muted-foreground">{aboutMsg()}</Text>
+          <Text class="text-[10px] text-faint">更新源尚未配置时，请到 GitHub Releases 手动下载。</Text>
         </View>
       </Dialog>
     </View>

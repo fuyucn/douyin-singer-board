@@ -29,10 +29,17 @@ jobs:
         run: nsh -V
 
       - name: Unit tests
-        run: nsh test src/matcher.test.ts
+        run: |
+          nsh test src/matcher.test.ts
+          nsh test src/autoSync.test.ts
 
       - name: UI test
-        run: nsh test board.test.tsx
+        run: |
+          nsh test board.test.tsx
+          nsh test parity.test.tsx
+
+      - name: Auto-sync worker test
+        run: nsh test sync-worker.test.tsx
 
       - name: WebSocket Cookie header
         run: nsh test ws-cookie.test.ts
@@ -62,7 +69,7 @@ jobs:
       - name: Smoke portable exe
         shell: pwsh
         run: |
-          Start-Process "dist\SUSUSongBoard-Portable-0.5.3.exe"
+          Start-Process "dist\SUSUSongBoard-Portable-0.6.0.exe"
           Start-Sleep -Seconds 10
           $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
           if (-not $app) { throw "portable exe did not start the app" }
@@ -75,6 +82,6 @@ jobs:
           name: SUSUSongBoard-windows
           path: |
             nsh/dist/SUSUSongBoard.zip
-            nsh/dist/SUSUSongBoard-Setup-0.5.3.exe
-            nsh/dist/SUSUSongBoard-Portable-0.5.3.exe
+            nsh/dist/SUSUSongBoard-Setup-0.6.0.exe
+            nsh/dist/SUSUSongBoard-Portable-0.6.0.exe
           if-no-files-found: error
