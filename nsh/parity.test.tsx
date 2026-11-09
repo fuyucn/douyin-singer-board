@@ -12,7 +12,7 @@ test("settings modal opens on general and the info button jumps to about", async
   await app.press("id:about");
   const texts = app.texts();
   expect(texts).toContain("SUSUSongBoard");
-  expect(texts).toContain("v0.7.0 · NSH 原生版");
+  expect(texts).toContain("v0.7.1 · NSH 原生版");
   expect(texts).toContain("仓库：fuyucn/douyin-singer-board · 分支 nsh");
   expect(texts).toContain("检查更新");
   expect(texts).not.toContain("平台插件");

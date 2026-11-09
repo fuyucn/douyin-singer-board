@@ -39,6 +39,18 @@ Branches:
 > `ui.tsx` `IconButton()` and every raw text button carries
 > `items-center justify-center`. The header right group is back to the original
 > `gap-1` + `ml-2` spacing, and the Stop icon is a white filled square again.
+> 0.7.1 also moves row actions out of `DataTable.renderCell` into a toolbar:
+> NSH does not deliver presses to buttons inside a rendered cell on a real
+> renderer, so copy/mark/delete had been silent no-ops there even though
+> headless tests passed. The table now uses `onRowPress` selection.
+>
+> 0.7.1 fixes the silent buttons: `capabilities.clipboard` was missing, so
+> every copy button rejected with ERR_ACCESS_DENIED and the log claimed success
+> before the promise settled. All write calls now go through `copyText()` with
+> await/catch, a shared footer status line gives visible feedback, clear-list
+> asks for a second press, and `actions.test.tsx` asserts clipboard contents,
+> row disappearance, log honesty and every previously silent button.
+>
 > 0.7.0 merges the Settings dialog and the About dialog into one modal with
 > three underline tabs (general / plugin / about). The header info button opens
 > Settings directly on the about tab; "管理酷狗" opens it on the plugin tab.

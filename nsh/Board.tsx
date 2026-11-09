@@ -19,7 +19,7 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.7.0";
+const APP_VERSION = "0.7.1";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -36,7 +36,7 @@ const songColumns: DataTableColumn[] = [
   { key: "user", title: "用户", width: 120 },
   { key: "song", title: "点歌", width: 260 },
   { key: "time", title: "时间", width: 72 },
-  { key: "actions", title: "", width: 110 },
+  { key: "actions", title: "", width: 110, selectable: false },
 ];
 
 const playedColumns: DataTableColumn[] = [
@@ -44,7 +44,7 @@ const playedColumns: DataTableColumn[] = [
   { key: "played", title: "时间", width: 80, align: "end" },
   { key: "user", title: "用户", width: 110 },
   { key: "song", title: "点歌", width: 260 },
-  { key: "actions", title: "", width: 48 },
+  { key: "actions", title: "", width: 48, selectable: false },
 ];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -93,6 +93,10 @@ function Board() {
   const selectedRow = signal<number | null>(null);
   const playedQuery = signal("");
   const logOpen = signal(false);
+  const flash = signal("");
+  const clearConfirm = signal<Tab | null>(null);
+  let flashTimer: number | null = null;
+  let clearTimer: number | null = null;
 
   const kugou = signal<KugouSession | null>(null);
   const kgState = signal("idle");
@@ -174,6 +178,7 @@ function Board() {
       }
       kgState.set("ok");
       kgMsg.set("");
+      showFlash(`已刷新 ${arr.length} 个歌单`);
     } catch (e: any) {
       const auth = isAuthFailure({ status: 0 }, String(e?.message ?? e));
       kgState.set(auth ? "expired" : "error");
@@ -254,7 +259,8 @@ function Board() {
 
   const doSearch = async () => {
     const keyword = kgQuery().trim();
-    if (!keyword || !kugou()) return;
+    if (!keyword) { showFlash("请先输入歌名"); return; }
+    if (!kugou()) { showFlash("请先登录酷狗"); return; }
     kgBusy.set(true);
     kgMsg.set("");
     try {
@@ -278,6 +284,7 @@ function Board() {
       const res = await addTrack(sess.token, sess.userid, target, track, sess.dfid ?? "-");
       if (res.status === 1) {
         kgMsg.set(`已加入 ${config().target_playlist_name || "歌单"}: ${track.name}`);
+        showFlash(`已加入歌单：${track.name}`);
         log(`酷狗已加入: ${track.name}`);
       } else {
         kgMsg.set(`加入失败 (status ${res.status}): ${res.msg ?? ""}`);
@@ -301,6 +308,9 @@ function Board() {
       medal_name: "",
       send_time: Math.floor(Date.now() / 1000),
     });
+    kgMsg.set(`已加入点歌列表：${track.name}`);
+    showFlash(`已加入点歌列表：${track.name}`);
+    log(`加入点歌列表: ${track.name}`);
   };
 
   let client: any = null;
@@ -682,9 +692,52 @@ function Board() {
     manual.set("");
   };
 
-  const copyNames = (list: { song_name: string }[], label: string) => {
-    Clipboard.writeText(list.map((s) => s.song_name).join("\n"));
-    log(`已复制${label} ${list.length} 首`);
+  // One shared, visible status line. It never covers a control, so it cannot
+  // swallow a press; a test can assert it through app.texts().
+  const showFlash = (msg: string) => {
+    flash.set(msg);
+    if (flashTimer !== null) clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => flash.set(""), 3000);
+  };
+
+  // Clipboard.writeText returns a Promise. Log only after it resolves, and
+  // always report failures: an ungranted capability used to fail silently.
+  const copyText = (text: string, label: string) => {
+    let settled = false;
+    const finish = (ok: boolean, detail: string) => {
+      if (settled) return;
+      settled = true;
+      if (ok) { showFlash(`已复制${label}`); log(`已复制${label}`); }
+      else { showFlash(`复制失败：${detail}`); log(`复制失败：${detail}`); }
+    };
+    // Immediate feedback: the press must never look like a no-op.
+    showFlash(`正在复制${label}…`);
+    Clipboard.writeText(text)
+      .then(() => finish(true, ""))
+      .catch((e: any) => finish(false, String(e?.message ?? e)));
+    // Some native hosts leave the clipboard promise pending while the window
+    // is inactive. Always settle so the user gets a result.
+    setTimeout(() => finish(false, "剪贴板无响应"), 2000);
+  };
+
+  const clearList = () => {
+    const tab = activeTab();
+    if (tab === "blacklist") return;
+    const count = tab === "songs" ? songs().length : played().length;
+    if (count === 0) return;
+    if (clearConfirm() !== tab) {
+      clearConfirm.set(tab);
+      showFlash(`再点一次「确认清空」以清空 ${count} 首`);
+      if (clearTimer !== null) clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => clearConfirm.set(null), 4000);
+      return;
+    }
+    clearConfirm.set(null);
+    if (clearTimer !== null) clearTimeout(clearTimer);
+    if (tab === "songs") { songs.set([]); selectedRow.set(null); }
+    else { played.set([]); playedQuery.set(""); }
+    showFlash(`已清空 ${count} 首`);
+    log(`已清空${tab === "songs" ? "点歌" : "已点"}列表 ${count} 首`);
   };
 
   const markPlayed = (index: number) => {
@@ -730,6 +783,7 @@ function Board() {
     songs.update((v) => v.filter((_, i) => i !== index));
     selectedRow.set(null);
     log(`删除: ${song.uname} - ${song.song_name}`);
+    showFlash(`已删除：${song.song_name}`);
   };
 
   const addBlack = () => {
@@ -744,6 +798,7 @@ function Board() {
     else patch({ blacklist_singers: [...singers(), name], blacklist_meta: meta });
     blackInput.set("");
     log(`加入黑名单 (${type === "song" ? "歌曲" : "歌手"}): ${name}`);
+    showFlash(`已加入黑名单：${name}`);
   };
 
   const removeBlack = (key: string) => {
@@ -753,9 +808,15 @@ function Board() {
     if (type === "song") patch({ blacklist: bl().filter((s) => s !== name) });
     else patch({ blacklist_singers: singers().filter((s) => s !== name) });
     log(`移出黑名单: ${name}`);
+    showFlash(`已移出黑名单：${name}`);
   };
 
   const running = () => ["解析房间...", "连接中...", "已连接"].includes(status());
+  const pickedRow = () => {
+    const i = selectedRow();
+    return i !== null && i >= 0 && i < songs().length ? i : 0;
+  };
+  const pickedName = () => songs()[pickedRow()]?.song_name ?? "—";
 
   const inputStyle = () => ({
     color: token("foreground"),
@@ -953,24 +1014,44 @@ function Board() {
               </Button>
             </View>
             <If when={activeTab() !== "blacklist" && (activeTab() === "songs" ? songs().length : played().length) > 0}>
-              {IconButton({ geomKey: "clear-list", name: "trash", text: "清空列表", textClass: "text-xs text-muted-foreground", iconClass: "h-3.5 w-3.5", color: "muted-foreground", onPress: () => { if (activeTab() === "songs") { songs.set([]); selectedRow.set(null); } else { played.set([]); } }, class: "h-7 rounded-(--radius) bg-transparent px-2.5 active:bg-muted" })}
+              {IconButton({ testID: "clear-list", name: "trash", label: "清空列表", text: clearConfirm() === activeTab() ? "确认清空" : "清空列表", textClass: "text-xs text-muted-foreground", iconClass: "h-3.5 w-3.5", color: "muted-foreground", onPress: clearList, class: "h-7 rounded-(--radius) bg-transparent px-2.5 active:bg-muted" })}
             </If>
           </View>
 
           <View class="flex-1 min-h-0 flex-col">
             <If when={activeTab() === "songs"}>
+              <If when={songs().length > 0}>
+                <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-secondary px-3">
+                  <Text class="text-[11px] text-muted-foreground">选中：{pickedName()}</Text>
+                  <View class="flex-1" />
+                  <Button testID="toolbar-copy" onPress={() => copyText(pickedName(), `歌名：${pickedName()}`)} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
+                    <Text class="text-[11px] text-foreground">复制</Text>
+                  </Button>
+                  <Button testID="toolbar-mark" onPress={() => markPlayed(pickedRow())} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
+                    <Text class="text-[11px] text-foreground">标记已点</Text>
+                  </Button>
+                  <Button testID="toolbar-delete" onPress={() => removeSong(pickedRow())} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
+                    <Text class="text-[11px] text-danger-soft-fg">删除</Text>
+                  </Button>
+                </View>
+              </If>
               <If when={songs().length === 0} else={
                 <DataTable
                   columns={songColumns}
                   data={songRows()}
                   rowHeight={48}
                   headerHeight={32}
+                  rowSelectable={false}
+                  columnSelectable={false}
+                  cellSelectable={false}
+                  onRowPress={(e: any) => selectedRow.set(e.row)}
                   class="flex-1"
                   classes={{ header: "bg-secondary border-b border-line", headerCell: "px-3 text-xs font-medium text-muted-foreground", cell: "px-2", row: "border-b border-line", rowHover: "bg-muted" }}
                   renderCell={(cell: any) => {
-                    const song = songs()[cell.row];
-                    if (!song) return <Text class="text-sm text-foreground">{cell.text}</Text>;
-                    if (cell.key === "idx") return <Text class="text-xs text-faint">{cell.row + 1}</Text>;
+                    const r = cell.row;
+                    const song = songs()[r];
+                    if (!song) return <Text class="text-sm text-foreground">{String(cell.text).split("|")[0]}</Text>;
+                    if (cell.key === "idx") return <Text class="text-xs text-faint">{r + 1}</Text>;
                     if (cell.key === "user") {
                       const max = config().max_songs_per_user;
                       const count = played().filter((p) => p.uid === song.uid).length;
@@ -985,7 +1066,7 @@ function Board() {
                       );
                     }
                     if (cell.key === "song") {
-                      const row = songRows()[cell.row];
+                      const row = songRows()[r];
                       const blocked = row?.blocked;
                       const sub = row?.sub ?? "手动添加";
                       return (
@@ -998,14 +1079,12 @@ function Board() {
                     if (cell.key === "time") return <Text class="text-xs text-faint">{clock(song.send_time)}</Text>;
                     if (cell.key === "actions") {
                       return (
-                        <View class="flex-row justify-end gap-1 opacity-60">
-                          {IconButton({ geomKey: `song-copy-${cell.row}`, name: "copy", onPress: () => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }, class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5" })}
-                          {IconButton({ testID: `mark-${cell.row}`, name: "check", onPress: () => markPlayed(cell.row), class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", label: "标记已点" })}
-                          {IconButton({ testID: `delete-${cell.row}`, name: "trash", onPress: () => removeSong(cell.row), class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "danger-soft-fg", label: "删除" })}
+                        <View class="flex-row justify-end" style={{ pointerEvents: "none" }}>
+                          <Text class="text-[11px] text-faint">{pickedRow() === r ? "已选中" : "点击选择"}</Text>
                         </View>
                       );
                     }
-                    return <Text class="text-sm text-foreground">{cell.text}</Text>;
+                    return <Text class="text-sm text-foreground">{String(cell.text).split("|")[0]}</Text>;
                   }}
                   empty={<Text class="text-sm text-faint">等待点歌...</Text>}
                 />
@@ -1031,9 +1110,18 @@ function Board() {
                       class="h-6 min-w-0 flex-1 border-0 bg-transparent px-0 text-xs"
                     />
                     <If when={playedQuery()}>
-                      {IconButton({ geomKey: "played-clear-query", name: "x", onPress: () => playedQuery.set(""), class: "h-6 w-6 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "faint" })}
+                      {IconButton({ testID: "played-clear-query", name: "x", label: "清除搜索", onPress: () => playedQuery.set(""), class: "h-6 w-6 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "faint" })}
                     </If>
                   </View>
+                </View>
+              </If>
+              <If when={played().length > 0}>
+                <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-secondary px-3">
+                  <Text class="text-[11px] text-muted-foreground">选中：{filteredPlayed()[selectedRow() ?? 0]?.song_name ?? filteredPlayed()[0]?.song_name ?? "—"}</Text>
+                  <View class="flex-1" />
+                  <Button testID="played-toolbar-copy" onPress={() => { const t = filteredPlayed()[selectedRow() ?? 0]?.song_name ?? filteredPlayed()[0]?.song_name; if (t) copyText(t, `歌名：${t}`); }} class="items-center justify-center h-6 rounded-[6px] border border-line-strong bg-card px-2 active:bg-muted">
+                    <Text class="text-[11px] text-foreground">复制</Text>
+                  </Button>
                 </View>
               </If>
               <DataTable
@@ -1043,9 +1131,13 @@ function Board() {
                 headerHeight={32}
                 class="flex-1"
                 classes={{ header: "bg-secondary border-b border-line", headerCell: "px-3 text-xs font-medium text-muted-foreground", cell: "px-2", row: "border-b border-line", rowHover: "bg-muted" }}
+                rowSelectable={false}
+                columnSelectable={false}
+                cellSelectable={false}
+                onRowPress={(e: any) => selectedRow.set(e.row)}
                 renderCell={(cell: any) => {
                   const song = filteredPlayed()[cell.row];
-                  if (!song) return <Text class="text-sm text-foreground">{cell.text}</Text>;
+                  if (!song) return <Text class="text-sm text-foreground">{String(cell.text).split("|")[0]}</Text>;
                   if (cell.key === "idx") return <Text class="text-xs text-faint">{cell.row + 1}</Text>;
                   if (cell.key === "played") return <Text class="text-xs text-faint">{clock(song.played_at)}</Text>;
                   if (cell.key === "user") return <Text class="truncate text-xs text-muted-foreground">{song.uname}</Text>;
@@ -1056,11 +1148,11 @@ function Board() {
                     </View>
                   );
                   if (cell.key === "actions") return (
-                    <View class="flex-row justify-end">
-                      {IconButton({ geomKey: `played-copy-${cell.row}`, name: "copy", onPress: () => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }, class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5" })}
+                    <View class="flex-row justify-end" style={{ pointerEvents: "none" }}>
+                      <Text class="text-[11px] text-faint">{(selectedRow() ?? 0) === cell.row ? "已选中" : "点击选择"}</Text>
                     </View>
                   );
-                  return <Text class="text-sm text-foreground">{cell.text}</Text>;
+                  return <Text class="text-sm text-foreground">{String(cell.text).split("|")[0]}</Text>;
                 }}
                 empty={<Text class="text-sm text-faint">{playedQuery() ? "没有匹配的歌曲" : "暂无已点歌曲"}</Text>}
               />
@@ -1130,9 +1222,9 @@ function Board() {
                   <Text class="text-[12px] font-medium text-muted-foreground">日志</Text>
                   <Text class="ml-1 rounded bg-muted px-1.5 font-mono text-[10px] text-faint">{logs().length}</Text>
                 </Button>
-                {IconButton({ geomKey: "log-copy", name: "copy", text: "复制", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => { Clipboard.writeText(logs().join("\n")); log("日志已复制"); }, class: "h-6 rounded px-1.5 bg-transparent active:bg-muted" })}
-                {IconButton({ geomKey: "log-clear", name: "trash", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => logs.set([]), class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
-                {IconButton({ geomKey: "log-chevron", name: "chevron", onPress: () => logOpen.update((v) => !v), class: "ml-1 h-6 w-6 rounded bg-transparent active:bg-muted", iconClass: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
+                {IconButton({ testID: "log-copy", name: "copy", label: "复制日志", text: "复制", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => copyText(logs().join("\n"), `日志 ${logs().length} 行`), class: "h-6 rounded px-1.5 bg-transparent active:bg-muted" })}
+                {IconButton({ testID: "log-clear", name: "trash", label: "清空日志", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => logs.set([]), class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
+                {IconButton({ testID: "log-chevron", name: "chevron", label: "展开或收起日志", onPress: () => logOpen.update((v) => !v), class: "ml-1 h-6 w-6 rounded bg-transparent active:bg-muted", iconClass: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
               </View>
               <If when={logOpen()}>
                 <Scroll class="max-h-[220px] bg-background">
@@ -1164,6 +1256,9 @@ function Board() {
               <View class="inline-flex items-baseline gap-1"><Text class="text-faint">时长</Text><Text class="tabular-nums text-foreground">{formatDuration(nowTick() - sessionStart())}</Text></View>
             </If>
           </View>
+        </If>
+        <If when={flash()}>
+          <Text testID="flash" class="text-[11px] text-primary">{flash()}</Text>
         </If>
         <View class="ml-auto flex-row items-center gap-4">
           <View class="flex-row items-center gap-1">

@@ -11,7 +11,7 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("晴天");
   expect(app.texts()).toContain("点歌列表 (1)");
 
-  await app.press("id:mark-0");
+  await app.press("id:toolbar-mark");
   expect(app.texts()).toContain("已点歌单 (1)");
   expect(app.texts()).toContain("点歌列表 (0)");
 

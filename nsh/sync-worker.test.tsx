@@ -133,7 +133,7 @@ test("manual mark during an in-flight worker write adds only once", async () => 
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
   await app.wait(2200);
-  await app.press("id:mark-0");
+  await app.press("id:toolbar-mark");
   await app.wait(4000);
   expect(app.texts()).toContain("已点歌单 (1)");
   expect(adds).toBe(1);

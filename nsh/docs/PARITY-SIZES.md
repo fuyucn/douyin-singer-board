@@ -164,6 +164,23 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
 
+## 0.7.1 interaction fixes
+
+Row copy/mark/delete buttons were drawn inside `DataTable.renderCell`. On a
+real renderer (`nsh test --target macos`) `app.press` finds the element but its
+`onPress` never fires, while headless tests call `onPress` directly and stayed
+green. Verified by target diagnostics: tab-bar `clear-list`, sidebar `添加` and
+blacklist `black-add` all worked; only table-cell buttons did not. Row actions
+now live in a toolbar above each table, driven by the native `onRowPress`
+callback. The actions column shows a read-only selection hint.
+
+Copy/rename/delete/join/clear actions were only checked for appearance. The
+clipboard capability was undeclared, so `Clipboard.writeText` rejected silently;
+`log()` ran before the promise settled, which made the log claim a success that
+never happened. `actions.test.tsx` (8 cases, in CI) now asserts the clipboard
+contents, that the deleted row's text disappears, that clearing played resets
+the stale search filter, and that every button has a visible result.
+
 ## 0.7.0 Settings tabs
 
 The single modal is 560x520pt (fits the 880x560 minimum window). Its header

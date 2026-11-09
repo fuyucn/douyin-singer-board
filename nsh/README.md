@@ -47,12 +47,24 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.7.0.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.7.1.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.7.0.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.7.1.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
+
+## Table actions
+
+NSH's `DataTable` does not deliver presses to buttons drawn inside
+`renderCell` on a real renderer (headless tests call `onPress` directly and
+therefore looked green). Row operations therefore live in a toolbar above each
+table, driven by the table's native `onRowPress` selection:
+`toolbar-copy` / `toolbar-mark` / `toolbar-delete` for the queue, and
+`played-toolbar-copy` for the played list. The row's actions column now shows a
+read-only `已选中` / `点击选择` hint instead of unclickable icons.
+`table-actions-target.test.tsx` is also run with `--target macos` locally to
+verify presses on a real renderer; CI runs it headless.
 
 ## Current state
 
@@ -71,7 +83,7 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
   auth-failure circuit breaker, and clean teardown on config/session changes.
   Manual "mark played" takes over an in-flight worker task, never double-adds.
 - Footer elapsed-time stat; `kugou_enabled` gates all Kugou UI and workers.
-- One Settings modal with three underline tabs (0.7.0):
+- One Settings modal with three underline tabs (0.7.1):
   `general` (appearance, read-only runtime info), `plugin` (platform plugin
   picker with exactly one active plugin — Kugou or the NetEase placeholder —
   plus QR login, playlists, search, add, auto-sync), and `about` (version,
