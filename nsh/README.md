@@ -40,9 +40,9 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.3.0.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.3.1.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.3.0.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.3.1.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
@@ -62,8 +62,9 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - Windows CI: matcher, UI, Cookie header + WS write/read, live Douyin room
   handshake, package, installer, portable smoke.
-- Kugou tab: QR login, playlist picker, search, add to playlist/list, optional
-  auto-sync on mark-played. Token refresh/user info are still missing.
+- Left panel has an 插件 entry for the built-in Kugou adapter; the 酷狗 tab has
+  QR login, playlist picker, search, add to playlist/list, optional auto-sync
+  on mark-played. Token refresh/user info are still missing.
 - Auto-update is not configured yet; the portable wrapper can be replaced by a
   newer single file, which re-extracts its newer payload.
 

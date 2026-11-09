@@ -457,11 +457,12 @@ function Board() {
         <Text class="text-xs text-[#59616e]">{status()}</Text>
         <Text class="text-xs text-[#88919f]">{roomName()}</Text>
         <View class="flex-1" />
-        <Text class="text-[11px] text-[#88919f]">0.3.0</Text>
+        <Text class="text-[11px] text-[#88919f]">0.3.1</Text>
       </View>
 
       <View class="flex-1 flex-row">
-        <View class="w-[280px] gap-3 border-r border-[#e3e7ec] bg-white p-4">
+        <Scroll class="h-full w-[280px] border-r border-[#e3e7ec] bg-white">
+          <View class="gap-3 p-4">
           <Text class="text-[13px] font-semibold text-[#191d24]">连接</Text>
           <View class="gap-2">
             <Text class="text-[12px] text-[#59616e]">抖音房间号</Text>
@@ -526,7 +527,22 @@ function Board() {
             <Text class="text-[12px] text-[#59616e]">黑名单：{bl().length}</Text>
             <Text class="text-[12px] text-[#59616e]">连接：{status()}</Text>
           </View>
-        </View>
+
+          <View class="h-px bg-[#e3e7ec]" />
+          <Text class="text-[13px] font-semibold text-[#191d24]">插件</Text>
+          <View class="flex-row items-center gap-2">
+            <View class={`h-2 w-2 rounded-full ${kugou() ? "bg-[#2e8a66]" : "bg-[#c2c8d0]"}`} />
+            <Text class="flex-1 text-[12px] text-[#59616e]">酷狗音乐</Text>
+            <Button
+              onPress={() => { activeTab.set("kugou"); log("打开插件: 酷狗音乐"); }}
+              class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]"
+            >
+              <Text class="text-[11px] text-[#191d24]">打开</Text>
+            </Button>
+          </View>
+          <Text class="text-[11px] text-[#88919f]">内置 v0.1.0 · 搜索 / 歌单 / 加歌</Text>
+          </View>
+        </Scroll>
 
         <View class="flex-1 p-3 gap-2">
           <View class="flex-row items-center gap-2">

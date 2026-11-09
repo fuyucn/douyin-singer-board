@@ -17,7 +17,10 @@ test("board shell, simulated request and tabs", async () => {
   expect(app.texts()).toContain("已点 1");
   expect(app.texts()).toContain("点歌 0");
 
-  await app.press("酷狗");
+  expect(app.texts()).toContain("插件");
+  expect(app.texts()).toContain("酷狗音乐");
+  expect(app.texts()).toContain("内置 v0.1.0 · 搜索 / 歌单 / 加歌");
+  await app.press("打开");
   expect(app.texts()).toContain("酷狗登录");
   expect(app.texts()).toContain("生成登录二维码 / 刷新");
 
