@@ -20,23 +20,24 @@ jobs:
 
       - name: Install NSH nightly
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
-          $env:NSH_VERSION = "nightly"
-          $ok = $false
-          for ($i = 1; $i -le 4 -and -not $ok; $i++) {
-            try {
-              # PowerShell 7 returns .Content as byte[]; the original pipe form
-              # works and is what nsh.dev documents.
-              irm https://nsh.dev/install.ps1 | iex
-              $ok = $true
-            } catch {
-              Write-Host "NSH install attempt $i failed: $_"
-              if ($i -lt 4) { Start-Sleep -Seconds (10 * $i) }
-            }
-          }
-          if (-not $ok) { throw "NSH nightly install failed after 4 attempts" }
-          "$env:LOCALAPPDATA\nsh\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          # nsh.dev/install.ps1 fetches a .sha256 sidecar that currently returns
+          # 504 on GitHub's release CDN. Download the asset through the GitHub
+          # API with gh instead (same bytes, different endpoint), then unpack.
+          $tmp = "$env:TEMP\nsh-unpack"
+          $zip = "$env:TEMP\nsh-windows-x86_64.zip"
+          $dest = "$env:LOCALAPPDATA\nsh"
+          Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+          gh release download nightly --repo longbridge/nsh --pattern "nsh-windows-x86_64.zip" --dir $env:TEMP --clobber
+          Move-Item -Force $zip "$tmp.zip"
+          Expand-Archive -LiteralPath "$tmp.zip" -DestinationPath $tmp -Force
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
+          if (-not (Test-Path (Join-Path $dest "bin\nsh.exe"))) { throw "nsh.exe missing after unpack" }
+          (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: Check NSH
         run: nsh -V
