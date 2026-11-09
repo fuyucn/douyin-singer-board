@@ -6,7 +6,6 @@ export { iconCenterDelta, iconGeometry };
 function geometryReport(): string {
   geomTick();
   const parts = Object.entries(iconGeometry)
-    .filter(([, g]) => g.hasButton && g.hasIcon)
     .map(([key, g]) => {
       const d = iconCenterDelta(g);
       return `${key}=${d.dx.toFixed(2)},${d.dy.toFixed(2)},${g.hasButton ? "B" : "-"}${g.hasIcon ? "I" : "-"},${g.buttonW}x${g.buttonH},${g.iconW}x${g.iconH}`;

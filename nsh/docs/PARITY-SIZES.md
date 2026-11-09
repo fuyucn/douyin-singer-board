@@ -16,12 +16,13 @@ its own centering.
 All icon-bearing buttons now go through `ui.tsx` `IconButton()`, and every raw
 text button carries `items-center justify-center`. Three guards keep it that way:
 
-- `geometry.test.tsx` — `onLayout` bounds of button + icon at five icon-only
-  sizes; center delta must be <= 1pt. Runs headless, so it is in CI.
-- `text-layout.test.tsx` — fixed-height text button: asserts the label is
-  intrinsic-width, vertically centered, and that an icon+label group stays on
-  one row and centered. Covers the text variant that `geometry.test.tsx`
-  deliberately does not.
+- `geometry.test.tsx` — `onLayout` bounds at five icon-only sizes, plus the
+  `IconButton` icon+label variant (vertical centering only). Center delta must
+  be <= 1pt. Runs headless on the Windows CI.
+- `text-layout.test.tsx` — fixed-height raw `<Button>` control: asserts the
+  label is intrinsic-width and centered, and that an icon+label group stays on
+  one row. This covers the shadcn baseline, not a substitute for the
+  `IconButton` case above.
 - `scripts/check_icon_buttons.py` — static guard (also on the Linux PR gate):
   no raw `<Button>` may contain `Icon({`, and every raw `<Button>` must carry
   the centering classes.
@@ -48,7 +49,8 @@ every icon-only size.
 | table row actions | 28x28 | 14x14 | 28x28 | 14x14 |
 | played-search clear, log chevron | 24x24 | 12-14 | 24x24 | 14x14 |
 | blacklist add | 32x32 | 16x16 | 32x32 | 16x16 |
-| clear-list / log copy / log clear (icon + text) | h-7 (28pt), gap-1 | 14x14 | h-7 (28pt), gap-1 | 14x14 |
+| clear-list (icon + text) | h-7 (28pt), gap-1 | 14x14 | h-7 (28pt), gap-1 | 14x14 |
+| log copy / log clear (icon + text) | auto height ~18pt, gap-0.5 | 12x12 | h-6 (24pt), gap-1 | 12x12 | known difference |
 
 ## Header right group
 
@@ -129,10 +131,21 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | About modal | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
 | Settings dialog | none (config in left panel) | appearance + platform plugin picker | Follows "plugins in Settings" |
 | Log panel visibility | toggled from About | shown automatically once logs exist | Simplified |
-| Stop icon | filled square (`fill-current`) | filled square from 0.6.2 | Fixed |
+| Stop icon | filled square (`fill-current`) | filled square from 0.6.2 | Fixed; verified in `final-stop.png` (connected state) |
 | Button labels | inline-flex centered | centered from 0.6.2 | Fixed |
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
+
+## Not done in this pass (previous review items P4 / P6)
+
+- P4: the original with Kugou disabled shows only two header icons; NSH always
+  shows three. That branch remains ~34pt further left (documented above).
+- P6: no automated absolute-x test for the header, no dialog geometry
+  comparison, no theme-switch color regression test, no logged-in Kugou
+  sidebar screenshot, no About parity items, and no right-click blacklist add.
+  These are tracked as follow-ups, not claimed as verified.
+- P11: `App.tsx` is the POC "counts taps" entry and still has uncentered raw
+  Buttons. The shipping entry is `Board.tsx`, which the guard covers.
 
 ## Open questions for the user
 
@@ -147,8 +160,10 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 
 The original is a Chromium CSS box model; NSH is a native flex/grid layout with
 platform text rendering. **Pixel-identical is not achievable.** The check applied here (pending user
-sign-off) is: every control's position and size within 1pt, row heights and
-spacing matching, colors/theme matching, and automated geometry tests that fail
-when any icon or text button regresses. If exact WebKit rendering is required, the only
+sign-off) is: **icon/button center delta <= 1pt** (automated, headless);
+**text labels within +/-3pt** (measured by OCR; native font metrics differ);
+row heights and spacing matching; colors/theme matching. The measured tabs x
+(+3/+4.5pt) and 添加 y (+2.5pt) are within the text tolerance, not the 1pt
+icon tolerance. If exact WebKit rendering is required, the only
 option is to host the original React frontend in an NSH WebView, which gives up
 the native-rendering size win and needs WebView2 on Windows.

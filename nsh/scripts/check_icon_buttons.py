@@ -23,12 +23,19 @@ for m in buttons:
     line = board[: m.start()].count("\n") + 1
     if "Icon({" in block:
         errors.append(f"Board.tsx:{line} raw <Button> draws an icon; use IconButton()")
-    # Center on the cross axis always; on the main axis either center it or
-    # explicitly opt into a left-aligned row (the original log-panel header).
+    # Center on the cross axis always. On the main axis only a full-width
+    # left-aligned row (the original log-panel header: flex-1 + flex-row) is
+    # exempt; a plain flex-row is still a regression waiting to happen.
     if "items-center" not in block:
         errors.append(f"Board.tsx:{line} raw <Button> lacks items-center")
-    elif "justify-center" not in block and "flex-row" not in block:
-        errors.append(f"Board.tsx:{line} raw <Button> lacks justify-center / flex-row")
+    elif "justify-center" not in block:
+        left_row_exempt = "flex-row" in block and "flex-1" in block
+        if not left_row_exempt:
+            errors.append(f"Board.tsx:{line} raw <Button> lacks justify-center")
+    # An IconButton nested inside a raw Button is also a leak: use the
+    # component itself as the button.
+    if "IconButton({" in block:
+        errors.append(f"Board.tsx:{line} raw <Button> wraps an IconButton")
 
 # 2. IconButton must center both variants.
 if 'layout = props.text ? "flex-row items-center justify-center gap-1" : "items-center justify-center"' not in ui:
@@ -64,6 +71,7 @@ for name, (box, icon) in ORIGINAL_SIZES.items():
 print(f"IconButton call sites in Board.tsx: {board.count('IconButton({')}")
 print(f"Raw <Button> blocks: {len(buttons)} (all must be centered)")
 print(f"Standalone Icon() (non-button): {board.count('Icon({')}")
+print("Note: App.tsx is the POC entry, not the shipping Board.tsx; it is outside this guard.")
 
 if errors:
     print("\nFAILED:")

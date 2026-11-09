@@ -6,9 +6,13 @@ test("IconButton centers its icon at every size", async () => {
   const report = app.texts().find((t) => t.startsWith("GEOM|"));
   expect(typeof report).toBe("string");
   const entries = String(report).slice(5).split(";").filter(Boolean);
-  expect(entries.length).toBe(5);
+  expect(entries.length).toBe(6);
   const bad = entries.filter((e) => {
-    const [dx, dy] = e.split("=")[1].split(",").map(Number);
+    const [key, values] = e.split("=");
+    const [dx, dy] = values.split(",").map(Number);
+    // In an icon+label button the glyph sits left of the text by design; only
+    // vertical centering applies there. Icon-only buttons need both axes.
+    if (key === "with-text") return Math.abs(dy) > 1;
     return Math.abs(dx) > 1 || Math.abs(dy) > 1;
   });
   expect(bad).toEqual([]);

@@ -25,15 +25,32 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           # nsh.dev/install.ps1 fetches a .sha256 sidecar that currently returns
-          # 504 on GitHub's release CDN. Download the asset through the GitHub
-          # API with gh instead (same bytes, different endpoint), then unpack.
+          # 504 on GitHub's release CDN. Fetch both assets through the GitHub
+          # API with gh, verify the checksum ourselves, then unpack.
           $tmp = "$env:TEMP\nsh-unpack"
           $zip = "$env:TEMP\nsh-windows-x86_64.zip"
+          $sum = "$zip.sha256"
           $dest = "$env:LOCALAPPDATA\nsh"
+          $ok = $false
+          for ($i = 1; $i -le 3 -and -not $ok; $i++) {
+            try {
+              gh release download nightly --repo longbridge/nsh `
+                --pattern "nsh-windows-x86_64.zip" `
+                --pattern "nsh-windows-x86_64.zip.sha256" `
+                --dir $env:TEMP --clobber
+              $expected = (Get-Content -Raw -LiteralPath $sum).Trim().Split(" ")[0].ToUpper()
+              $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToUpper()
+              if ($expected -ne $actual) { throw "checksum mismatch: $actual vs $expected" }
+              $ok = $true
+            } catch {
+              Write-Host "NSH download attempt $i failed: $_"
+              if ($i -lt 3) { Start-Sleep -Seconds (10 * $i) }
+            }
+          }
+          if (-not $ok) { throw "NSH nightly download failed after 3 attempts" }
           Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
-          gh release download nightly --repo longbridge/nsh --pattern "nsh-windows-x86_64.zip" --dir $env:TEMP --clobber
-          Move-Item -Force $zip "$tmp.zip"
-          Expand-Archive -LiteralPath "$tmp.zip" -DestinationPath $tmp -Force
+          Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
           if (-not (Test-Path (Join-Path $dest "bin\nsh.exe"))) { throw "nsh.exe missing after unpack" }

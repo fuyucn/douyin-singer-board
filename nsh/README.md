@@ -24,8 +24,12 @@ nsh package Board.tsx --target macos -o dist --name SUSUSongBoard
 Windows builds must run on Windows (Explorer icon embedding and runtime tests):
 
 ```powershell
-$env:NSH_VERSION = "nightly"
-irm https://nsh.dev/install.ps1 | iex
+# CI installs nightly through the GitHub API because the release CDN's
+# .sha256 sidecar currently returns 504. For a local Windows build:
+gh release download nightly --repo longbridge/nsh `
+  --pattern "nsh-windows-x86_64.zip" --dir $env:TEMP --clobber
+# Unpack nsh/bin/nsh.exe and nsh/runtime/ into %LOCALAPPDATA%\nsh, add
+# %LOCALAPPDATA%\nsh\bin to PATH, then:
 nsh package Board.tsx --target windows -o dist --name SUSUSongBoard
 ```
 

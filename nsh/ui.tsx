@@ -61,10 +61,9 @@ export const iconGeometry: Record<string, IconGeom> = {};
 /** Bumped on every layout sample so a test-visible report can render live.
  *  An unsubscribed signal is inert in production; the harness subscribes. */
 export const geomTick = signal(0);
-let anonymousSeq = 0;
 
 function sample(key: string): IconGeom {
-  if (key !== "anonymous") geomTick.update((v) => v + 1);
+  geomTick.update((v) => v + 1);
   return iconGeometry[key] ?? (iconGeometry[key] = {
     buttonW: 0, buttonH: 0, iconX: 0, iconY: 0, iconW: 0, iconH: 0,
     hasButton: false, hasIcon: false,
@@ -94,11 +93,13 @@ export function IconButton(props: {
   text?: string;
   textClass?: string;
 }) {
-  // Never collapse several buttons into one sample: each call site gets a
-  // stable geomKey/testID, otherwise a unique anonymous key.
-  const key = props.geomKey ?? props.testID ?? `anonymous-${++anonymousSeq}`;
+  // Only explicitly keyed buttons are sampled. A button without a stable key
+  // must not write into the module-level table on every re-render.
+  const sampleKey = props.geomKey ?? props.testID ?? null;
+  const key = sampleKey ?? "anonymous";
   const iconClass = props.iconClass ?? "h-4 w-4";
   const onContentLayout = (e: any) => {
+    if (!sampleKey) return;
     const g = sample(key);
     g.iconX = e.bounds.origin.x;
     g.iconY = e.bounds.origin.y;
@@ -111,20 +112,21 @@ export function IconButton(props: {
     class: iconClass,
     color: props.color,
     scheme: colorScheme(),
-    onLayout: props.text ? undefined : onContentLayout,
+    onLayout: onContentLayout,
   });
-  // A text variant measures the whole icon+label group (its own row), so the
-  // geometry test can assert that the group is centered in the button.
+  // Keep icon and Text as DIRECT Button children: NSH only reports onLayout
+  // for direct children, so a wrapping View would hide the icon's geometry.
   const content = props.text
-    ? <View class="flex-row items-center gap-1" onLayout={onContentLayout}>{iconEl}<Text class={props.textClass ?? "text-xs text-foreground"}>{props.text}</Text></View>
+    ? [iconEl, <Text class={props.textClass ?? "text-xs text-foreground"} onLayout={onContentLayout}>{props.text}</Text>]
     : iconEl;
   const layout = props.text ? "flex-row items-center justify-center gap-1" : "items-center justify-center";
   return (
     <Button
       testID={props.testID}
       onPress={props.onPress}
-      accessibilityLabel={props.label ?? props.name}
+      accessibilityLabel={props.label ?? props.text ?? props.name}
       onLayout={(e: any) => {
+        if (!sampleKey) return;
         const g = sample(key);
         g.buttonW = e.bounds.size.width;
         g.buttonH = e.bounds.size.height;
