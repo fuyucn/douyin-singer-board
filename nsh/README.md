@@ -70,11 +70,14 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
   3–5 s cycle, exponential backoff, blacklist/cooldown/per-user-limit skips,
   auth-failure circuit breaker, and clean teardown on config/session changes.
   Manual "mark played" takes over an in-flight worker task, never double-adds.
-- About dialog: version, repository, and `nsh/updater` check (no manifest yet).
 - Footer elapsed-time stat; `kugou_enabled` gates all Kugou UI and workers.
-- Settings dialog: appearance and a platform plugin picker with exactly one
-  active plugin (Kugou, or the NetEase placeholder). Kugou management (QR
-  login, playlist picker, search, add to playlist/list, auto-sync) lives there.
+- One Settings modal with three underline tabs (0.7.0):
+  `general` (appearance, read-only runtime info), `plugin` (platform plugin
+  picker with exactly one active plugin — Kugou or the NetEase placeholder —
+  plus QR login, playlists, search, add, auto-sync), and `about` (version,
+  repository, `nsh/updater` check; no manifest yet). The old standalone About
+  dialog is gone: the header info button opens Settings on the `about` tab,
+  the sidebar Kugou button opens it on `plugin`.
   Token/userid are kept in `Storage`, not in the repo. Icons are drawn as plain
   function calls so their SVG colors follow theme changes.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
