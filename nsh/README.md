@@ -40,9 +40,9 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.4.0.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.5.0.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.4.0.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.5.0.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
@@ -51,7 +51,7 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
 
 - Original layout: header (logo, status, theme toggle, settings, start/stop),
   left settings panel, 点歌 / 已点歌单 / 黑名单 tabs, song table, log, manual
-  add; config persisted with `Storage`; light/dark/system appearance.
+  add; config persisted with `Storage`; light/dark/system appearance; colors use the original shadcn tokens from `theme.json`.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
 - 已点: select a row and mark it, or double-press it; copy/clear the played list.

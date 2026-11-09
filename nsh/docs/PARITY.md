@@ -27,7 +27,7 @@ Branches:
 >>> STATUS: P0 shell, P1 core and the original layout are in `Board.tsx`:
 > header (theme/settings/start-stop), left settings panel, 点歌 / 已点歌单 /
 > 黑名单 tabs, song table, log, manual add, mark-played/delete, blacklist,
-> config persistence. Kugou moved out of the main tabs into a Settings dialog
+> config persistence. Kugou moved out of the main tabs into a Settings dialog (0.5.0), with the original shadcn tokens in `theme.json`
 > with a single active platform plugin (Kugou / NetEase placeholder). macOS test passes. Windows CI is green: matcher unit test,
 > UI test (tabs, mark-played, blacklist), Cookie handshake (with WS write/read),
 > live Douyin handshake, packaging, NSIS installer, single-file portable exe,
