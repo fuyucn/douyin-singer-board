@@ -660,7 +660,7 @@ function Board() {
             </View>
 
             <View class="mt-auto p-4 text-[11px] text-faint">
-              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.0</Text>
+              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.1</Text>
             </View>
           </View>
         </Scroll>
@@ -927,8 +927,8 @@ function Board() {
       <Dialog
         open={settingsOpen()}
         onOpenChange={({ open }: any) => settingsOpen.set(open)}
-        class="w-[560px] rounded-(--radius) border border-line bg-card shadow-2xl"
-        backdropClass="bg-black/30"
+        class="m-auto w-[560px] rounded-(--radius) border border-line bg-card shadow-2xl"
+        backdropClass="bg-overlay"
       >
         <View class="h-[620px]">
           <View class="h-[48px] flex-row items-center border-b border-line px-4">

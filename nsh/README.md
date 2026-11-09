@@ -40,9 +40,9 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.5.0.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.5.1.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.5.0.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.5.1.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
