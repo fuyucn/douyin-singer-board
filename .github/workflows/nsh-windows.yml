@@ -26,8 +26,9 @@ jobs:
           $ok = $false
           for ($i = 1; $i -le 4 -and -not $ok; $i++) {
             try {
-              $script = Invoke-WebRequest -UseBasicParsing -Uri "https://nsh.dev/install.ps1"
-              Invoke-Expression $script.Content
+              # PowerShell 7 returns .Content as byte[]; the original pipe form
+              # works and is what nsh.dev documents.
+              irm https://nsh.dev/install.ps1 | iex
               $ok = $true
             } catch {
               Write-Host "NSH install attempt $i failed: $_"
