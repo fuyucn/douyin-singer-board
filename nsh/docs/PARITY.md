@@ -39,6 +39,10 @@ Branches:
 > `ui.tsx` `IconButton()` and every raw text button carries
 > `items-center justify-center`. The header right group is back to the original
 > `gap-1` + `ml-2` spacing, and the Stop icon is a white filled square again.
+> 0.7.2 uses a green Start and red Stop button at the user's request; the
+> original's Start button was neutral `fg-base`, so this is a deliberate
+> deviation from pixel parity.
+>
 > 0.7.1 also moves row actions out of `DataTable.renderCell` into a toolbar:
 > NSH does not deliver presses to buttons inside a rendered cell on a real
 > renderer, so copy/mark/delete had been silent no-ops there even though

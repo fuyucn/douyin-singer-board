@@ -47,9 +47,9 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.7.1.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.7.2.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.7.1.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.7.2.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
@@ -84,7 +84,7 @@ headless.
   auth-failure circuit breaker, and clean teardown on config/session changes.
   Manual "mark played" takes over an in-flight worker task, never double-adds.
 - Footer elapsed-time stat; `kugou_enabled` gates all Kugou UI and workers.
-- One Settings modal with three underline tabs (0.7.1):
+- One Settings modal with three underline tabs (0.7.2):
   `general` (appearance, read-only runtime info), `plugin` (platform plugin
   picker with exactly one active plugin — Kugou or the NetEase placeholder —
   plus QR login, playlists, search, add, auto-sync), and `about` (version,

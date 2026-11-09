@@ -18,7 +18,7 @@ function Harness() {
   return (
     <View class="flex-col gap-2 p-4">
       {IconButton({ geomKey: "header-30", name: "info", onPress: noop, class: "h-[30px] w-[30px] bg-muted", iconClass: "h-[15px] w-[15px]" })}
-      {IconButton({ geomKey: "start-30", name: "play", onPress: noop, class: "h-[30px] w-[30px] rounded-[6px] bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background" })}
+      {IconButton({ geomKey: "start-30", name: "play", onPress: noop, class: "h-[30px] w-[30px] rounded-[6px] bg-success", iconClass: "h-[15px] w-[15px]", color: "background" })}
       {IconButton({ geomKey: "row-28", name: "copy", onPress: noop, class: "h-7 w-7 bg-muted", iconClass: "h-3.5 w-3.5" })}
       {IconButton({ geomKey: "small-24", name: "x", onPress: noop, class: "h-6 w-6 bg-muted", iconClass: "h-3.5 w-3.5" })}
       {IconButton({ geomKey: "add-32", name: "plus", onPress: noop, class: "h-8 w-8 bg-muted", iconClass: "h-4 w-4" })}

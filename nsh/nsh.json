@@ -1,8 +1,8 @@
 {
   "name": "SUSUSongBoard",
   "id": "com.sususongboard.nsh",
-  "version": "0.7.1",
-  "build": 701,
+  "version": "0.7.2",
+  "build": 702,
   "icon": "assets/icon.png",
   "window": {
     "title": "SUSUSongBoard",

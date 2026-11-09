@@ -19,7 +19,7 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.7.1";
+const APP_VERSION = "0.7.2";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -867,8 +867,8 @@ function Board() {
           {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "settings", name: "settings", onPress: () => openSettings("general"), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "about", name: "info", onPress: () => openSettings("about"), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
-            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
+          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-success active:bg-success-hover", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
+            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive active:bg-danger-hover", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
           </If>
         </View>
       </View>

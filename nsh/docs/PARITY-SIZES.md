@@ -164,6 +164,25 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
 
+## 0.7.2 start/stop palette
+
+The user asked for a green Start and red Stop button. Measured from
+`--target macos` screenshots (button box x 853..882, y 11..40):
+
+| Theme | Start background | Stop background |
+|---|---|---|
+| light | rgb(74, 136, 105) green | red + white square |
+| dark | rgb(113, 187, 149) green | rgb(224, 131, 123) red + white square |
+
+Implementation: `bg-success active:bg-success-hover` for Start,
+`bg-destructive active:bg-danger-hover` for Stop; the Start glyph keeps
+`color="background"` so it stays legible on green in both themes.
+
+**This is an intentional deviation from the original Tauri app**, whose Start
+button is `bg-[var(--fg-base)]` — near-black in light theme, near-white in
+dark — in both `main` and `feat/susu`. Only Stop was red there. The palette is
+guarded in `scripts/check_icon_buttons.py`.
+
 ## 0.7.1 interaction fixes
 
 Row copy/mark/delete buttons were drawn inside `DataTable.renderCell`. On a

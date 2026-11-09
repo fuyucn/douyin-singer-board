@@ -57,6 +57,12 @@ for testid in ("start", "stop"):
         errors.append(f"Board.tsx: {testid} lost the original 30x30/6px box class")
 if 'color: "#ffffff"' not in board:
     errors.append("Board.tsx: Stop icon is no longer white (original text-white)")
+# User-requested palette: green start, red stop (the original Tauri app used a
+# neutral fg-base start button). Keep it guarded so it cannot drift back.
+if 'testID: "start"' in board and 'bg-success active:bg-success-hover' not in board:
+    errors.append("Board.tsx: Start button lost the green success palette")
+if 'testID: "stop"' in board and 'bg-destructive active:bg-danger-hover' not in board:
+    errors.append("Board.tsx: Stop button lost the red danger palette")
 if 'props.color.startsWith("#")' not in ui:
     errors.append("ui.tsx: Icon() no longer accepts raw hex colors")
 
