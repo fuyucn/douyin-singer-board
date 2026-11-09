@@ -1,4 +1,5 @@
 import { Clipboard, colorScheme, effect, Image, mount, Scroll, setColorScheme, signal, Storage, Text, token, View } from "nsh";
+import { Icon, IconButton } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
 import { Button, DataTable, Dialog, Input, type DataTableColumn } from "nsh/base";
@@ -18,7 +19,7 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.6.0";
+const APP_VERSION = "0.6.1";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -45,33 +46,6 @@ const playedColumns: DataTableColumn[] = [
   { key: "song", title: "点歌", width: 260 },
   { key: "actions", title: "", width: 48 },
 ];
-
-const ICON_PATHS: Record<string, string> = {
-  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
-  square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
-  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
-  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
-  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
-  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  chevron: '<path d="m6 9 6 6 6-6"/>',
-  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
-  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
-  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
-};
-
-// Called as a plain function (not a <Icon/> component): NSH keeps child
-// components' first render, which froze SVG colors across theme switches.
-// `scheme` makes the theme dependency explicit at each call site.
-function Icon(props: { name: string; class?: string; color?: string; scheme?: string }) {
-  void props.scheme;
-  const c = token((props.color ?? "muted-foreground") as any);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[props.name] ?? ""}</svg>`;
-  return <Image src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} class={props.class ?? "h-4 w-4"} />;
-}
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clock = (ts: number) => {
@@ -806,24 +780,16 @@ function Board() {
           </Text>
         </View>
         <View class="flex-1" />
-        <Button testID="theme" onPress={toggleTheme} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
-          {Icon({ scheme: colorScheme(), name: colorScheme() === "dark" ? "sun" : "moon", class: "h-[15px] w-[15px]" })}
-        </Button>
-        <Button testID="settings" onPress={() => settingsOpen.set(true)} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
-          {Icon({ scheme: colorScheme(), name: "settings", class: "h-[15px] w-[15px]" })}
-        </Button>
-        <Button testID="about" onPress={() => aboutOpen.set(true)} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
-          {Icon({ scheme: colorScheme(), name: "info", class: "h-[15px] w-[15px]" })}
-        </Button>
-        <If when={running()} else={
-          <Button testID="start" onPress={start} class="ml-2 h-8 w-8 rounded-(--radius) bg-foreground">
-            {Icon({ scheme: colorScheme(), name: "play", class: "h-[15px] w-[15px]", color: "background" })}
-          </Button>
-        }>
-          <Button testID="stop" onPress={stop} class="ml-2 h-8 w-8 rounded-(--radius) bg-destructive">
-            {Icon({ scheme: colorScheme(), name: "square", class: "h-[15px] w-[15px]", color: "destructive-foreground" })}
-          </Button>
-        </If>
+        {/* Original AppHeader wraps the right actions in one flex-row with
+            gap-1; start/stop adds ml-2. Keep that so the icon slots line up. */}
+        <View class="flex-row items-center gap-1">
+          {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "settings", name: "settings", onPress: () => settingsOpen.set(true), class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "about", name: "info", onPress: () => aboutOpen.set(true), class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-2 h-8 w-8 rounded-(--radius) bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
+            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-2 h-8 w-8 rounded-(--radius) bg-destructive", iconClass: "h-[15px] w-[15px]", color: "destructive-foreground", label: "停止" })}
+          </If>
+        </View>
       </View>
 
       <View class="flex-1 min-h-0 flex-row">
@@ -983,13 +949,7 @@ function Board() {
               </Button>
             </View>
             <If when={activeTab() !== "blacklist" && (activeTab() === "songs" ? songs().length : played().length) > 0}>
-              <Button
-                onPress={() => { if (activeTab() === "songs") { songs.set([]); selectedRow.set(null); } else { played.set([]); } }}
-                class="h-7 gap-1 rounded-(--radius) bg-transparent px-2.5 active:bg-muted"
-              >
-                {Icon({ scheme: colorScheme(), name: "trash", class: "h-3.5 w-3.5", color: "muted-foreground" })}
-                <Text class="text-xs text-muted-foreground">清空列表</Text>
-              </Button>
+              {IconButton({ geomKey: "clear-list", name: "trash", text: "清空列表", textClass: "text-xs text-muted-foreground", iconClass: "h-3.5 w-3.5", color: "muted-foreground", onPress: () => { if (activeTab() === "songs") { songs.set([]); selectedRow.set(null); } else { played.set([]); } }, class: "h-7 rounded-(--radius) bg-transparent px-2.5 active:bg-muted" })}
             </If>
           </View>
 
@@ -1035,15 +995,9 @@ function Board() {
                     if (cell.key === "actions") {
                       return (
                         <View class="flex-row justify-end gap-1 opacity-60">
-                          <Button onPress={() => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            {Icon({ scheme: colorScheme(), name: "copy", class: "h-3.5 w-3.5" })}
-                          </Button>
-                          <Button testID={`mark-${cell.row}`} onPress={() => markPlayed(cell.row)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            {Icon({ scheme: colorScheme(), name: "check", class: "h-3.5 w-3.5" })}
-                          </Button>
-                          <Button testID={`delete-${cell.row}`} onPress={() => removeSong(cell.row)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                            {Icon({ scheme: colorScheme(), name: "trash", class: "h-3.5 w-3.5", color: "danger-soft-fg" })}
-                          </Button>
+                          {IconButton({ geomKey: `song-copy-${cell.row}`, name: "copy", onPress: () => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }, class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5" })}
+                          {IconButton({ testID: `mark-${cell.row}`, name: "check", onPress: () => markPlayed(cell.row), class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", label: "标记已点" })}
+                          {IconButton({ testID: `delete-${cell.row}`, name: "trash", onPress: () => removeSong(cell.row), class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "danger-soft-fg", label: "删除" })}
                         </View>
                       );
                     }
@@ -1073,9 +1027,7 @@ function Board() {
                       class="h-6 min-w-0 flex-1 border-0 bg-transparent px-0 text-xs"
                     />
                     <If when={playedQuery()}>
-                      <Button onPress={() => playedQuery.set("")} class="h-6 w-6 rounded-(--radius) bg-transparent active:bg-muted">
-                        {Icon({ scheme: colorScheme(), name: "x", class: "h-3.5 w-3.5", color: "faint" })}
-                      </Button>
+                      {IconButton({ geomKey: "played-clear-query", name: "x", onPress: () => playedQuery.set(""), class: "h-6 w-6 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "faint" })}
                     </If>
                   </View>
                 </View>
@@ -1101,9 +1053,7 @@ function Board() {
                   );
                   if (cell.key === "actions") return (
                     <View class="flex-row justify-end">
-                      <Button onPress={() => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                        {Icon({ scheme: colorScheme(), name: "copy", class: "h-3.5 w-3.5" })}
-                      </Button>
+                      {IconButton({ geomKey: `played-copy-${cell.row}`, name: "copy", onPress: () => { Clipboard.writeText(song.song_name); log(`已复制: ${song.song_name}`); }, class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5" })}
                     </View>
                   );
                   return <Text class="text-sm text-foreground">{cell.text}</Text>;
@@ -1130,9 +1080,7 @@ function Board() {
                     placeholder={blackType() === "song" ? "输入歌曲名…" : "输入歌手名…"}
                     class="h-8 min-w-0 flex-1 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                   />
-                  <Button testID="black-add" onPress={addBlack} class="h-8 w-8 rounded-(--radius) border border-line-strong bg-card active:bg-muted">
-                    {Icon({ scheme: colorScheme(), name: "plus", class: "h-4 w-4" })}
-                  </Button>
+                  {IconButton({ testID: "black-add", name: "plus", onPress: addBlack, class: "h-8 w-8 rounded-(--radius) border border-line-strong bg-card active:bg-muted", iconClass: "h-4 w-4", label: "加入黑名单" })}
                 </View>
                 <If when={blackRows().length === 0} else={
                   <View class="flex-1 flex-col min-h-0">
@@ -1154,9 +1102,7 @@ function Board() {
                             <Text class="w-28 truncate text-xs text-muted-foreground">{item().singer}</Text>
                             <Text class="w-24 text-right text-xs text-faint">{item().stamp}</Text>
                             <View class="w-10 items-end">
-                              <Button testID={`black-remove-${index()}`} onPress={() => removeBlack(item().key)} class="h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted">
-                                {Icon({ scheme: colorScheme(), name: "x", class: "h-3.5 w-3.5", color: "danger-soft-fg" })}
-                              </Button>
+                              {IconButton({ testID: `black-remove-${index()}`, name: "x", onPress: () => removeBlack(item().key), class: "h-7 w-7 rounded-(--radius) bg-transparent active:bg-muted", iconClass: "h-3.5 w-3.5", color: "danger-soft-fg", label: "移出黑名单" })}
                             </View>
                           </View>
                         )}
@@ -1180,17 +1126,9 @@ function Board() {
                   <Text class="text-[12px] font-medium text-muted-foreground">日志</Text>
                   <Text class="ml-1 rounded bg-muted px-1.5 font-mono text-[10px] text-faint">{logs().length}</Text>
                 </Button>
-                <Button onPress={() => { Clipboard.writeText(logs().join("\n")); log("日志已复制"); }} class="h-6 flex-row items-center gap-1 rounded px-1.5 bg-transparent active:bg-muted">
-                  {Icon({ scheme: colorScheme(), name: "copy", class: "h-3 w-3", color: "faint" })}
-                  <Text class="text-[11px] text-faint">复制</Text>
-                </Button>
-                <Button onPress={() => logs.set([])} class="h-6 flex-row items-center gap-1 rounded px-1.5 bg-transparent active:bg-danger-soft-bg">
-                  {Icon({ scheme: colorScheme(), name: "trash", class: "h-3 w-3", color: "faint" })}
-                  <Text class="text-[11px] text-faint">清空</Text>
-                </Button>
-                <Button onPress={() => logOpen.update((v) => !v)} class="ml-1 h-6 w-6 rounded bg-transparent active:bg-muted">
-                  {Icon({ scheme: colorScheme(), name: "chevron", class: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
-                </Button>
+                {IconButton({ geomKey: "log-copy", name: "copy", text: "复制", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => { Clipboard.writeText(logs().join("\n")); log("日志已复制"); }, class: "h-6 rounded px-1.5 bg-transparent active:bg-muted" })}
+                {IconButton({ geomKey: "log-clear", name: "trash", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => logs.set([]), class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
+                {IconButton({ geomKey: "log-chevron", name: "chevron", onPress: () => logOpen.update((v) => !v), class: "ml-1 h-6 w-6 rounded bg-transparent active:bg-muted", iconClass: `h-3.5 w-3.5 ${logOpen() ? "rotate-180" : ""}`, color: "faint" })}
               </View>
               <If when={logOpen()}>
                 <Scroll class="max-h-[220px] bg-background">

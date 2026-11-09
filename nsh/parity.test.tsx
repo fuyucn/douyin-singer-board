@@ -5,7 +5,7 @@ test("about dialog shows version, repo and update action", async () => {
   await app.press("id:about");
   const texts = app.texts();
   expect(texts).toContain("SUSUSongBoard");
-  expect(texts).toContain("v0.6.0 · NSH 原生版");
+  expect(texts).toContain("v0.6.1 · NSH 原生版");
   expect(texts).toContain("仓库：fuyucn/douyin-singer-board · 分支 nsh");
   expect(texts).toContain("检查更新");
   await app.press("id:about-close");
