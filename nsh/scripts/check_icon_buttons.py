@@ -59,10 +59,17 @@ if 'color: "#ffffff"' not in board:
     errors.append("Board.tsx: Stop icon is no longer white (original text-white)")
 # User-requested palette: green start, red stop (the original Tauri app used a
 # neutral fg-base start button). Keep it guarded so it cannot drift back.
-if 'testID: "start"' in board and 'bg-success active:bg-success-hover' not in board:
-    errors.append("Board.tsx: Start button lost the green success palette")
-if 'testID: "stop"' in board and 'bg-destructive active:bg-danger-hover' not in board:
-    errors.append("Board.tsx: Stop button lost the red danger palette")
+# Locate the actual call sites, not a whole-file substring (which a stale
+# comment could satisfy).
+for testid, palette, label in (
+    ('testID: "start"', 'bg-success active:bg-success-hover', 'green Start'),
+    ('testID: "stop"', 'bg-[#c5403c] active:bg-danger-hover', 'red Stop'),
+):
+    pos = board.find(testid)
+    if pos < 0:
+        errors.append(f"Board.tsx: {label} button not found")
+    elif palette not in board[pos:pos + 400]:
+        errors.append(f"Board.tsx: {label} lost its palette ({palette})")
 if 'props.color.startsWith("#")' not in ui:
     errors.append("ui.tsx: Icon() no longer accepts raw hex colors")
 

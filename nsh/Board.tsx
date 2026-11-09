@@ -868,7 +868,7 @@ function Board() {
           {IconButton({ testID: "settings", name: "settings", onPress: () => openSettings("general"), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "about", name: "info", onPress: () => openSettings("about"), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-success active:bg-success-hover", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
-            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive active:bg-danger-hover", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
+            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-[#c5403c] active:bg-danger-hover", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
           </If>
         </View>
       </View>

@@ -171,12 +171,19 @@ The user asked for a green Start and red Stop button. Measured from
 
 | Theme | Start background | Stop background |
 |---|---|---|
-| light | rgb(74, 136, 105) green | red + white square |
-| dark | rgb(113, 187, 149) green | rgb(224, 131, 123) red + white square |
+| light | rgb(74, 136, 105) green | rgb(182, 74, 66) red + white square |
+| dark | rgb(113, 187, 149) green | rgb(182, 74, 66) red + white square |
 
-Implementation: `bg-success active:bg-success-hover` for Start,
-`bg-destructive active:bg-danger-hover` for Stop; the Start glyph keeps
-`color="background"` so it stays legible on green in both themes.
+Implementation: `bg-success active:bg-success-hover` for Start, and a fixed
+`bg-[#c5403c] active:bg-danger-hover` for Stop. The theme's dark
+`destructive` token is a pale salmon (#ef7d77); a white square on it was only
+~2.4:1 contrast, so Stop now uses the same unambiguous red in both themes
+(~5.5:1). The Start glyph keeps `color="background"` (dark on pale green in
+dark theme, near-white on deep green in light theme).
+
+Not verified: icon color after switching theme at runtime (the data-URI SVG
+pipeline froze colors once before), `active:` hover rendering (static
+screenshots never trigger it), and Windows Direct2D color/DPI output.
 
 **This is an intentional deviation from the original Tauri app**, whose Start
 button is `bg-[var(--fg-base)]` — near-black in light theme, near-white in
