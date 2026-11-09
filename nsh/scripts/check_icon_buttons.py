@@ -43,7 +43,24 @@ if 'layout = props.text ? "flex-row items-center justify-center gap-1" : "items-
 if "class={`${layout} ${props.class}`}" not in ui:
     errors.append("ui.tsx: IconButton no longer applies the centering layout")
 
-# 3. Sizes taken from the original Tauri app (src/components/...). Every
+# 3. Start/Stop box model. The original's shadcn base class has a 1px
+#    transparent border, so size-8 (32px) paints a 30x30 visible box with a
+#    6px radius. Keep the exact class that reproduces it; the geometry tests
+#    only assert centering, they do not assert this box.
+STOP_START_BOX = 'ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px]'
+for testid in ("start", "stop"):
+    marker = f'testID: "{testid}"'
+    pos = board.find(marker)
+    if pos < 0:
+        errors.append(f"Board.tsx: {testid} IconButton not found")
+    elif STOP_START_BOX not in board[pos:pos + 400]:
+        errors.append(f"Board.tsx: {testid} lost the original 30x30/6px box class")
+if 'color: "#ffffff"' not in board:
+    errors.append("Board.tsx: Stop icon is no longer white (original text-white)")
+if 'props.color.startsWith("#")' not in ui:
+    errors.append("ui.tsx: Icon() no longer accepts raw hex colors")
+
+# 4. Sizes taken from the original Tauri app (src/components/...). Every
 #    icon-bearing call site must use one of these explicit sizes.
 ORIGINAL_SIZES = {
     "header": (30, 15),
@@ -71,6 +88,7 @@ for name, (box, icon) in ORIGINAL_SIZES.items():
 print(f"IconButton call sites in Board.tsx: {board.count('IconButton({')}")
 print(f"Raw <Button> blocks: {len(buttons)} (all must be centered)")
 print(f"Standalone Icon() (non-button): {board.count('Icon({')}")
+print(f"Start/Stop box guard: {STOP_START_BOX}")
 print("Note: App.tsx is the POC entry, not the shipping Board.tsx; it is outside this guard.")
 
 if errors:

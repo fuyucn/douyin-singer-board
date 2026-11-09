@@ -33,13 +33,23 @@ text button carries `items-center justify-center`. Three guards keep it that way
 |---|---|---|
 | Original | x 853..882, y 11..40 (30x30) | 4.0pt |
 | 0.6.2 | x 852..883.5, y 9.5..41 (32x32) | 5.5pt |
-| **0.6.3** | **x 853..882.5, y 10.5..40 (30x30)** | **3.5pt** |
+| **0.6.3** | **x 853..882.5, y 10.5..40 (~30x30)** | **3.5pt** |
 
 The original's shadcn base class has `border border-transparent`, so a
 `size-8` (32px) button paints a 30x30 rounded box. 0.6.3 uses an explicit
-`h-[30px] w-[30px] rounded-[6px] mr-[1px]` to match it. The Stop button uses
-the same box and now draws a **white** filled square (`text-white` in the
-original), not the dark `destructive-foreground` token.
+`ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px]` to match it: the 9pt
+left + 1pt right margin keeps the right action group's footprint at 40pt, so
+the three preceding icon buttons stay at 756.8 / 790.8 / 824.8 (measured in
+0.6.3). The Stop button uses the same box and now draws a **white** filled
+square (`text-white` in the original), not the dark `destructive-foreground`
+token. `scripts/check_icon_buttons.py` asserts this exact class string, the
+white color and `Icon()`'s hex support, because the geometry tests only cover
+centering.
+
+The 3.5pt top-corner inset still differs from the original's 4.0pt by 0.5pt;
+at 2x sampling the inset metric is coarse and cannot prove a 6px vs
+`bg-clip-padding` 5px radius difference. The radius is therefore reported as
+"within 0.5pt", not as an exact match.
 
 ## Icon centering (start button, dark theme)
 
@@ -79,9 +89,11 @@ Icon x centers at 900px wide:
 | Original, kugou disabled (2 icons) | 790.5 | — | 825.0 | 868 |
 | Original, kugou enabled (3 icons) | 756.8 | 790.8 | 824.8 | 868 |
 | 0.6.0 (3 icons, gap-3) | 732.8 | 774.8 | 816.8 | 868 |
-| **0.6.1 (3 icons, gap-1)** | **756.8** | **790.8** | **824.8** | **868** |
+| **0.6.3 (3 icons, gap-1)** | **756.8** | **790.8** | **824.8** | **866.5** |
 
-0.6.1/0.6.2 matches the original's **three-icon** layout exactly. When the
+0.6.3 matches the original's **three-icon** layout for the first three
+icons exactly; the start glyph center is 866.5 vs the original's 867.3
+(-0.8pt, within the 1pt icon tolerance). When the
 original has Kugou disabled it shows only two icons (790.5 / 825.0); NSH always
 shows three, so that branch is ~34pt further left. That is a known branch
 difference, not a measured match.
@@ -139,7 +151,7 @@ These come from NSH's native layout defaults, not from missing classes:
 Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 `src/components/BlacklistPanel.tsx` and `src/App.tsx`:
 
-| Area | Original | NSH 0.6.2 | Status |
+| Area | Original | NSH 0.6.3 | Status |
 |---|---|---|---|
 | Header middle button | Kugou login icon (when `kugou_enabled`) | Settings gear | Follows "plugins in Settings", not separately confirmed |
 | About modal | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
@@ -147,9 +159,17 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Log panel visibility | toggled from About | shown automatically once logs exist | Simplified |
 | Stop icon | white filled square (`fill-current text-white`) | white filled square from 0.6.3 | Fixed; verified in `final-stop.png` (connected state) |
 | Button labels | inline-flex centered | centered from 0.6.2 | Fixed |
-| Start/stop box | visible 30x30, radius 6px | 30x30, radius 6px from 0.6.3 | Fixed |
+| Start/stop box | visible 30x30, radius 6px | 30x30, radius 6px from 0.6.3 | Fixed; corner inset within 0.5pt |
+| Header ghost icon buttons | size 30px incl. 1px border; hover highlight 28x28 | 30x30, radius 6.4pt | Known 2pt difference in hover state only; not changed to avoid shifting the group |
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
+
+## Evidence location
+
+The connected/Stop screenshot and all other screenshots live in the delivery
+folder `~/Desktop/nsh-singe/screenshots/` (not in the repo). `button-check.html`
+in the same folder embeds zoomed crops as data URIs, so it opens on a phone
+without any sibling files.
 
 ## Not done in this pass (previous review items P4 / P6)
 

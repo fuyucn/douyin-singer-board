@@ -786,8 +786,8 @@ function Board() {
           {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "settings", name: "settings", onPress: () => settingsOpen.set(true), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "about", name: "info", onPress: () => aboutOpen.set(true), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-2 mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
-            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-2 mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
+          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
+            {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
           </If>
         </View>
       </View>
