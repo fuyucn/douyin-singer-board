@@ -16,6 +16,10 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("点歌列表 (0)");
 
   await app.press("id:settings");
+  expect(app.texts()).toContain("常规");
+  expect(app.texts()).toContain("外观");
+  expect(app.texts()).not.toContain("平台插件");
+  await app.press("id:settings-tab-plugin");
   expect(app.texts()).toContain("平台插件");
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");

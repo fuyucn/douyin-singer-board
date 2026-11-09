@@ -154,8 +154,8 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Area | Original | NSH 0.6.3 | Status |
 |---|---|---|---|
 | Header middle button | Kugou login icon (when `kugou_enabled`) | Settings gear | Follows "plugins in Settings", not separately confirmed |
-| About modal | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
-| Settings dialog | none (config in left panel) | appearance + platform plugin picker | Follows "plugins in Settings" |
+| About | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | 关于 tab in Settings: version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
+| Settings dialog | none (config in left panel) | one modal with 常规 / 插件 / 关于 tabs | Follows "plugins in Settings" + 0.7.0 tabs request |
 | Log panel visibility | toggled from About | shown automatically once logs exist | Simplified |
 | Stop icon | white filled square (`fill-current text-white`) | white filled square from 0.6.3 | Fixed; verified in `final-stop.png` (connected state) |
 | Button labels | inline-flex centered | centered from 0.6.2 | Fixed |
@@ -163,6 +163,18 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Header ghost icon buttons | size 30px incl. 1px border; hover highlight 28x28 | 30x30, radius 6.4pt | Known 2pt difference in hover state only; not changed to avoid shifting the group |
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
+
+## 0.7.0 Settings tabs
+
+The single modal is 560x520pt (fits the 880x560 minimum window). Its header
+keeps the 48pt title bar, then a 40pt underline tab row reusing the main
+window's tab style. Only the selected tab is mounted (`If`), so hidden tab
+text never leaks into `app.texts()`. Tab testIDs: `settings-tab-general`,
+`settings-tab-plugin`, `settings-tab-about`; close is `settings-close`.
+
+Icon geometry measurements above are from 0.6.3 and were not retaken for
+0.7.0: the header buttons themselves did not change, only where their
+`onPress` navigates.
 
 ## Evidence location
 

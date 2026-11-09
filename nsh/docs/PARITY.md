@@ -39,6 +39,9 @@ Branches:
 > `ui.tsx` `IconButton()` and every raw text button carries
 > `items-center justify-center`. The header right group is back to the original
 > `gap-1` + `ml-2` spacing, and the Stop icon is a white filled square again.
+> 0.7.0 merges the Settings dialog and the About dialog into one modal with
+> three underline tabs (general / plugin / about). The header info button opens
+> Settings directly on the about tab; "管理酷狗" opens it on the plugin tab.
 > 0.6.3 matches the original's visible 30x30 start/stop box (its shadcn base
 > class has a 1px transparent border) and its 6px radius. Two headless
 > geometry tests plus a source guard (also on the Linux PR gate) protect it.

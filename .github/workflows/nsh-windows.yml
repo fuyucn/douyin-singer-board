@@ -78,7 +78,9 @@ jobs:
 
       - name: Icon button parity guard
         shell: pwsh
-        run: python scripts/check_icon_buttons.py
+        run: |
+          python scripts/check_icon_buttons.py
+          python scripts/check_versions.py
 
       - name: WebSocket Cookie header
         run: nsh test ws-cookie.test.ts
@@ -112,7 +114,7 @@ jobs:
       - name: Smoke portable exe
         shell: pwsh
         run: |
-          Start-Process "dist\SUSUSongBoard-Portable-0.6.3.exe"
+          Start-Process "dist\SUSUSongBoard-Portable-0.7.0.exe"
           Start-Sleep -Seconds 10
           $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
           if (-not $app) { throw "portable exe did not start the app" }
@@ -125,6 +127,6 @@ jobs:
           name: SUSUSongBoard-windows
           path: |
             nsh/dist/SUSUSongBoard.zip
-            nsh/dist/SUSUSongBoard-Setup-0.6.3.exe
-            nsh/dist/SUSUSongBoard-Portable-0.6.3.exe
+            nsh/dist/SUSUSongBoard-Setup-0.7.0.exe
+            nsh/dist/SUSUSongBoard-Portable-0.7.0.exe
           if-no-files-found: error

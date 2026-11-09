@@ -35,5 +35,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Icon and text button centering guard
-        run: python nsh/scripts/check_icon_buttons.py
+      - name: Icon / text button and version guards
+        run: |
+          python nsh/scripts/check_icon_buttons.py
+          python nsh/scripts/check_versions.py

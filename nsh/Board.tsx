@@ -19,7 +19,7 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.6.3";
+const APP_VERSION = "0.7.0";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -84,6 +84,11 @@ function Board() {
   const blackInput = signal("");
   const activeTab = signal<Tab>("songs");
   const settingsOpen = signal(false);
+  const settingsTab = signal<"general" | "plugin" | "about">("general");
+  const openSettings = (tab: "general" | "plugin" | "about" = "general") => {
+    settingsTab.set(tab);
+    settingsOpen.set(true);
+  };
   const themeMode = signal<"system" | "light" | "dark">("system");
   const selectedRow = signal<number | null>(null);
   const playedQuery = signal("");
@@ -99,7 +104,6 @@ function Board() {
   const kgMsg = signal("");
   const kgCache = signal<Record<string, SearchState>>({});
   const blackType = signal<"song" | "singer">("song");
-  const aboutOpen = signal(false);
   const aboutMsg = signal("");
   const aboutBusy = signal(false);
   const nowTick = signal(Math.floor(Date.now() / 1000));
@@ -784,8 +788,8 @@ function Board() {
             gap-1; start/stop adds ml-2. Keep that so the icon slots line up. */}
         <View class="flex-row items-center gap-1">
           {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          {IconButton({ testID: "settings", name: "settings", onPress: () => settingsOpen.set(true), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          {IconButton({ testID: "about", name: "info", onPress: () => aboutOpen.set(true), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "settings", name: "settings", onPress: () => openSettings("general"), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "about", name: "info", onPress: () => openSettings("about"), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
             {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-destructive", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
           </If>
@@ -893,7 +897,7 @@ function Board() {
                         class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                       />
                       <View class="flex-row gap-2">
-                        <Button onPress={() => settingsOpen.set(true)} class="items-center justify-center h-8 flex-1 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
+                        <Button onPress={() => openSettings("plugin")} class="items-center justify-center h-8 flex-1 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
                           <Text class="text-xs text-foreground">管理酷狗</Text>
                         </Button>
                         <Button
@@ -1183,32 +1187,64 @@ function Board() {
         class="m-auto w-[560px] rounded-(--radius) border border-line bg-card shadow-2xl"
         backdropClass="bg-overlay"
       >
-        <View class="h-[620px]">
+        <View class="h-[520px]">
           <View class="h-[48px] flex-row items-center border-b border-line px-4">
             <Text class="text-[14px] font-semibold text-foreground">设置</Text>
             <View class="flex-1" />
-            <Button onPress={() => settingsOpen.set(false)} class="items-center justify-center rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
+            <Button testID="settings-close" onPress={() => settingsOpen.set(false)} class="items-center justify-center rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
               <Text class="text-[12px] text-foreground">关闭</Text>
             </Button>
           </View>
+          <View class="h-10 flex-row items-center gap-1 border-b border-line px-4">
+            <Each of={(["general", "plugin", "about"] as const)} key={(t: any) => t}>
+              {(tab: any) => (
+                <Button
+                  testID={`settings-tab-${tab()}`}
+                  onPress={() => settingsTab.set(tab())}
+                  class={`h-9 items-center justify-center rounded-none border-0 border-b-2 bg-transparent px-3 ${settingsTab() === tab() ? "border-foreground" : "border-transparent"}`}
+                >
+                  <Text class={`text-[12px] font-medium ${settingsTab() === tab() ? "text-foreground" : "text-muted-foreground"}`}>
+                    {tab() === "general" ? "常规" : tab() === "plugin" ? "插件" : "关于"}
+                  </Text>
+                </Button>
+              )}
+            </Each>
+          </View>
           <Scroll class="flex-1 p-4">
             <View class="gap-3">
-              <Text class="text-[13px] font-semibold text-foreground">外观</Text>
-              <View class="flex-row gap-2">
-                <Each of={(["system", "light", "dark"] as const)} key={(m: any) => m}>
-                  {(mode: any) => (
-                    <Button
-                      onPress={() => applyTheme(mode())}
-                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${themeMode() === mode() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
-                    >
-                      <Text class={`text-[11px] ${themeMode() === mode() ? "text-primary-foreground" : "text-foreground"}`}>
-                        {mode() === "system" ? "跟随系统" : mode() === "light" ? "亮色" : "暗色"}
-                      </Text>
-                    </Button>
-                  )}
-                </Each>
-              </View>
-              <View class="h-px bg-muted" />
+              <If when={settingsTab() === "general"}>
+                <View class="gap-3">
+                  <Text class="text-[13px] font-semibold text-foreground">外观</Text>
+                  <View class="flex-row gap-2">
+                    <Each of={(["system", "light", "dark"] as const)} key={(m: any) => m}>
+                      {(mode: any) => (
+                        <Button
+                          onPress={() => applyTheme(mode())}
+                          class={`items-center justify-center rounded-[6px] px-3 py-1 ${themeMode() === mode() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                        >
+                          <Text class={`text-[11px] ${themeMode() === mode() ? "text-primary-foreground" : "text-foreground"}`}>
+                            {mode() === "system" ? "跟随系统" : mode() === "light" ? "亮色" : "暗色"}
+                          </Text>
+                        </Button>
+                      )}
+                    </Each>
+                  </View>
+                  <View class="h-px bg-muted" />
+                  <Text class="text-[13px] font-semibold text-foreground">运行信息</Text>
+                  <View class="gap-1 rounded-[6px] border border-line px-3 py-2">
+                    <Text class="text-[12px] text-muted-foreground">直播间 ID：{config().room_id || "—"}</Text>
+                    <Text class="text-[12px] text-muted-foreground">版本：v{APP_VERSION}</Text>
+                    <Text class="text-[12px] text-muted-foreground">运行要求：Windows 10 1809+ / macOS 14+</Text>
+                  </View>
+                  <Text class="text-[11px] text-faint">直播间配置、点歌规则与手动点歌都在左侧面板；自动同步与登录在插件页。</Text>
+                  <Button testID="go-plugin" onPress={() => settingsTab.set("plugin")} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                    <Text class="text-[12px] text-foreground">前往插件设置 →</Text>
+                  </Button>
+                </View>
+              </If>
+              <If when={settingsTab() === "plugin"}>
+                <View class="gap-3">
+
               <Text class="text-[13px] font-semibold text-foreground">平台插件</Text>
               <Text class="text-[11px] text-faint">同一时间只启用一个平台插件；切换后另一个平台的登录与自动同步会停用。</Text>
               <View class="flex-row items-center gap-2 rounded-[6px] border border-line px-3 py-2">
@@ -1349,39 +1385,34 @@ function Board() {
               <If when={config().active_plugin === "kugou" && !config().kugou_enabled}>
                 <Text class="text-[12px] text-faint">酷狗服务已停用，上方开关可重新启用。</Text>
               </If>
+
+                </View>
+              </If>
+              <If when={settingsTab() === "about"}>
+                <View class="gap-3">
+                  <View class="flex-row items-center gap-3">
+                    <Image src={logo} class="h-10 w-10 rounded-[4px]" />
+                    <View class="flex-1">
+                      <Text class="text-[14px] font-semibold text-foreground">SUSUSongBoard</Text>
+                      <Text class="text-[11px] text-faint">v{APP_VERSION} · NSH 原生版</Text>
+                    </View>
+                  </View>
+                  <View class="h-px bg-line" />
+                  <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
+                  <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
+                  <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
+                  <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                    <Text class="text-[12px] text-primary-foreground">{aboutBusy() ? "检查中…" : "检查更新"}</Text>
+                  </Button>
+                  <Text class="text-[11px] text-muted-foreground">{aboutMsg()}</Text>
+                  <Text class="text-[10px] text-faint">更新源尚未配置时，请到 GitHub Releases 手动下载。</Text>
+                </View>
+              </If>
             </View>
           </Scroll>
         </View>
       </Dialog>
 
-      <Dialog
-        open={aboutOpen()}
-        onOpenChange={({ open }: any) => aboutOpen.set(open)}
-        class="m-auto w-[400px] rounded-(--radius) border border-line bg-card shadow-2xl"
-        backdropClass="bg-overlay"
-      >
-        <View class="gap-3 p-5">
-          <View class="flex-row items-center gap-3">
-            <Image src={logo} class="h-10 w-10 rounded-[4px]" />
-            <View class="flex-1">
-              <Text class="text-[14px] font-semibold text-foreground">SUSUSongBoard</Text>
-              <Text class="text-[11px] text-faint">v{APP_VERSION} · NSH 原生版</Text>
-            </View>
-            <Button testID="about-close" onPress={() => aboutOpen.set(false)} class="items-center justify-center rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
-              <Text class="text-[12px] text-foreground">关闭</Text>
-            </Button>
-          </View>
-          <View class="h-px bg-line" />
-          <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
-          <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
-          <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
-          <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
-            <Text class="text-[12px] text-primary-foreground">{aboutBusy() ? "检查中…" : "检查更新"}</Text>
-          </Button>
-          <Text class="text-[11px] text-muted-foreground">{aboutMsg()}</Text>
-          <Text class="text-[10px] text-faint">更新源尚未配置时，请到 GitHub Releases 手动下载。</Text>
-        </View>
-      </Dialog>
     </View>
   );
 }

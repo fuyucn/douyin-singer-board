@@ -163,6 +163,7 @@ test("worker restart during an in-flight write does not replay it", async () => 
   await app.wait(2100);
   expect(adds).toBe(1);
   await app.press("id:settings");
+  await app.press("id:settings-tab-plugin");
   await app.press("id:kugou-toggle");
   await app.press("id:kugou-toggle");
   await app.press("关闭");
