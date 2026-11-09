@@ -24,10 +24,11 @@ Branches:
 - Old app's Kugou token still valid: 5 playlists incl. `测试4` (listid 27),
   so playlist APIs can be tested without scanning.
 
->>> STATUS: P0 shell and P1 core are built in `Board.tsx`: header, settings,
-> tabs for 点歌 / 已点 / 黑名单, song table, log, manual add, simulated request,
-> mark-played/delete, blacklist add/remove, config persistence, matcher and
-> listener wiring. macOS test passes. Windows CI is green: matcher unit test,
+>>> STATUS: P0 shell, P1 core and the original layout are in `Board.tsx`:
+> header (theme/settings/start-stop), left settings panel, 点歌 / 已点歌单 /
+> 黑名单 tabs, song table, log, manual add, mark-played/delete, blacklist,
+> config persistence. Kugou moved out of the main tabs into a Settings dialog
+> with a single active platform plugin (Kugou / NetEase placeholder). macOS test passes. Windows CI is green: matcher unit test,
 > UI test (tabs, mark-played, blacklist), Cookie handshake (with WS write/read),
 > live Douyin handshake, packaging, NSIS installer, single-file portable exe,
 > and a smoke run that extracts and launches the app.

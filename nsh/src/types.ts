@@ -12,6 +12,7 @@ export interface Config {
   kugou_enabled: boolean;
   blacklist?: string[];
   auto_sync?: boolean;
+  active_plugin?: "kugou" | "netease" | "";
 }
 
 export interface DanmuInfo {

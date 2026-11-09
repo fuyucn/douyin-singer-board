@@ -1,5 +1,6 @@
-import { Clipboard, effect, Image, mount, Scroll, signal, Storage, Text, View } from "nsh";
-import { Button, DataTable, Input, type DataTableColumn } from "nsh/base";
+import { Clipboard, colorScheme, effect, Image, mount, Scroll, setColorScheme, signal, Storage, Text, View } from "nsh";
+import icon from "./assets/icon.png";
+import { Button, DataTable, Dialog, Input, type DataTableColumn } from "nsh/base";
 import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
@@ -15,7 +16,12 @@ import {
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
-type Tab = "songs" | "played" | "blacklist" | "kugou";
+type Tab = "songs" | "played" | "blacklist";
+type PluginId = "kugou" | "netease";
+const PLUGINS = [
+  { id: "kugou", name: "酷狗音乐", version: "内置 v0.1.0", note: "登录、歌单、搜索、自动同步" },
+  { id: "netease", name: "网易云音乐", version: "未接入", note: "占位；同一时间只启用一个平台" },
+];
 type KugouSession = { token: string; userid: string; dfid?: string; nickname?: string };
 type PlayedInfo = DanmuInfo & { played_at: number };
 
@@ -54,6 +60,7 @@ function Board() {
     kugou_enabled: false,
     blacklist: [],
     auto_sync: false,
+    active_plugin: "kugou",
   });
   const status = signal("未连接");
   const roomName = signal("");
@@ -63,6 +70,7 @@ function Board() {
   const manual = signal("");
   const blackInput = signal("");
   const activeTab = signal<Tab>("songs");
+  const settingsOpen = signal(false);
   const selectedRow = signal<number | null>(null);
 
   const kugou = signal<KugouSession | null>(null);
@@ -94,6 +102,18 @@ function Board() {
     if (!configLoaded) return;
     Storage.setItem("board.config", JSON.stringify(config())).catch(() => {});
   });
+
+  Storage.getItem("board.theme")
+    .then((raw) => {
+      if (raw === "light" || raw === "dark" || raw === "system") setColorScheme(raw);
+    })
+    .catch(() => {});
+
+  const toggleTheme = () => {
+    const next = colorScheme() === "dark" ? "light" : "dark";
+    setColorScheme(next);
+    Storage.setItem("board.theme", next).catch(() => {});
+  };
 
   const saveSession = (sess: KugouSession) => {
     kugou.set(sess);
@@ -377,18 +397,6 @@ function Board() {
     manual.set("");
   };
 
-  const simulate = () => {
-    const r = matcher.match({
-      uid: "test",
-      uname: "测试观众",
-      content: `点歌 ${manual().trim() || "晴天"}`,
-      medal_level: 0,
-      medal_name: "",
-    });
-    if (r.kind === "song") addSong(r.danmu);
-    else log(`模拟未匹配: ${r.reason}`);
-  };
-
   const copyNames = (list: { song_name: string }[], label: string) => {
     Clipboard.writeText(list.map((s) => s.song_name).join("\n"));
     log(`已复制${label} ${list.length} 首`);
@@ -404,7 +412,7 @@ function Board() {
 
     const sess = kugou();
     const target = config().target_playlist_id;
-    if ((config().auto_sync ?? false) && sess && target) {
+    if (config().active_plugin === "kugou" && (config().auto_sync ?? false) && sess && target) {
       search({ keyword: song.song_name, pagesize: 3 })
         .then((tracks) => {
           const track = tracks[0];
@@ -439,218 +447,228 @@ function Board() {
     log(`移出黑名单: ${name}`);
   };
 
+  const running = () => ["解析房间...", "连接中...", "已连接"].includes(status());
+
   const tabButton = (key: Tab, label: string) => (
     <Button
       onPress={() => { activeTab.set(key); selectedRow.set(null); }}
-      class={`rounded-[6px] px-3 py-1 ${activeTab() === key ? "bg-[#2f6fb0]" : "border border-[#d7dce2] active:bg-[#f4f6f8]"}`}
+      class={`rounded-[6px] px-3 py-1 ${activeTab() === key ? "bg-[#2f6fb0] dark:bg-[#3d7fbe]" : "border border-[#d7dce2] dark:border-[#3a4048] active:bg-[#f4f6f8] dark:bg-[#17191b]"}`}
     >
-      <Text class={`text-[12px] ${activeTab() === key ? "text-white" : "text-[#191d24]"}`}>{label}</Text>
+      <Text class={`text-[12px] ${activeTab() === key ? "text-white" : "text-[#191d24] dark:text-[#e7e9ec]"}`}>{label}</Text>
     </Button>
   );
 
   return (
-    <View class="flex-1 bg-[#f4f6f8]">
-      <View class="h-[52px] flex-row items-center gap-3 border-b border-[#e3e7ec] bg-white px-4">
-        <Text class="text-sm font-semibold text-[#191d24]">SUSUSongBoard</Text>
-        <Text class="text-[11px] text-[#88919f]">NSH 迁移版</Text>
-        <View class={`h-2 w-2 rounded-full ${status() === "已连接" ? "bg-[#2e8a66]" : "bg-[#c2c8d0]"}`} />
-        <Text class="text-xs text-[#59616e]">{status()}</Text>
-        <Text class="text-xs text-[#88919f]">{roomName()}</Text>
+    <View class="flex-1 bg-[#f4f6f8] dark:bg-[#17191b]">
+      <View class="h-[52px] flex-row items-center gap-3 border-b border-[#e3e7ec] dark:border-[#2b3036] bg-white dark:bg-[#1f2227] px-4">
+        <Image src={icon} class="h-6 w-6 rounded-[6px]" />
+        <Text class="text-sm font-semibold whitespace-nowrap text-[#191d24] dark:text-[#e7e9ec]">SUSUSongBoard</Text>
+        <View class={`h-2 w-2 rounded-full ${status() === "已连接" ? "bg-[#2e8a66]" : "bg-[#c2c8d0] dark:bg-[#4a515a]"}`} />
+        <Text class="text-xs text-[#59616e] dark:text-[#a9b1bd]">{status()}</Text>
+        <Text class="max-w-[180px] truncate text-xs text-[#88919f] dark:text-[#7e8795]">{roomName()}</Text>
         <View class="flex-1" />
-        <Text class="text-[11px] text-[#88919f]">0.3.1</Text>
+        <Button onPress={toggleTheme} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+          <Text class="text-[13px] text-[#191d24] dark:text-[#e7e9ec]">{colorScheme() === "dark" ? "☀" : "☾"}</Text>
+        </Button>
+        <Button onPress={() => settingsOpen.set(true)} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+          <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">设置</Text>
+        </Button>
+        <Button
+          onPress={() => (running() ? stop() : start())}
+          class={`rounded-[6px] px-3 py-1 active:opacity-80 ${running() ? "border border-[#d7dce2] dark:border-[#3a4048] bg-white dark:bg-[#1f2227]" : "bg-[#2f6fb0] dark:bg-[#3d7fbe]"}`}
+        >
+          <Text class={`text-[12px] ${running() ? "text-[#191d24] dark:text-[#e7e9ec]" : "text-white"}`}>{running() ? "停止" : "开始"}</Text>
+        </Button>
       </View>
 
       <View class="flex-1 flex-row">
-        <Scroll class="h-full w-[280px] border-r border-[#e3e7ec] bg-white">
+        <Scroll class="h-full w-[280px] border-r border-[#e3e7ec] dark:border-[#2b3036] bg-white dark:bg-[#1f2227]">
           <View class="gap-3 p-4">
-          <Text class="text-[13px] font-semibold text-[#191d24]">连接</Text>
+          <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">直播间配置</Text>
           <View class="gap-2">
-            <Text class="text-[12px] text-[#59616e]">抖音房间号</Text>
+            <View class="flex-row items-center justify-between gap-2">
+              <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">抖音直播间 ID</Text>
+              <If when={roomName()}>
+                <View class="flex-row items-center gap-1">
+                  <View class="h-1.5 w-1.5 rounded-full bg-[#2e8a66]" />
+                  <Text class="max-w-[120px] truncate text-[11px] text-[#59616e] dark:text-[#a9b1bd]">{roomName()}</Text>
+                </View>
+              </If>
+            </View>
             <Input
               value={config().room_id}
               onChange={({ value }) => patch({ room_id: value })}
               onSubmit={start}
               placeholder="例如 145997388006"
-              class="rounded-[6px] border border-[#d7dce2] px-3 py-2 text-[13px] text-[#191d24]"
+              class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-2 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
             />
-            <View class="flex-row gap-2">
-              <Button onPress={start} class="flex-1 rounded-[6px] bg-[#2f6fb0] px-3 py-2 active:opacity-80">
-                <Text class="text-[13px] text-white">连接</Text>
-              </Button>
-              <Button onPress={stop} class="rounded-[6px] border border-[#d7dce2] px-3 py-2 active:bg-[#f4f6f8]">
-                <Text class="text-[13px] text-[#191d24]">断开</Text>
-              </Button>
-            </View>
-            <Text class="text-[11px] text-[#88919f]">状态：{status()}</Text>
-          </View>
-
-          <View class="h-px bg-[#e3e7ec]" />
-          <Text class="text-[13px] font-semibold text-[#191d24]">点歌规则</Text>
-          <View class="gap-2">
-            <Text class="text-[12px] text-[#59616e]">点歌模板</Text>
+            <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">点歌指令模板</Text>
             <Input
               value={config().sing_prefix}
               onChange={({ value }) => patch({ sing_prefix: value })}
-              class="rounded-[6px] border border-[#d7dce2] px-3 py-2 text-[13px] text-[#191d24]"
+              class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-2 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
             />
+          </View>
+
+          <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
+          <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">点歌规则</Text>
+          <View class="gap-2">
             <View class="flex-row items-center gap-2">
-              <Text class="text-[12px] text-[#59616e]">粉丝团最低</Text>
+              <Text class="w-28 text-[12px] text-[#59616e] dark:text-[#a9b1bd]">最低粉丝团等级</Text>
               <Input
                 value={String(config().fans_level)}
                 onChange={({ value }) => patch({ fans_level: num(value) })}
-                class="w-16 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[13px] text-[#191d24]"
+                class="w-16 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
               />
             </View>
             <View class="flex-row items-center gap-2">
-              <Text class="text-[12px] text-[#59616e]">点歌冷却(秒)</Text>
+              <Text class="w-28 text-[12px] text-[#59616e] dark:text-[#a9b1bd]">点歌冷却(秒)</Text>
               <Input
                 value={String(config().sing_cd)}
                 onChange={({ value }) => patch({ sing_cd: num(value) })}
-                class="w-16 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[13px] text-[#191d24]"
+                class="w-16 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
               />
             </View>
             <View class="flex-row items-center gap-2">
-              <Text class="text-[12px] text-[#59616e]">每人上限</Text>
+              <Text class="w-28 text-[12px] text-[#59616e] dark:text-[#a9b1bd]">重复点歌冷却(秒)</Text>
+              <Input
+                value={String(config().cooldown_seconds)}
+                onChange={({ value }) => patch({ cooldown_seconds: num(value) })}
+                class="w-16 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
+              />
+            </View>
+            <View class="flex-row items-center gap-2">
+              <Text class="w-28 text-[12px] text-[#59616e] dark:text-[#a9b1bd]">单人单场上限</Text>
               <Input
                 value={String(config().max_songs_per_user)}
                 onChange={({ value }) => patch({ max_songs_per_user: num(value) })}
-                class="w-16 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[13px] text-[#191d24]"
+                class="w-16 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[13px] text-[#191d24] dark:text-[#e7e9ec]"
               />
             </View>
           </View>
 
-          <View class="h-px bg-[#e3e7ec]" />
-          <Text class="text-[13px] font-semibold text-[#191d24]">本次会话</Text>
+          <If when={config().active_plugin === "kugou"}>
+            <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
+            <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">酷狗歌单</Text>
+            <If when={kugou()} else={
+              <View class="gap-1">
+                <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">尚未登录酷狗</Text>
+                <Button onPress={() => settingsOpen.set(true)} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                  <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">去设置登录</Text>
+                </Button>
+              </View>
+            }>
+              <View class="gap-1">
+                <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">歌单：{config().target_playlist_name || "未选择"}</Text>
+                <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">id: {config().target_playlist_id || "—"} · {kugou()!.nickname ?? kugou()!.userid}</Text>
+                <View class="flex-row gap-2">
+                  <Button onPress={() => settingsOpen.set(true)} class="flex-1 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                    <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">管理酷狗</Text>
+                  </Button>
+                  <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class={`flex-1 rounded-[6px] px-2 py-1 ${config().auto_sync ? "bg-[#2f6fb0] dark:bg-[#3d7fbe] active:opacity-80" : "border border-[#d7dce2] dark:border-[#3a4048] active:bg-[#f4f6f8] dark:bg-[#17191b]"}`}>
+                    <Text class={`text-[11px] ${config().auto_sync ? "text-white" : "text-[#191d24] dark:text-[#e7e9ec]"}`}>{config().auto_sync ? "同步中" : "自动同步"}</Text>
+                  </Button>
+                </View>
+              </View>
+            </If>
+          </If>
+
+          <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
+          <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">本次会话</Text>
           <View class="gap-1">
-            <Text class="text-[12px] text-[#59616e]">待处理：{songs().length}</Text>
-            <Text class="text-[12px] text-[#59616e]">已点：{played().length}</Text>
-            <Text class="text-[12px] text-[#59616e]">黑名单：{bl().length}</Text>
-            <Text class="text-[12px] text-[#59616e]">连接：{status()}</Text>
+            <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">待处理：{songs().length}</Text>
+            <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">已点：{played().length}</Text>
+            <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">黑名单：{bl().length}</Text>
+            <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">连接：{status()}</Text>
           </View>
 
-          <View class="h-px bg-[#e3e7ec]" />
-          <Text class="text-[13px] font-semibold text-[#191d24]">插件</Text>
-          <View class="flex-row items-center gap-2">
-            <View class={`h-2 w-2 rounded-full ${kugou() ? "bg-[#2e8a66]" : "bg-[#c2c8d0]"}`} />
-            <Text class="flex-1 text-[12px] text-[#59616e]">酷狗音乐</Text>
-            <Button
-              onPress={() => { activeTab.set("kugou"); log("打开插件: 酷狗音乐"); }}
-              class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]"
-            >
-              <Text class="text-[11px] text-[#191d24]">打开</Text>
+          <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
+          <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">手动点歌</Text>
+          <View class="flex-row gap-2">
+            <Input
+              value={manual()}
+              onChange={({ value }) => manual.set(value)}
+              onSubmit={addManual}
+              placeholder="输入歌曲名称..."
+              class="min-w-0 flex-1 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[12px] text-[#191d24] dark:text-[#e7e9ec]"
+            />
+            <Button onPress={addManual} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+              <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">添加</Text>
             </Button>
           </View>
-          <Text class="text-[11px] text-[#88919f]">内置 v0.1.0 · 搜索 / 歌单 / 加歌</Text>
+          <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">SUSUSongBoard v0.4.0</Text>
           </View>
         </Scroll>
 
         <View class="flex-1 p-3 gap-2">
           <View class="flex-row items-center gap-2">
             {tabButton("songs", `点歌 ${songs().length}`)}
-            {tabButton("played", `已点 ${played().length}`)}
+            {tabButton("played", `已点歌单 ${played().length}`)}
             {tabButton("blacklist", `黑名单 ${bl().length}`)}
-            {tabButton("kugou", kugou() ? "酷狗 ✓" : "酷狗")}
             <View class="flex-1" />
-            <If when={activeTab() === "songs"}>
-              <Input
-                value={manual()}
-                onChange={({ value }) => manual.set(value)}
-                onSubmit={addManual}
-                placeholder="手动添加歌曲"
-                class="w-36 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
-              />
-              <Button onPress={addManual} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
-                <Text class="text-[12px] text-white">添加</Text>
-              </Button>
-              <Button onPress={simulate} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">模拟</Text>
-              </Button>
-            </If>
             <If when={activeTab() === "blacklist"}>
               <Input
                 value={blackInput()}
                 onChange={({ value }) => blackInput.set(value)}
                 onSubmit={addBlack}
                 placeholder="歌曲名（精确匹配）"
-                class="w-44 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
+                class="w-44 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[12px] text-[#191d24] dark:text-[#e7e9ec]"
               />
-              <Button onPress={addBlack} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
+              <Button onPress={addBlack} class="rounded-[6px] bg-[#2f6fb0] dark:bg-[#3d7fbe] px-3 py-1 active:opacity-80">
                 <Text class="text-[12px] text-white">加入</Text>
-              </Button>
-            </If>
-            <If when={activeTab() === "kugou" && kugou()}>
-              <Input
-                value={kgQuery()}
-                onChange={({ value }) => kgQuery.set(value)}
-                onSubmit={doSearch}
-                placeholder="搜索酷狗歌曲"
-                class="w-40 rounded-[6px] border border-[#d7dce2] px-2 py-1 text-[12px] text-[#191d24]"
-              />
-              <Button onPress={doSearch} class="rounded-[6px] bg-[#2f6fb0] px-3 py-1 active:opacity-80">
-                <Text class="text-[12px] text-white">搜索</Text>
               </Button>
             </If>
           </View>
 
           <View class="flex-row items-center gap-2">
             <If when={activeTab() === "songs"}>
-              <Text class="text-[11px] text-[#88919f]">选中行后可标记已点/删除；双击行也可标记</Text>
+              <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">选中行后可标记已点/删除；双击行也可标记</Text>
               <View class="flex-1" />
               <Button
                 onPress={() => selectedRow() !== null && markPlayed(selectedRow()!)}
-                class={`rounded-[6px] px-3 py-1 ${selectedRow() !== null ? "bg-[#2f6fb0] active:opacity-80" : "bg-[#e3e7ec]"}`}
+                class={`rounded-[6px] px-3 py-1 ${selectedRow() !== null ? "bg-[#2f6fb0] dark:bg-[#3d7fbe] active:opacity-80" : "bg-[#e3e7ec] dark:bg-[#2b3036]"}`}
               >
-                <Text class={`text-[12px] ${selectedRow() !== null ? "text-white" : "text-[#88919f]"}`}>标记已点</Text>
+                <Text class={`text-[12px] ${selectedRow() !== null ? "text-white" : "text-[#88919f] dark:text-[#7e8795]"}`}>标记已点</Text>
               </Button>
               <Button
                 onPress={() => selectedRow() !== null && removeSong(selectedRow()!)}
-                class={`rounded-[6px] border border-[#d7dce2] px-3 py-1 ${selectedRow() !== null ? "active:bg-[#f4f6f8]" : "opacity-50"}`}
+                class={`rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 ${selectedRow() !== null ? "active:bg-[#f4f6f8] dark:bg-[#17191b]" : "opacity-50"}`}
               >
-                <Text class="text-[12px] text-[#191d24]">删除</Text>
+                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">删除</Text>
               </Button>
-              <Button onPress={() => copyNames(songs(), "点歌")} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">复制全部</Text>
+              <Button onPress={() => copyNames(songs(), "点歌")} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">复制全部</Text>
               </Button>
-              <Button onPress={() => { songs.set([]); selectedRow.set(null); }} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">清空</Text>
+              <Button onPress={() => { songs.set([]); selectedRow.set(null); }} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">清空</Text>
               </Button>
             </If>
             <If when={activeTab() === "played"}>
-              <Text class="text-[11px] text-[#88919f]">已点歌单（本次会话）</Text>
+              <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">已点歌单（本次会话）</Text>
               <View class="flex-1" />
-              <Button onPress={() => copyNames(played(), "已点")} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">复制已点</Text>
+              <Button onPress={() => copyNames(played(), "已点")} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">复制已点</Text>
               </Button>
-              <Button onPress={() => played.set([])} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">清空已点</Text>
+              <Button onPress={() => played.set([])} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">清空已点</Text>
               </Button>
             </If>
             <If when={activeTab() === "blacklist"}>
-              <Text class="text-[11px] text-[#88919f]">精确匹配歌曲名；命中后不再进入点歌列表</Text>
-            </If>
-            <If when={activeTab() === "kugou"}>
-              <Text class="text-[11px] text-[#88919f]">账号只保存在本机；加歌单需要选目标歌单</Text>
-              <View class="flex-1" />
-              <Button onPress={() => loadLists()} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">刷新歌单</Text>
-              </Button>
-              <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                <Text class="text-[12px] text-[#191d24]">自动同步: {(config().auto_sync ?? false) ? "开" : "关"}</Text>
-              </Button>
+              <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">精确匹配歌曲名；命中后不再进入点歌列表</Text>
             </If>
           </View>
 
-          <View class="flex-1 rounded-[8px] border border-[#e3e7ec] bg-white">
+          <View class="flex-1 rounded-[8px] border border-[#e3e7ec] dark:border-[#2b3036] bg-white dark:bg-[#1f2227]">
             <If when={activeTab() === "songs"}>
               <DataTable
                 columns={songColumns}
                 data={songRows()}
                 rowHeight={40}
                 class="flex-1"
-                empty={<Text class="text-[12px] text-[#88919f]">还没有点歌，连接直播间等待弹幕…</Text>}
+                empty={<Text class="text-[12px] text-[#88919f] dark:text-[#7e8795]">还没有点歌，连接直播间等待弹幕…</Text>}
                 onSelectionChange={({ selection }: any) => selectedRow.set(selection?.row ?? null)}
                 onDoublePress={({ target }: any) => { if (target?.row != null) markPlayed(target.row); }}
-                classes={{ header: "bg-[#f0f2f5]", headerCell: "text-[#59616e]", cell: "text-[#191d24]", rowHover: "bg-[#f4f6f8]" }}
+                classes={{ header: "bg-[#f0f2f5] dark:bg-[#23272d]", headerCell: "text-[#59616e] dark:text-[#a9b1bd]", cell: "text-[#191d24] dark:text-[#e7e9ec]", rowHover: "bg-[#f4f6f8] dark:bg-[#17191b]" }}
               />
             </If>
             <If when={activeTab() === "played"}>
@@ -659,8 +677,8 @@ function Board() {
                 data={playedRows()}
                 rowHeight={40}
                 class="flex-1"
-                empty={<Text class="text-[12px] text-[#88919f]">还没有已点歌曲</Text>}
-                classes={{ header: "bg-[#f0f2f5]", headerCell: "text-[#59616e]", cell: "text-[#191d24]", rowHover: "bg-[#f4f6f8]" }}
+                empty={<Text class="text-[12px] text-[#88919f] dark:text-[#7e8795]">还没有已点歌曲</Text>}
+                classes={{ header: "bg-[#f0f2f5] dark:bg-[#23272d]", headerCell: "text-[#59616e] dark:text-[#a9b1bd]", cell: "text-[#191d24] dark:text-[#e7e9ec]", rowHover: "bg-[#f4f6f8] dark:bg-[#17191b]" }}
               />
             </If>
             <If when={activeTab() === "blacklist"}>
@@ -669,10 +687,10 @@ function Board() {
                   <View class="gap-1">
                     <Each of={bl()} key={(s: string) => s}>
                       {(item: any) => (
-                        <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] px-2 py-2">
-                          <Text class="flex-1 text-[13px] text-[#191d24]">{item()}</Text>
-                          <Button onPress={() => removeBlack(item())} class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]">
-                            <Text class="text-[11px] text-[#191d24]">移除</Text>
+                        <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] dark:border-[#2b3036] px-2 py-2">
+                          <Text class="flex-1 text-[13px] text-[#191d24] dark:text-[#e7e9ec]">{item()}</Text>
+                          <Button onPress={() => removeBlack(item())} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                            <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">移除</Text>
                           </Button>
                         </View>
                       )}
@@ -680,95 +698,167 @@ function Board() {
                   </View>
                 </Scroll>
               }>
-                <Text class="p-4 text-[12px] text-[#88919f]">黑名单为空；命中的歌曲不会进入点歌列表</Text>
+                <Text class="p-4 text-[12px] text-[#88919f] dark:text-[#7e8795]">黑名单为空；命中的歌曲不会进入点歌列表</Text>
               </If>
-            </If>
-            <If when={activeTab() === "kugou"}>
-              <Scroll class="flex-1 p-4">
-                <If when={!kugou()}>
-                  <View class="gap-3">
-                    <Text class="text-[13px] font-semibold text-[#191d24]">酷狗登录</Text>
-                    <Text class="text-[12px] text-[#59616e]">扫码登录后可以搜索歌曲、加入歌单；登录令牌只保存在本机。</Text>
-                    <Button onPress={startLogin} class="self-start rounded-[6px] bg-[#2f6fb0] px-3 py-2 active:opacity-80">
-                      <Text class="text-[12px] text-white">生成登录二维码 / 刷新</Text>
-                    </Button>
-                    <If when={qr()}>
-                      <Image src={qr()!.image} class="h-[180px] w-[180px] rounded-[6px] border border-[#e3e7ec]" />
-                    </If>
-                    <Text class="text-[12px] text-[#59616e]">状态：{kgLabel()}</Text>
-                    <Text class="text-[11px] text-[#88919f]">{kgMsg()}</Text>
-                  </View>
-                </If>
-                <If when={kugou()}>
-                  <View class="gap-3">
-                    <View class="flex-row items-center gap-2">
-                      <Text class="text-[13px] font-semibold text-[#191d24]">酷狗账号</Text>
-                      <Text class="text-[12px] text-[#59616e]">{kugou()!.nickname ?? kugou()!.userid}</Text>
-                      <View class="flex-1" />
-                      <Button onPress={logout} class="rounded-[6px] border border-[#d7dce2] px-3 py-1 active:bg-[#f4f6f8]">
-                        <Text class="text-[12px] text-[#191d24]">退出登录</Text>
-                      </Button>
-                    </View>
-
-                    <Text class="text-[12px] font-semibold text-[#191d24]">目标歌单</Text>
-                    <If when={lists().length === 0} else={
-                      <View class="gap-1">
-                        <Each of={lists()} key={(p: any) => p.listid}>
-                          {(item: any) => (
-                            <View class={`flex-row items-center gap-2 rounded-[6px] border px-2 py-2 ${config().target_playlist_id === item().listid ? "border-[#2f6fb0] bg-[#eef4fb]" : "border-[#e3e7ec]"}`}>
-                              <Text class="flex-1 text-[13px] text-[#191d24]">{item().name}</Text>
-                              <Text class="text-[11px] text-[#88919f]">{item().count} 首</Text>
-                              <Button
-                                onPress={() => { patch({ target_playlist_id: item().listid, target_playlist_name: item().name }); log(`目标歌单: ${item().name}`); }}
-                                class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]"
-                              >
-                                <Text class="text-[11px] text-[#191d24]">{config().target_playlist_id === item().listid ? "当前" : "设为目标"}</Text>
-                              </Button>
-                            </View>
-                          )}
-                        </Each>
-                      </View>
-                    }>
-                      <Text class="text-[12px] text-[#88919f]">暂无歌单，点上方“刷新歌单”重试</Text>
-                    </If>
-
-                    <Text class="text-[12px] font-semibold text-[#191d24]">搜索结果</Text>
-                    <If when={kgResults().length === 0} else={
-                      <View class="gap-1">
-                        <Each of={kgResults()} key={(t: any) => t.hash}>
-                          {(item: any) => (
-                            <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] px-1 py-2">
-                              <View class="flex-1">
-                                <Text class="text-[13px] text-[#191d24]">{item().name}</Text>
-                                <Text class="text-[11px] text-[#88919f]">{item().artist}</Text>
-                              </View>
-                              <Button onPress={() => addToPlaylist(item())} class="rounded-[6px] bg-[#2f6fb0] px-2 py-1 active:opacity-80">
-                                <Text class="text-[11px] text-white">加入歌单</Text>
-                              </Button>
-                              <Button onPress={() => addKugouToBoard(item())} class="rounded-[6px] border border-[#d7dce2] px-2 py-1 active:bg-[#f4f6f8]">
-                                <Text class="text-[11px] text-[#191d24]">加入列表</Text>
-                              </Button>
-                            </View>
-                          )}
-                        </Each>
-                      </View>
-                    }>
-                      <Text class="text-[12px] text-[#88919f]">在上方搜索框输入歌名</Text>
-                    </If>
-                    <Text class="text-[11px] text-[#88919f]">{kgMsg()}</Text>
-                  </View>
-                </If>
-              </Scroll>
             </If>
           </View>
 
-          <View class="h-[96px] rounded-[8px] border border-[#e3e7ec] bg-white p-2">
+          <View class="h-[96px] rounded-[8px] border border-[#e3e7ec] dark:border-[#2b3036] bg-white dark:bg-[#1f2227] p-2">
             <Scroll class="flex-1">
-              <Text class="text-[11px] text-[#59616e]">{logs().join("\n")}</Text>
+              <Text class="text-[11px] text-[#59616e] dark:text-[#a9b1bd]">{logs().join("\n")}</Text>
             </Scroll>
           </View>
         </View>
       </View>
+
+      <Dialog
+        open={settingsOpen()}
+        onOpenChange={({ open }: any) => settingsOpen.set(open)}
+        class="w-[560px] rounded-[10px] border border-[#e3e7ec] dark:border-[#2b3036] bg-white dark:bg-[#1f2227]"
+        backdropClass="bg-black/30"
+      >
+        <View class="h-[620px]">
+          <View class="h-[48px] flex-row items-center border-b border-[#e3e7ec] dark:border-[#2b3036] px-4">
+            <Text class="text-[14px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">设置</Text>
+            <View class="flex-1" />
+            <Button onPress={() => settingsOpen.set(false)} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-3 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+              <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">关闭</Text>
+            </Button>
+          </View>
+          <Scroll class="flex-1 p-4">
+            <View class="gap-3">
+              <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">平台插件</Text>
+              <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">同一时间只启用一个平台插件；切换后另一个平台的登录与自动同步会停用。</Text>
+              <View class="gap-1">
+                <Each of={PLUGINS} key={(p: any) => p.id}>
+                  {(item: any) => (
+                    <View class={`flex-row items-center gap-2 rounded-[6px] border px-3 py-2 ${config().active_plugin === item().id ? "border-[#2f6fb0] dark:border-[#4a8bc9] bg-[#eef4fb] dark:bg-[#1b2a39]" : "border-[#e3e7ec] dark:border-[#2b3036]"}`}>
+                      <View class={`h-3 w-3 rounded-full border ${config().active_plugin === item().id ? "border-[#2f6fb0] dark:border-[#4a8bc9] bg-[#2f6fb0] dark:bg-[#3d7fbe]" : "border-[#c2c8d0] dark:border-[#4a515a]"}`} />
+                      <View class="flex-1">
+                        <Text class="text-[13px] text-[#191d24] dark:text-[#e7e9ec]">{item().name}</Text>
+                        <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">{item().version} · {item().note}</Text>
+                      </View>
+                      <Button
+                        onPress={() => patch({ active_plugin: item().id })}
+                        class={`rounded-[6px] px-3 py-1 ${config().active_plugin === item().id ? "bg-[#2f6fb0] dark:bg-[#3d7fbe]" : "border border-[#d7dce2] dark:border-[#3a4048] active:bg-[#f4f6f8] dark:bg-[#17191b]"}`}
+                      >
+                        <Text class={`text-[12px] ${config().active_plugin === item().id ? "text-white" : "text-[#191d24] dark:text-[#e7e9ec]"}`}>
+                          {config().active_plugin === item().id ? "已启用" : "启用"}
+                        </Text>
+                      </Button>
+                    </View>
+                  )}
+                </Each>
+              </View>
+
+              <View class="h-px bg-[#e3e7ec] dark:bg-[#2b3036]" />
+              <If when={config().active_plugin === "kugou"}>
+                <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">管理酷狗音乐</Text>
+                <If when={!kugou()}>
+                  <View class="gap-2">
+                    <Button onPress={startLogin} class="self-start rounded-[6px] bg-[#2f6fb0] dark:bg-[#3d7fbe] px-3 py-2 active:opacity-80">
+                      <Text class="text-[12px] text-white">生成登录二维码 / 刷新</Text>
+                    </Button>
+                    <If when={qr()}>
+                      <Image src={qr()!.image} class="h-[160px] w-[160px] rounded-[6px] border border-[#e3e7ec] dark:border-[#2b3036]" />
+                    </If>
+                    <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">状态：{kgLabel()}</Text>
+                    <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">{kgMsg()}</Text>
+                  </View>
+                </If>
+                <If when={kugou()}>
+                  <View class="gap-2">
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">已登录：{kugou()!.nickname ?? kugou()!.userid}</Text>
+                      <View class="flex-1" />
+                      <Button onPress={logout} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                        <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">退出登录</Text>
+                      </Button>
+                    </View>
+
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[12px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">目标歌单</Text>
+                      <View class="flex-1" />
+                      <Button onPress={() => loadLists()} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                        <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">刷新</Text>
+                      </Button>
+                    </View>
+                    <If when={lists().length === 0} else={
+                      <View class="gap-1">
+                        <Each of={lists()} key={(p: any) => p.listid}>
+                          {(item: any) => (
+                            <View class={`flex-row items-center gap-2 rounded-[6px] border px-2 py-1 ${config().target_playlist_id === item().listid ? "border-[#2f6fb0] dark:border-[#4a8bc9] bg-[#eef4fb] dark:bg-[#1b2a39]" : "border-[#e3e7ec] dark:border-[#2b3036]"}`}>
+                              <Text class="flex-1 text-[12px] text-[#191d24] dark:text-[#e7e9ec]">{item().name}</Text>
+                              <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">{item().count} 首</Text>
+                              <Button
+                                onPress={() => { patch({ target_playlist_id: item().listid, target_playlist_name: item().name }); log(`目标歌单: ${item().name}`); }}
+                                class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]"
+                              >
+                                <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">{config().target_playlist_id === item().listid ? "当前" : "设为目标"}</Text>
+                              </Button>
+                            </View>
+                          )}
+                        </Each>
+                      </View>
+                    }>
+                      <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">暂无歌单，点“刷新”重试</Text>
+                    </If>
+
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[12px] text-[#59616e] dark:text-[#a9b1bd]">标记已点时自动加入歌单</Text>
+                      <View class="flex-1" />
+                      <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class={`rounded-[6px] px-2 py-1 ${config().auto_sync ? "bg-[#2f6fb0] dark:bg-[#3d7fbe]" : "border border-[#d7dce2] dark:border-[#3a4048]"}`}>
+                        <Text class={`text-[11px] ${config().auto_sync ? "text-white" : "text-[#191d24] dark:text-[#e7e9ec]"}`}>{config().auto_sync ? "开" : "关"}</Text>
+                      </Button>
+                    </View>
+
+                    <Text class="text-[12px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">搜索并加入</Text>
+                    <View class="flex-row gap-2">
+                      <Input
+                        value={kgQuery()}
+                        onChange={({ value }) => kgQuery.set(value)}
+                        onSubmit={doSearch}
+                        placeholder="搜索酷狗歌曲"
+                        class="min-w-0 flex-1 rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 text-[12px] text-[#191d24] dark:text-[#e7e9ec]"
+                      />
+                      <Button onPress={doSearch} class="rounded-[6px] bg-[#2f6fb0] dark:bg-[#3d7fbe] px-3 py-1 active:opacity-80">
+                        <Text class="text-[12px] text-white">搜索</Text>
+                      </Button>
+                    </View>
+                    <If when={kgResults().length === 0} else={
+                      <View class="gap-1">
+                        <Each of={kgResults()} key={(t: any) => t.hash}>
+                          {(item: any) => (
+                            <View class="flex-row items-center gap-2 border-b border-[#e3e7ec] dark:border-[#2b3036] px-1 py-1">
+                              <View class="flex-1">
+                                <Text class="text-[12px] text-[#191d24] dark:text-[#e7e9ec]">{item().name}</Text>
+                                <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">{item().artist}</Text>
+                              </View>
+                              <Button onPress={() => addToPlaylist(item())} class="rounded-[6px] bg-[#2f6fb0] dark:bg-[#3d7fbe] px-2 py-1 active:opacity-80">
+                                <Text class="text-[11px] text-white">加入歌单</Text>
+                              </Button>
+                              <Button onPress={() => addKugouToBoard(item())} class="rounded-[6px] border border-[#d7dce2] dark:border-[#3a4048] px-2 py-1 active:bg-[#f4f6f8] dark:bg-[#17191b]">
+                                <Text class="text-[11px] text-[#191d24] dark:text-[#e7e9ec]">加入列表</Text>
+                              </Button>
+                            </View>
+                          )}
+                        </Each>
+                      </View>
+                    }>
+                      <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">输入歌名后点“搜索”</Text>
+                    </If>
+                    <Text class="text-[11px] text-[#88919f] dark:text-[#7e8795]">{kgMsg()}</Text>
+                  </View>
+                </If>
+              </If>
+              <If when={config().active_plugin === "netease"}>
+                <Text class="text-[13px] font-semibold text-[#191d24] dark:text-[#e7e9ec]">网易云音乐</Text>
+                <Text class="text-[12px] text-[#88919f] dark:text-[#7e8795]">尚未接入。切换回酷狗即可继续管理歌单；同一时间只启用一个平台。</Text>
+              </If>
+            </View>
+          </Scroll>
+        </View>
+      </Dialog>
     </View>
   );
 }
