@@ -17,11 +17,18 @@ ui = (ROOT / "ui.tsx").read_text(encoding="utf-8")
 errors = []
 
 # 1. No raw <Button> may contain a direct Icon() call.
-for m in re.finditer(r"<Button\b.*?</Button>", board, re.S):
+buttons = list(re.finditer(r"<Button\b.*?</Button>", board, re.S))
+for m in buttons:
     block = m.group(0)
+    line = board[: m.start()].count("\n") + 1
     if "Icon({" in block:
-        line = board[: m.start()].count("\n") + 1
         errors.append(f"Board.tsx:{line} raw <Button> draws an icon; use IconButton()")
+    # Center on the cross axis always; on the main axis either center it or
+    # explicitly opt into a left-aligned row (the original log-panel header).
+    if "items-center" not in block:
+        errors.append(f"Board.tsx:{line} raw <Button> lacks items-center")
+    elif "justify-center" not in block and "flex-row" not in block:
+        errors.append(f"Board.tsx:{line} raw <Button> lacks justify-center / flex-row")
 
 # 2. IconButton must center both variants.
 if 'layout = props.text ? "flex-row items-center justify-center gap-1" : "items-center justify-center"' not in ui:
@@ -55,7 +62,7 @@ print("Original button sizes (points):")
 for name, (box, icon) in ORIGINAL_SIZES.items():
     print(f"  {name:<8} button {box}x{box}  icon {icon}x{icon}")
 print(f"IconButton call sites in Board.tsx: {board.count('IconButton({')}")
-print(f"Raw <Button> blocks: {len(re.findall(r'<Button\b.*?</Button>', board, re.S))}")
+print(f"Raw <Button> blocks: {len(buttons)} (all must be centered)")
 print(f"Standalone Icon() (non-button): {board.count('Icon({')}")
 
 if errors:

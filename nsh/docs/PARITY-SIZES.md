@@ -13,14 +13,18 @@ out in a column from the top-left, while the original's shadcn `Button` is
 `inline-flex items-center justify-center`. Every icon-only button had to supply
 its own centering.
 
-All icon-bearing buttons now go through `ui.tsx` `IconButton()`. Two guards keep
-it that way:
+All icon-bearing buttons now go through `ui.tsx` `IconButton()`, and every raw
+text button carries `items-center justify-center`. Three guards keep it that way:
 
-- `geometry.test.tsx` — `onLayout` bounds of button + icon at five sizes;
-  center delta must be <= 1pt. Runs headless, so it is in CI.
-- `scripts/check_icon_buttons.py` — static guard: no raw `<Button>` in
-  `Board.tsx` may contain `Icon({`, and `IconButton` must keep its centering
-  layout.
+- `geometry.test.tsx` — `onLayout` bounds of button + icon at five icon-only
+  sizes; center delta must be <= 1pt. Runs headless, so it is in CI.
+- `text-layout.test.tsx` — fixed-height text button: asserts the label is
+  intrinsic-width, vertically centered, and that an icon+label group stays on
+  one row and centered. Covers the text variant that `geometry.test.tsx`
+  deliberately does not.
+- `scripts/check_icon_buttons.py` — static guard (also on the Linux PR gate):
+  no raw `<Button>` may contain `Icon({`, and every raw `<Button>` must carry
+  the centering classes.
 
 ## Icon centering (start button, dark theme)
 
@@ -28,10 +32,12 @@ it that way:
 |---|---|---|
 | Original | +1.0 | -0.5 |
 | 0.6.0 (before) | **-7.75** | **-7.75** |
-| 0.6.1 | +0.75 | 0.0 |
+| 0.6.1 / 0.6.2 | +0.75 | 0.0 |
 
-All four header icon buttons in 0.6.1: dx within -0.3..+0.3pt,
-dy within -0.8..+0.8pt. The geometry harness reports 0.00..0.50pt at every size.
+The other three header icon buttons in 0.6.1: dx within -0.3..+0.3pt,
+dy within -0.8..+0.8pt. The start button's +0.75pt is the triangle's optical
+center (the original is +1.0pt). The geometry harness reports 0.00..0.50pt at
+every icon-only size.
 
 ## Button size table (points)
 
@@ -42,7 +48,7 @@ dy within -0.8..+0.8pt. The geometry harness reports 0.00..0.50pt at every size.
 | table row actions | 28x28 | 14x14 | 28x28 | 14x14 |
 | played-search clear, log chevron | 24x24 | 12-14 | 24x24 | 14x14 |
 | blacklist add | 32x32 | 16x16 | 32x32 | 16x16 |
-| clear-list / log copy / log clear (icon + text) | h-28, gap-1 | 14x14 | h-28, gap-1 | 14x14 |
+| clear-list / log copy / log clear (icon + text) | h-7 (28pt), gap-1 | 14x14 | h-7 (28pt), gap-1 | 14x14 |
 
 ## Header right group
 
@@ -59,10 +65,15 @@ Icon x centers at 900px wide:
 | 0.6.0 (3 icons, gap-3) | 732.8 | 774.8 | 816.8 | 868 |
 | **0.6.1 (3 icons, gap-1)** | **756.8** | **790.8** | **824.8** | **868** |
 
-0.6.1 matches the original's three-icon layout exactly. The only semantic
-difference is the middle button: the original shows a Kugou login icon there
-(when `kugouEnabled`), NSH shows a settings gear because the new requirement
-puts plugin management inside Settings. This is an intentional deviation.
+0.6.1/0.6.2 matches the original's **three-icon** layout exactly. When the
+original has Kugou disabled it shows only two icons (790.5 / 825.0); NSH always
+shows three, so that branch is ~34pt further left. That is a known branch
+difference, not a measured match.
+
+The middle button is also a semantic change: the original shows a Kugou login
+icon there, NSH shows a settings gear. It follows the user's instruction to put
+plugin management inside Settings, but it has not been separately signed off —
+see "Open questions" below.
 
 ## Narrow window (880x560) OCR comparison
 
@@ -78,8 +89,12 @@ puts plugin management inside Settings. This is an intentional deviation.
 | 最低粉丝团等级 | (13, 283) | (15, 285) | +2, +2 |
 | 点歌冷却 (秒) | (149, 285) | (149.5, 286) | +0.5, +1 |
 
-No text overflow or clipping at the minimum window size. The sidebar scrolls,
-as in the original.
+The table above covers plain Text/Input labels and tab titles only; it does
+**not** cover button labels. Button-label geometry is covered by
+`text-layout.test.tsx` (center delta <= 1pt) plus a screenshot check of 添加:
+original (231, 603), 0.6.2 (231.5, 605.5), delta (+0.5, +2.5)pt. No text
+overflow or clipping at the minimum window size; the sidebar scrolls, as in the
+original.
 
 ## Remaining known differences (checked, not fixed)
 
@@ -89,9 +104,10 @@ These come from NSH's native layout defaults, not from missing classes:
   narrow layouts can overflow instead of shrinking. `min-w-0` / `truncate` are
   applied at the known sites; a full audit of every `flex-1` is still pending.
 - A view with no `display` lays children out in a **column** and stretches them
-  on the cross axis. Text buttons inside column parents can become full-width.
-  All current text buttons sit in row parents; the geometry harness wraps its
-  text case in a row to reproduce the real layout.
+  on the cross axis. Measured in `text-layout.test.tsx`: without centering, a
+  label inside a 32pt button was stretched to 848pt and pinned at y=0; with
+  `items-center justify-center` it is intrinsic-width and centered. All raw
+  text buttons in `Board.tsx` now carry those classes.
 - `Image` defaults to `objectFit: "cover"`; logo and QR images are square so
   they are unaffected, but any non-square asset would be cropped.
 - `DataTable` defaults to `rowHeight: 32` / header = row height. We pass 48/32
@@ -107,21 +123,32 @@ These come from NSH's native layout defaults, not from missing classes:
 Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 `src/components/BlacklistPanel.tsx` and `src/App.tsx`:
 
-| Area | Original | NSH 0.6.1 | Status |
+| Area | Original | NSH 0.6.2 | Status |
 |---|---|---|---|
-| Header middle button | Kugou login icon (when `kugou_enabled`) | Settings gear | Intentional: new requirement puts plugins in Settings |
+| Header middle button | Kugou login icon (when `kugou_enabled`) | Settings gear | Follows "plugins in Settings", not separately confirmed |
 | About modal | version, check update, telemetry toggle, show-logs toggle, Kugou feature toggle, skipped-version reset | version, repo, check update | Simplified; telemetry/log/Kugou switches not ported |
-| Settings dialog | none (config in left panel) | appearance + platform plugin picker | Intentional new requirement |
+| Settings dialog | none (config in left panel) | appearance + platform plugin picker | Follows "plugins in Settings" |
 | Log panel visibility | toggled from About | shown automatically once logs exist | Simplified |
+| Stop icon | filled square (`fill-current`) | filled square from 0.6.2 | Fixed |
+| Button labels | inline-flex centered | centered from 0.6.2 | Fixed |
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
+
+## Open questions for the user
+
+1. Is replacing the header's Kugou-login icon with a Settings gear acceptable,
+   or should both be present (plugin management still lives in Settings)?
+2. Is "control centers within 1pt + matching row heights/spacing/colors" the
+   right acceptance bar, or is exact WebKit-like rendering required?
+3. The About modal is still simplified (no telemetry / show-logs / Kugou
+   switches). Are those needed before parity sign-off?
 
 ## What "parity" can and cannot mean
 
 The original is a Chromium CSS box model; NSH is a native flex/grid layout with
-platform text rendering. **Pixel-identical is not achievable.** The accepted
-bar is: every control's position and size within 1pt, row heights and spacing
-matching, colors/theme matching, and an automated geometry test that fails when
-any icon button regresses. If exact WebKit rendering is required, the only
+platform text rendering. **Pixel-identical is not achievable.** The check applied here (pending user
+sign-off) is: every control's position and size within 1pt, row heights and
+spacing matching, colors/theme matching, and automated geometry tests that fail
+when any icon or text button regresses. If exact WebKit rendering is required, the only
 option is to host the original React frontend in an NSH WebView, which gives up
 the native-rendering size win and needs WebView2 on Windows.

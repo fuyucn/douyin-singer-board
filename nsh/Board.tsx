@@ -19,7 +19,7 @@ import {
 } from "./plugins/kugou";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.6.1";
+const APP_VERSION = "0.6.2";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -762,7 +762,7 @@ function Board() {
   const tabButton = (key: Tab, label: string) => (
     <Button
       onPress={() => { activeTab.set(key); selectedRow.set(null); }}
-      class={`rounded-[6px] px-3 py-1 ${activeTab() === key ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+      class={`items-center justify-center rounded-[6px] px-3 py-1 ${activeTab() === key ? "bg-primary" : "border border-line-strong active:bg-background"}`}
     >
       <Text class={`text-[12px] ${activeTab() === key ? "text-primary-foreground" : "text-foreground"}`}>{label}</Text>
     </Button>
@@ -783,9 +783,9 @@ function Board() {
         {/* Original AppHeader wraps the right actions in one flex-row with
             gap-1; start/stop adds ml-2. Keep that so the icon slots line up. */}
         <View class="flex-row items-center gap-1">
-          {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          {IconButton({ testID: "settings", name: "settings", onPress: () => settingsOpen.set(true), class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          {IconButton({ testID: "about", name: "info", onPress: () => aboutOpen.set(true), class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "settings", name: "settings", onPress: () => settingsOpen.set(true), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
+          {IconButton({ testID: "about", name: "info", onPress: () => aboutOpen.set(true), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-2 h-8 w-8 rounded-(--radius) bg-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
             {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-2 h-8 w-8 rounded-(--radius) bg-destructive", iconClass: "h-[15px] w-[15px]", color: "destructive-foreground", label: "停止" })}
           </If>
@@ -893,12 +893,12 @@ function Board() {
                         class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                       />
                       <View class="flex-row gap-2">
-                        <Button onPress={() => settingsOpen.set(true)} class="h-8 flex-1 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
+                        <Button onPress={() => settingsOpen.set(true)} class="items-center justify-center h-8 flex-1 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
                           <Text class="text-xs text-foreground">管理酷狗</Text>
                         </Button>
                         <Button
                           onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })}
-                          class={`h-8 flex-1 rounded-(--radius) px-2.5 ${config().auto_sync ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}
+                          class={`items-center justify-center h-8 flex-1 rounded-(--radius) px-2.5 ${config().auto_sync ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}
                         >
                           <Text class={`text-xs ${config().auto_sync ? "text-primary-foreground" : "text-foreground"}`}>
                             {config().auto_sync ? "同步中" : "自动同步"}
@@ -923,7 +923,7 @@ function Board() {
                   placeholder="输入歌曲名称..."
                   class="h-8 min-w-0 flex-1 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                 />
-                <Button onPress={addManual} class="h-8 shrink-0 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
+                <Button onPress={addManual} class="items-center justify-center h-8 shrink-0 rounded-(--radius) border border-line-strong bg-card px-2.5 active:bg-muted">
                   <Text class="text-sm text-foreground">添加</Text>
                 </Button>
               </View>
@@ -1066,10 +1066,10 @@ function Board() {
               <View class="flex-1 flex-col min-h-0">
                 <View class="flex-row items-center gap-2 border-b border-line bg-card px-3 py-2 shrink-0">
                   <View class="flex-row gap-1">
-                    <Button testID="black-type-song" onPress={() => blackType.set("song")} class={`h-8 rounded-[6px] px-2 ${blackType() === "song" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
+                    <Button testID="black-type-song" onPress={() => blackType.set("song")} class={`items-center justify-center h-8 rounded-[6px] px-2 ${blackType() === "song" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
                       <Text class={`text-[11px] ${blackType() === "song" ? "text-primary-foreground" : "text-foreground"}`}>歌曲</Text>
                     </Button>
-                    <Button testID="black-type-singer" onPress={() => blackType.set("singer")} class={`h-8 rounded-[6px] px-2 ${blackType() === "singer" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
+                    <Button testID="black-type-singer" onPress={() => blackType.set("singer")} class={`items-center justify-center h-8 rounded-[6px] px-2 ${blackType() === "singer" ? "bg-primary" : "border border-line-strong bg-card active:bg-muted"}`}>
                       <Text class={`text-[11px] ${blackType() === "singer" ? "text-primary-foreground" : "text-foreground"}`}>歌手</Text>
                     </Button>
                   </View>
@@ -1187,7 +1187,7 @@ function Board() {
           <View class="h-[48px] flex-row items-center border-b border-line px-4">
             <Text class="text-[14px] font-semibold text-foreground">设置</Text>
             <View class="flex-1" />
-            <Button onPress={() => settingsOpen.set(false)} class="rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
+            <Button onPress={() => settingsOpen.set(false)} class="items-center justify-center rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
               <Text class="text-[12px] text-foreground">关闭</Text>
             </Button>
           </View>
@@ -1199,7 +1199,7 @@ function Board() {
                   {(mode: any) => (
                     <Button
                       onPress={() => applyTheme(mode())}
-                      class={`rounded-[6px] px-3 py-1 ${themeMode() === mode() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${themeMode() === mode() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
                     >
                       <Text class={`text-[11px] ${themeMode() === mode() ? "text-primary-foreground" : "text-foreground"}`}>
                         {mode() === "system" ? "跟随系统" : mode() === "light" ? "亮色" : "暗色"}
@@ -1216,7 +1216,7 @@ function Board() {
                   <Text class="text-[12px] text-foreground">启用酷狗服务</Text>
                   <Text class="text-[11px] text-faint">停用后预搜索、歌单与后台自动同步全部停止</Text>
                 </View>
-                <Button testID="kugou-toggle" onPress={() => patch({ kugou_enabled: !config().kugou_enabled })} class={`rounded-[6px] px-3 py-1 ${config().kugou_enabled ? "bg-primary" : "border border-line-strong active:bg-background"}`}>
+                <Button testID="kugou-toggle" onPress={() => patch({ kugou_enabled: !config().kugou_enabled })} class={`items-center justify-center rounded-[6px] px-3 py-1 ${config().kugou_enabled ? "bg-primary" : "border border-line-strong active:bg-background"}`}>
                   <Text class={`text-[12px] ${config().kugou_enabled ? "text-primary-foreground" : "text-foreground"}`}>{config().kugou_enabled ? "已启用" : "已停用"}</Text>
                 </Button>
               </View>
@@ -1231,7 +1231,7 @@ function Board() {
                       </View>
                       <Button
                         onPress={() => patch({ active_plugin: item().id })}
-                        class={`rounded-[6px] px-3 py-1 ${config().active_plugin === item().id ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                        class={`items-center justify-center rounded-[6px] px-3 py-1 ${config().active_plugin === item().id ? "bg-primary" : "border border-line-strong active:bg-background"}`}
                       >
                         <Text class={`text-[12px] ${config().active_plugin === item().id ? "text-primary-foreground" : "text-foreground"}`}>
                           {config().active_plugin === item().id ? "已启用" : "启用"}
@@ -1247,7 +1247,7 @@ function Board() {
                 <Text class="text-[13px] font-semibold text-foreground">管理酷狗音乐</Text>
                 <If when={!kugou()}>
                   <View class="gap-2">
-                    <Button onPress={startLogin} class="self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                    <Button onPress={startLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
                       <Text class="text-[12px] text-primary-foreground">生成登录二维码 / 刷新</Text>
                     </Button>
                     <If when={qr()}>
@@ -1262,7 +1262,7 @@ function Board() {
                     <View class="flex-row items-center gap-2">
                       <Text class="text-[12px] text-muted-foreground">已登录：{kugou()!.nickname ?? kugou()!.userid}</Text>
                       <View class="flex-1" />
-                      <Button onPress={logout} class="rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                      <Button onPress={logout} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
                         <Text class="text-[11px] text-foreground">退出登录</Text>
                       </Button>
                     </View>
@@ -1270,7 +1270,7 @@ function Board() {
                     <View class="flex-row items-center gap-2">
                       <Text class="text-[12px] font-semibold text-foreground">目标歌单</Text>
                       <View class="flex-1" />
-                      <Button onPress={() => loadLists()} class="rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                      <Button onPress={() => loadLists()} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
                         <Text class="text-[11px] text-foreground">刷新</Text>
                       </Button>
                     </View>
@@ -1283,7 +1283,7 @@ function Board() {
                               <Text class="text-[11px] text-faint">{item().count} 首</Text>
                               <Button
                                 onPress={() => { patch({ target_playlist_id: item().listid, target_playlist_name: item().name }); log(`目标歌单: ${item().name}`); }}
-                                class="rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
+                                class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
                               >
                                 <Text class="text-[11px] text-foreground">{config().target_playlist_id === item().listid ? "当前" : "设为目标"}</Text>
                               </Button>
@@ -1298,7 +1298,7 @@ function Board() {
                     <View class="flex-row items-center gap-2">
                       <Text class="text-[12px] text-muted-foreground">标记已点时自动加入歌单</Text>
                       <View class="flex-1" />
-                      <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class={`rounded-[6px] px-2 py-1 ${config().auto_sync ? "bg-primary" : "border border-line-strong"}`}>
+                      <Button onPress={() => patch({ auto_sync: !(config().auto_sync ?? false) })} class={`items-center justify-center rounded-[6px] px-2 py-1 ${config().auto_sync ? "bg-primary" : "border border-line-strong"}`}>
                         <Text class={`text-[11px] ${config().auto_sync ? "text-primary-foreground" : "text-foreground"}`}>{config().auto_sync ? "开" : "关"}</Text>
                       </Button>
                     </View>
@@ -1312,7 +1312,7 @@ function Board() {
                         placeholder="搜索酷狗歌曲"
                         class="min-w-0 flex-1 rounded-[6px] border border-line-strong px-2 py-1 text-[12px] text-foreground"
                       />
-                      <Button onPress={doSearch} class="rounded-[6px] bg-primary px-3 py-1 active:opacity-80">
+                      <Button onPress={doSearch} class="items-center justify-center rounded-[6px] bg-primary px-3 py-1 active:opacity-80">
                         <Text class="text-[12px] text-primary-foreground">搜索</Text>
                       </Button>
                     </View>
@@ -1325,10 +1325,10 @@ function Board() {
                                 <Text class="text-[12px] text-foreground">{item().name}</Text>
                                 <Text class="text-[11px] text-faint">{item().artist}</Text>
                               </View>
-                              <Button onPress={() => addToPlaylist(item())} class="rounded-[6px] bg-primary px-2 py-1 active:opacity-80">
+                              <Button onPress={() => addToPlaylist(item())} class="items-center justify-center rounded-[6px] bg-primary px-2 py-1 active:opacity-80">
                                 <Text class="text-[11px] text-primary-foreground">加入歌单</Text>
                               </Button>
-                              <Button onPress={() => addKugouToBoard(item())} class="rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                              <Button onPress={() => addKugouToBoard(item())} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
                                 <Text class="text-[11px] text-foreground">加入列表</Text>
                               </Button>
                             </View>
@@ -1367,7 +1367,7 @@ function Board() {
               <Text class="text-[14px] font-semibold text-foreground">SUSUSongBoard</Text>
               <Text class="text-[11px] text-faint">v{APP_VERSION} · NSH 原生版</Text>
             </View>
-            <Button testID="about-close" onPress={() => aboutOpen.set(false)} class="rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
+            <Button testID="about-close" onPress={() => aboutOpen.set(false)} class="items-center justify-center rounded-[6px] border border-line-strong px-3 py-1 active:bg-background">
               <Text class="text-[12px] text-foreground">关闭</Text>
             </Button>
           </View>
@@ -1375,7 +1375,7 @@ function Board() {
           <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
           <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
           <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
-          <Button testID="about-update" onPress={checkUpdate} class="self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+          <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
             <Text class="text-[12px] text-primary-foreground">{aboutBusy() ? "检查中…" : "检查更新"}</Text>
           </Button>
           <Text class="text-[11px] text-muted-foreground">{aboutMsg()}</Text>

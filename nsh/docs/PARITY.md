@@ -34,11 +34,13 @@ Branches:
 > extracts and launches the app. Live Douyin handshake, QR login and Kugou
 > search API are non-blocking CI steps (external services), not guarantees.
 >
-> 0.6.1 fixes the icon geometry the user reported three times: NSH's Button
-> is an unstyled column host, so every icon-only button now goes through
-> `ui.tsx` `IconButton()` with `items-center justify-center`. The header right
-> group is back to the original `gap-1` + `ml-2` spacing. Measured comparison,
-> size table and automated guards: `docs/PARITY-SIZES.md`.
+> 0.6.1/0.6.2 fixes the geometry the user reported three times: NSH's Button
+> is an unstyled column host, so every icon-only button goes through
+> `ui.tsx` `IconButton()` and every raw text button carries
+> `items-center justify-center`. The header right group is back to the original
+> `gap-1` + `ml-2` spacing, and the Stop icon is filled again. Two headless
+> geometry tests plus a source guard (also on the Linux PR gate) protect it.
+> Measured comparison, size table and open questions: `docs/PARITY-SIZES.md`.
 >
 > 0.6.0 adds the missing background half of Kugou: an eager per-song search
 > cache, singer blacklist entries, a `SyncLedger`-based auto-sync worker with

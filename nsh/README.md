@@ -43,9 +43,9 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.6.1.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.6.2.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.6.1.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.6.2.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
@@ -74,10 +74,13 @@ CI also smoke-runs the portable exe and checks the payload is extracted.
   Token/userid are kept in `Storage`, not in the repo. Icons are drawn as plain
   function calls so their SVG colors follow theme changes.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
-- All icon-bearing buttons go through `ui.tsx` `IconButton()` (NSH's Button has
-  no centering of its own). `geometry.test.tsx` asserts icon/button center
-  deltas <= 1pt at five sizes; `scripts/check_icon_buttons.py` guards the
-  source invariant. See `docs/PARITY-SIZES.md` for the measured comparison.
+- All icon-bearing buttons go through `ui.tsx` `IconButton()`; all raw text
+  buttons carry `items-center justify-center` (NSH's Button is an unstyled
+  column host, shadcn's is inline-flex centered). `geometry.test.tsx` asserts
+  icon/button center deltas <= 1pt at five sizes, `text-layout.test.tsx`
+  asserts fixed-height text labels are centered, and
+  `scripts/check_icon_buttons.py` guards both source invariants.
+  See `docs/PARITY-SIZES.md` for the measured comparison.
 - Windows CI: matcher + auto-sync unit tests, UI + parity + worker + geometry
   tests, icon-button source guard, Cookie header + WS write/read, package,
   installer, portable smoke. The

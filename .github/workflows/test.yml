@@ -27,3 +27,13 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - run: pnpm test
+
+  nsh-ui-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Icon and text button centering guard
+        run: python nsh/scripts/check_icon_buttons.py

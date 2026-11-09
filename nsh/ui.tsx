@@ -6,6 +6,7 @@ import { Button } from "nsh/base";
 
 export const ICON_PATHS: Record<string, string> = {
   play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  // Original uses lucide <Square className="fill-current"/> for Stop.
   square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
@@ -32,7 +33,8 @@ export function Icon(props: {
 }) {
   void props.scheme;
   const c = token((props.color ?? "muted-foreground") as any);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[props.name] ?? ""}</svg>`;
+  const svgFill = props.name === "square" ? c : "none";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${svgFill}" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON_PATHS[props.name] ?? ""}</svg>`;
   return (
     <Image
       src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`}
@@ -56,11 +58,13 @@ export interface IconGeom {
   hasIcon: boolean;
 }
 export const iconGeometry: Record<string, IconGeom> = {};
-/** Bumped on every layout sample so a test-visible report can render live. */
+/** Bumped on every layout sample so a test-visible report can render live.
+ *  An unsubscribed signal is inert in production; the harness subscribes. */
 export const geomTick = signal(0);
+let anonymousSeq = 0;
 
 function sample(key: string): IconGeom {
-  geomTick.update((v) => v + 1);
+  if (key !== "anonymous") geomTick.update((v) => v + 1);
   return iconGeometry[key] ?? (iconGeometry[key] = {
     buttonW: 0, buttonH: 0, iconX: 0, iconY: 0, iconW: 0, iconH: 0,
     hasButton: false, hasIcon: false,
@@ -90,7 +94,9 @@ export function IconButton(props: {
   text?: string;
   textClass?: string;
 }) {
-  const key = props.geomKey ?? props.testID ?? "anonymous";
+  // Never collapse several buttons into one sample: each call site gets a
+  // stable geomKey/testID, otherwise a unique anonymous key.
+  const key = props.geomKey ?? props.testID ?? `anonymous-${++anonymousSeq}`;
   const iconClass = props.iconClass ?? "h-4 w-4";
   const onContentLayout = (e: any) => {
     const g = sample(key);
@@ -107,9 +113,10 @@ export function IconButton(props: {
     scheme: colorScheme(),
     onLayout: props.text ? undefined : onContentLayout,
   });
-  // A text variant measures its whole icon+label group, not just the glyph.
+  // A text variant measures the whole icon+label group (its own row), so the
+  // geometry test can assert that the group is centered in the button.
   const content = props.text
-    ? <View class="flex-row items-center gap-1">{iconEl}<Text class={props.textClass ?? "text-xs text-foreground"}>{props.text}</Text></View>
+    ? <View class="flex-row items-center gap-1" onLayout={onContentLayout}>{iconEl}<Text class={props.textClass ?? "text-xs text-foreground"}>{props.text}</Text></View>
     : iconEl;
   const layout = props.text ? "flex-row items-center justify-center gap-1" : "items-center justify-center";
   return (
