@@ -7,4 +7,7 @@ test("live room handshake", async () => {
   await app.press("id:start");
   await new Promise((r) => setTimeout(r, 12000));
   expect(app.texts()).toContain("已连接");
+  await app.press("id:stop");
+  await new Promise((r) => setTimeout(r, 1200));
+  expect(app.texts()).toContain("未连接");
 }, 40000);

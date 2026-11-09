@@ -513,20 +513,22 @@ function Board() {
         <Button testID="settings" onPress={() => settingsOpen.set(true)} class="h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted">
           <Icon name="settings" class="h-[15px] w-[15px]" />
         </Button>
-        <Button
-          testID="start"
-          onPress={() => (running() ? stop() : start())}
-          class={`ml-2 h-8 w-8 rounded-(--radius) ${running() ? "bg-destructive" : "bg-foreground"}`}
-        >
-          <Icon name={running() ? "square" : "play"} class="h-[15px] w-[15px]" color={running() ? "destructive-foreground" : "background"} />
-        </Button>
+        <If when={running()} else={
+          <Button testID="start" onPress={start} class="ml-2 h-8 w-8 rounded-(--radius) bg-foreground">
+            <Icon name="play" class="h-[15px] w-[15px]" color="background" />
+          </Button>
+        }>
+          <Button testID="stop" onPress={stop} class="ml-2 h-8 w-8 rounded-(--radius) bg-destructive">
+            <Icon name="square" class="h-[15px] w-[15px]" color="destructive-foreground" />
+          </Button>
+        </If>
       </View>
 
       <View class="flex-1 min-h-0 flex-row">
         <Scroll testID="sidebar" class="h-full w-72 shrink-0 border-r border-line bg-card">
           <View class="flex-col min-h-full">
             <View class="p-4">
-              <Text class="mb-3 text-[13px] font-medium text-foreground">直播间配置</Text>
+              <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">直播间配置</Text>
               <View class="gap-3">
                 <View class="gap-1.5">
                   <View class="flex-row items-center justify-between gap-2">
@@ -564,7 +566,7 @@ function Board() {
             <View class="h-px bg-line" />
 
             <View class="p-4">
-              <Text class="mb-3 text-[13px] font-medium text-foreground">点歌规则</Text>
+              <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">点歌规则</Text>
               <View class="gap-3">
                 <View class="flex-row gap-3">
                   <View class="flex-1 gap-1.5">
@@ -608,7 +610,7 @@ function Board() {
             <If when={config().active_plugin === "kugou" && kugou()}>
               <View class="h-px bg-line" />
               <View class="p-4">
-                <Text class="mb-3 text-[13px] font-medium text-foreground">Kugou 歌单</Text>
+                <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">Kugou 歌单</Text>
                 <View class="gap-2">
                   <If when={kugou()}>
                     <View class="gap-2">
@@ -643,8 +645,8 @@ function Board() {
 
             <View class="h-px bg-line" />
 
-            <View class="p-4">
-              <Text class="mb-3 text-[13px] font-medium text-foreground">手动点歌</Text>
+            <View class="p-4 pt-6">
+              <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">手动点歌</Text>
               <View class="flex-row gap-2">
                 <Input
                   value={manual()}
@@ -660,7 +662,7 @@ function Board() {
             </View>
 
             <View class="mt-auto p-4 text-[11px] text-faint">
-              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.1</Text>
+              <Text class="text-[11px] text-faint">SUSUSongBoard v0.5.2</Text>
             </View>
           </View>
         </Scroll>
@@ -668,13 +670,13 @@ function Board() {
         <View class="flex-1 flex-col min-h-0 bg-card">
           <View class="flex-row items-center justify-between border-b border-line px-3 py-1 shrink-0">
             <View class="flex-row items-center">
-              <Button onPress={() => { activeTab.set("songs"); selectedRow.set(null); }} class={`h-9 rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "songs" ? "border-foreground" : "border-transparent"}`}>
+              <Button onPress={() => { activeTab.set("songs"); selectedRow.set(null); }} class={`h-9 items-center justify-center rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "songs" ? "border-foreground" : "border-transparent"}`}>
                 <Text class={`text-sm font-medium ${activeTab() === "songs" ? "text-foreground" : "text-muted-foreground"}`}>点歌列表 ({songs().length})</Text>
               </Button>
-              <Button onPress={() => { activeTab.set("played"); selectedRow.set(null); }} class={`h-9 rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "played" ? "border-foreground" : "border-transparent"}`}>
+              <Button onPress={() => { activeTab.set("played"); selectedRow.set(null); }} class={`h-9 items-center justify-center rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "played" ? "border-foreground" : "border-transparent"}`}>
                 <Text class={`text-sm font-medium ${activeTab() === "played" ? "text-foreground" : "text-muted-foreground"}`}>已点歌单 ({played().length})</Text>
               </Button>
-              <Button onPress={() => { activeTab.set("blacklist"); selectedRow.set(null); }} class={`h-9 rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "blacklist" ? "border-foreground" : "border-transparent"}`}>
+              <Button onPress={() => { activeTab.set("blacklist"); selectedRow.set(null); }} class={`h-9 items-center justify-center rounded-none border-0 border-b-2 bg-transparent px-3 ${activeTab() === "blacklist" ? "border-foreground" : "border-transparent"}`}>
                 <Text class={`text-sm font-medium ${activeTab() === "blacklist" ? "text-foreground" : "text-muted-foreground"}`}>黑名单 ({bl().length})</Text>
               </Button>
             </View>
