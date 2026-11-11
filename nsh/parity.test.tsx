@@ -1,6 +1,6 @@
 import { expect, open, test } from "nsh/test";
 
-test("settings modal opens on general and the info button jumps to about", async () => {
+test("settings modal opens on general", async () => {
   const app = await open("./Board.tsx", { width: 900, height: 700 });
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
@@ -8,16 +8,7 @@ test("settings modal opens on general and the info button jumps to about", async
   expect(app.texts()).toContain("运行信息");
   expect(app.texts()).not.toContain("酷狗登录");
   await app.press("id:settings-close");
-
-  await app.press("id:about");
-  const texts = app.texts();
-  expect(texts).toContain("SUSUSongBoard");
-  expect(texts).toContain("v0.8.1");
-  expect(texts).toContain("仓库：fuyucn/douyin-singer-board · 分支 nsh");
-  expect(texts).toContain("检查更新");
-  expect(texts).not.toContain("平台插件");
-  await app.press("id:settings-close");
-  expect(app.texts()).not.toContain("检查更新");
+  expect(app.texts()).not.toContain("运行信息");
 });
 
 test("settings tabs switch between general, plugin and about", async () => {

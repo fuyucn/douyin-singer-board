@@ -1090,7 +1090,6 @@ function Board() {
         <View class="flex-row items-center gap-1">
           {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "settings", name: "settings", onPress: () => openSettings("general"), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          {IconButton({ testID: "about", name: "info", onPress: () => openSettings("about"), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {/* Two Ifs, not If/else: the else element is built once, so a
               colour that follows the scheme would keep the first scheme's
               value and the play icon would vanish after a theme switch. */}
