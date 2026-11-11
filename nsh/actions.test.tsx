@@ -247,9 +247,16 @@ test("clear list asks for confirmation and resets the played search", async () =
   expect(app.texts()).not.toContain("没有匹配的歌曲");
 });
 
+async function showLogPanel(app: any) {
+  await app.press("id:settings");
+  await app.press("id:log-toggle");
+  await app.press("id:settings-close");
+}
+
 test("log copy does not lie about its own success", async () => {
   const app = await open("./Board.tsx", { width: 900, height: 700, clipboard: "INITIAL" });
   await add(app, "晴天");
+  await showLogPanel(app);
   await app.press("id:log-copy");
   const clip = String(app.clipboard());
   expect(clip.length).toBeGreaterThan(0);
@@ -268,6 +275,7 @@ test("blacklist add/remove and log chevron still respond", async () => {
   await app.press("id:black-remove-0");
   expect(app.texts()).toContain("黑名单 (0)");
   await add(app, "晴天");
+  await showLogPanel(app);
   await app.press("id:log-chevron");
   expect(app.texts().some((t: string) => t.includes("复制"))).toBe(true);
 });

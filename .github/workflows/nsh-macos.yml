@@ -69,6 +69,7 @@ jobs:
           nsh test actions.test.tsx
           nsh test parity.test.tsx
           nsh test sqlite-store.test.tsx
+          nsh test log.test.tsx
           nsh test sqlite-bridge.test.tsx
           nsh test sync-worker.test.tsx
           nsh test text-layout.test.tsx

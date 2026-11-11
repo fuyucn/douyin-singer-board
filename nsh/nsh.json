@@ -1,8 +1,8 @@
 {
   "name": "SUSUSongBoard",
   "id": "com.sususongboard.app",
-  "version": "0.8.4",
-  "build": 804,
+  "version": "0.8.5",
+  "build": 805,
   "rust": "native",
   "icon": "assets/icon.png",
   "window": {

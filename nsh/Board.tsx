@@ -23,7 +23,7 @@ import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.4";
+const APP_VERSION = "0.8.5";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -67,7 +67,10 @@ spinMotion.play({
 function Board() {
   // Test launch parameters are explicit; normal app launches have none.
   const testSeed = host.params.sqliteTestSeed as Record<string, string> | undefined;
-  const storage = createSqliteStore(process.dataDir, testSeed);
+  // Tests can point the store at a temporary directory to exercise a real
+  // file across an app restart; production always uses process.dataDir.
+  const testDir = host.params.sqliteTestDir as string | undefined;
+  const storage = createSqliteStore(testDir ?? process.dataDir, testSeed);
   const config = signal<Config>({
     room_id: "145997388006",
     sing_prefix: DEFAULT_SING_PREFIX,
@@ -101,6 +104,9 @@ function Board() {
   const themeMode = signal<"system" | "light" | "dark">("system");
   const playedQuery = signal("");
   const logOpen = signal(false);
+  // The log panel is opt-in: hidden until the user turns it on, and the
+  // choice is kept in SQLite (settings), not in board.config.
+  const logVisible = signal(false);
   const clearConfirm = signal<Tab | null>(null);
   let clearTimer: number | null = null;
 
@@ -137,6 +143,7 @@ function Board() {
           themeMode.set(theme);
           setColorScheme(theme);
         }
+        logVisible.set((await storage.getItem("board.log_visible")) === "1");
         configLoaded.set(true);
         restoreSession();
       } catch (e: any) {
@@ -197,6 +204,11 @@ function Board() {
 
   const toggleTheme = () => {
     applyTheme(colorScheme() === "dark" ? "light" : "dark");
+  };
+
+  const setLogVisible = (on: boolean) => {
+    logVisible.set(on);
+    storage.setItem("board.log_visible", on ? "1" : "0").catch(storageError);
   };
 
   const saveSession = (sess: KugouSession) => {
@@ -1544,7 +1556,7 @@ function Board() {
             </If>
           </View>
 
-          <If when={logs().length > 0}>
+          <If when={logVisible() && logs().length > 0}>
             <View class="shrink-0 border-t border-line bg-card">
               <View class="flex-row items-center bg-secondary px-3 py-[6px]">
                 <Button onPress={() => logOpen.update((v) => !v)} class="flex-1 flex-row items-center gap-2 bg-transparent p-0 active:bg-transparent">
@@ -1653,6 +1665,22 @@ function Board() {
                         </Button>
                       )}
                     </Each>
+                  </View>
+                  <View class="h-px bg-muted" />
+                  <View class="flex-row items-center justify-between gap-3">
+                    <View class="flex-1 gap-0.5">
+                      <Text class="text-[13px] text-foreground">显示日志面板</Text>
+                      <Text class="text-[11px] text-faint">默认隐藏；打开后底部出现日志条，可复制、清空、展开</Text>
+                    </View>
+                    <Button
+                      testID="log-toggle"
+                      onPress={() => setLogVisible(!logVisible())}
+                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${logVisible() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                    >
+                      <Text class={`text-[11px] ${logVisible() ? "text-primary-foreground" : "text-foreground"}`}>
+                        {logVisible() ? "已显示" : "已隐藏"}
+                      </Text>
+                    </Button>
                   </View>
                   <View class="h-px bg-muted" />
                   <Text class="text-[13px] font-semibold text-foreground">运行信息</Text>

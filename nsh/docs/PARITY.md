@@ -264,6 +264,12 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > 6 s for errors), and gives 点歌指令模板's ⓘ the placeholder tooltip
 > (`[song]`/`[歌曲]`, `[space]`/`[空格]`, both examples).
 
+> 0.8.5 hides the log panel behind a switch instead of always showing it:
+> 设置 → 常规 → 显示日志面板 (default 已隐藏). The choice is stored as
+> `board.log_visible` ("1"/"0") in SQLite's `settings` table, so it survives
+> a restart; the bar (复制 / 清空 / 展开) only renders when it is on and the
+> log has lines.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;
