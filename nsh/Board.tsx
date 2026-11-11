@@ -1,5 +1,5 @@
-import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Picker, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
-import { Icon, IconButton } from "./ui";
+import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
+import { Icon, IconButton, PALETTE } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
 import { Button, Dialog, Input } from "nsh/base";
@@ -20,12 +20,10 @@ import {
 } from "./plugins/kugou";
 import { clearPlaylistByName, resolvePlaylistByName } from "./plugins/kugou/playlistOps";
 import process from "process";
-import { parseSqlite } from "./plugins/kugou/sqliteReader";
-import { convertTauriDatabase } from "./src/legacyMigration";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.8.1";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -995,86 +993,6 @@ function Board() {
   };
 
   // Import a Tauri-era storage export (produced by
-  // scripts/migrate-tauri-to-nsh.py) into SQLite. Validate first, then commit
-  // every imported key and the marker together before updating the UI.
-  let importingLegacy = false;
-  const importLegacy = async () => {
-    if (importingLegacy) return;
-    importingLegacy = true;
-    showFlash("请选择原版 Tauri 数据库或迁移 JSON…");
-    try {
-      const picked = await Picker.pickFiles({ filters: [
-        { name: "Tauri 数据库", extensions: ["db", "sqlite", "sqlite3"] },
-        { name: "NSH storage JSON", extensions: ["json"] },
-      ] });
-      if (!picked || picked.length === 0) { showFlash("已取消导入"); return; }
-      const file = picked[0].file;
-      const buf = new Uint8Array(await (file as any).arrayBuffer());
-      const magic = new TextDecoder("latin1").decode(buf.slice(0, 16));
-      let data: any;
-      if (magic === "SQLite format 3\0") {
-        const converted = convertTauriDatabase(parseSqlite(buf));
-        if (!converted) throw new Error("数据库缺少 config 表");
-        data = converted;
-        showFlash("已读取 Tauri SQLite，正在写入…");
-      } else {
-        let text: string;
-        try { text = new TextDecoder().decode(buf); }
-        catch { throw new Error("无法读取文件"); }
-        data = JSON.parse(text);
-      }
-      const required = ["board.config"];
-      for (const k of required) {
-        if (typeof data[k] !== "string") throw new Error(`缺少 ${k}`);
-      }
-      // Validate board.config parses and has the core fields.
-      const cfg = JSON.parse(data["board.config"]);
-      if (typeof cfg.room_id !== "string") throw new Error("board.config 缺少 room_id");
-      const imported: Record<string, string> = {
-        "board.config": data["board.config"],
-        legacyMigrationDone: "manual-import@" + Math.floor(Date.now() / 1000),
-      };
-      if (typeof data["board.theme"] === "string") imported["board.theme"] = data["board.theme"];
-      if (typeof data["kugou.session"] === "string") imported["kugou.session"] = data["kugou.session"];
-      await storage.setItems(imported);
-      // Reload in-memory state from the freshly imported config so the UI
-      // reflects it without a restart.
-      config.set({
-        room_id: cfg.room_id ?? "",
-        sing_prefix: cfg.sing_prefix ?? DEFAULT_SING_PREFIX,
-        fans_level: cfg.fans_level ?? 0,
-        sing_cd: cfg.sing_cd ?? 0,
-        cooldown_seconds: cfg.cooldown_seconds ?? 1800,
-        max_songs_per_user: cfg.max_songs_per_user ?? 3,
-        target_playlist_name: cfg.target_playlist_name ?? "",
-        target_playlist_id: cfg.target_playlist_id ?? 0,
-        kugou_enabled: cfg.kugou_enabled !== false,
-        blacklist: Array.isArray(cfg.blacklist) ? cfg.blacklist : [],
-        blacklist_singers: Array.isArray(cfg.blacklist_singers) ? cfg.blacklist_singers : [],
-        blacklist_meta: cfg.blacklist_meta && typeof cfg.blacklist_meta === "object" ? cfg.blacklist_meta : {},
-        auto_sync: false,
-        active_plugin: cfg.active_plugin === "kugou" || cfg.active_plugin === "netease" || cfg.active_plugin === "" ? cfg.active_plugin : (cfg.kugou_enabled === false ? "" : "kugou"),
-        config_version: 2,
-      });
-      if (data["board.theme"] === "light" || data["board.theme"] === "dark" || data["board.theme"] === "system") {
-        applyTheme(data["board.theme"]);
-      }
-      // Restore session if present.
-      if (typeof data["kugou.session"] === "string") {
-        try {
-          const sess = JSON.parse(data["kugou.session"]);
-          if (sess?.token && sess?.userid) { kugou.set(sess); await loadLists(sess); }
-        } catch {}
-      }
-      showFlash("原版数据导入成功");
-      log("原版数据导入成功");
-    } catch (e: any) {
-      showFlash("导入失败：" + String(e?.message ?? e));
-      log("导入失败：" + String(e?.message ?? e));
-    } finally {
-      importingLegacy = false;
-    }
-  };
 
   const addBlackByName = (type: "song" | "singer", name: string) => {
     const clean = name.trim();
@@ -1173,8 +1091,14 @@ function Board() {
           {IconButton({ testID: "theme", name: colorScheme() === "dark" ? "sun" : "moon", onPress: toggleTheme, label: colorScheme() === "dark" ? "切换亮色" : "切换暗色", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "settings", name: "settings", onPress: () => openSettings("general"), label: "设置", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
           {IconButton({ testID: "about", name: "info", onPress: () => openSettings("about"), label: "关于 / 检查更新", class: "h-[30px] w-[30px] rounded-(--radius) bg-transparent text-muted-foreground active:bg-muted", iconClass: "h-[15px] w-[15px]" })}
-          <If when={running()} else={IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground active:bg-muted-foreground", iconClass: "h-[15px] w-[15px]", color: "background", label: "开始" })}>
+          {/* Two Ifs, not If/else: the else element is built once, so a
+              colour that follows the scheme would keep the first scheme's
+              value and the play icon would vanish after a theme switch. */}
+          <If when={running()}>
             {IconButton({ testID: "stop", name: "square", onPress: stop, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-[#c5403c] active:bg-danger-hover", iconClass: "h-[15px] w-[15px]", color: "#ffffff", label: "停止" })}
+          </If>
+          <If when={!running()}>
+            {IconButton({ testID: "start", name: "play", onPress: start, class: "ml-[9px] mr-[1px] h-[30px] w-[30px] rounded-[6px] bg-foreground active:bg-muted-foreground", iconClass: "h-[15px] w-[15px]", color: colorScheme() === "dark" ? PALETTE.dark.background : PALETTE.light.background, label: "开始" })}
           </If>
         </View>
       </View>
@@ -1780,7 +1704,7 @@ function Board() {
                     <Image src={logo} class="h-10 w-10 rounded-[4px]" />
                     <View class="flex-1">
                       <Text class="text-[14px] font-semibold text-foreground">SUSUSongBoard</Text>
-                      <Text class="text-[11px] text-faint">v{APP_VERSION} · NSH 原生版</Text>
+                      <Text class="text-[11px] text-faint">v{APP_VERSION}</Text>
                     </View>
                   </View>
                   <View class="h-px bg-line" />
@@ -1806,10 +1730,6 @@ function Board() {
                       <Text testID="about-progress" class="text-[10px] text-faint">下载中 {Math.round((updateProgress() ?? 0) * 100)}%</Text>
                     </View>
                   </If>
-                  <Button testID="about-import-legacy" onPress={importLegacy} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
-                    <Text class="text-[12px] text-foreground">导入原版数据 (Tauri SQLite → JSON)</Text>
-                  </Button>
-                  <Text class="text-[11px] text-faint">选择 migrate-tauri-to-nsh.py 生成的 storage.json 或等价 JSON；会覆盖当前配置与登录。</Text>
                   <Text class="text-[10px] text-faint">更新会校验清单签名与安装包 SHA-256；失败时保持当前版本，可到 GitHub Releases 手动下载。</Text>
                 </View>
               </If>
@@ -1845,9 +1765,6 @@ function Board() {
                 <Text class="text-[11px] text-faint">如需完整功能，请在插件页启用「酷狗音乐」。</Text>
               </View>
               <View class="gap-2">
-                <Button testID="firstrun-import-legacy" onPress={importLegacy} class="items-center justify-center self-start w-full rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
-                  <Text class="text-[12px] text-primary-foreground">导入原版数据 (Tauri SQLite → JSON)</Text>
-                </Button>
                 <Button testID="firstrun-enable-kugou" onPress={() => { selectPlugin("kugou"); showFirstRunImport.set(false); }} class="items-center justify-center self-start w-full rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
                   <Text class="text-[12px] text-foreground">启用酷狗音乐，开始完整体验</Text>
                 </Button>

@@ -138,6 +138,11 @@ jobs:
     name: Publish release
     needs: build
     runs-on: ubuntu-latest
+    # The workflow's default working directory is `nsh` (where the app lives);
+    # artifacts and manifest paths here are relative to the repository root.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
         with:
@@ -178,7 +183,7 @@ jobs:
           printf '%s' "$UPDATE_KEY" > key.secret
           trap 'rm -f key.secret' EXIT
           nsh update-manifest dist/*.tar.gz dist/*.zip \
-            --notes notes.md --key key.secret -o dist
+            --entry nsh --notes notes.md --key key.secret -o dist
           cat dist/latest.json
 
       - name: Release notes

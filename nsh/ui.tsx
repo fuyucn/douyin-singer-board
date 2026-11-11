@@ -82,6 +82,17 @@ export function iconCenterDelta(g: IconGeom): { dx: number; dy: number } {
   };
 }
 
+/** The app's palette (`theme.json`), read by scheme.
+ *
+ *  `token()` in the runtime keeps the appearance the app started in, so an
+ *  inverse button (dark on light, light on dark) must take its icon colour
+ *  from this table instead of `token("background")`, or the icon keeps the
+ *  first scheme's colour and disappears when the user switches. */
+export const PALETTE = {
+  light: { background: "#f4f6f8", foreground: "#191d24" },
+  dark: { background: "#17191b", foreground: "#edf0f1" },
+} as const;
+
 /** Icon-only button, mirroring shadcn's `inline-flex items-center justify-center`.
  *  Always centers; `class` supplies size/color/state only. */
 export function IconButton(props: {

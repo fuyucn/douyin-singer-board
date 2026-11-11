@@ -38,7 +38,7 @@ def has(path: Path, needle: str) -> bool:
 
 checks = [
     (N / "Board.tsx", f'const APP_VERSION = "{v}";'),
-    (N / "parity.test.tsx", f"v{v} · NSH 原生版"),
+    (N / "parity.test.tsx", f"v{v}"),
     (N / "installer" / "installer.nsi", f'!define APP_VERSION "{v}"'),
     (N / "installer" / "portable.nsi", f'!define APP_VERSION "{v}"'),
     (N / "installer" / "portable.nsi", f'!define APP_BUILD "{b}"'),

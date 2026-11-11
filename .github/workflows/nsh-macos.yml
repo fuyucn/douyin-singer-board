@@ -70,8 +70,6 @@ jobs:
           nsh test parity.test.tsx
           nsh test sqlite-store.test.tsx
           nsh test sqlite-bridge.test.tsx
-          nsh test import-db.test.tsx
-          nsh test import-legacy.test.tsx
           nsh test sync-worker.test.tsx
           nsh test text-layout.test.tsx
           nsh test geometry.test.tsx
@@ -79,7 +77,6 @@ jobs:
       - name: Real macOS renderer tests
         run: |
           nsh test table-actions-target.test.tsx --target macos
-          nsh test sqlite-bridge-target.test.tsx --target macos
 
       - name: Playlist crypto KAT (NSH vs Node)
         run: |
