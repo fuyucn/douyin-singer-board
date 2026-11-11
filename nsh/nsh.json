@@ -1,8 +1,8 @@
 {
   "name": "SUSUSongBoard",
   "id": "com.sususongboard.app",
-  "version": "0.8.2",
-  "build": 802,
+  "version": "0.8.3",
+  "build": 803,
   "rust": "native",
   "icon": "assets/icon.png",
   "window": {
@@ -42,7 +42,7 @@
   },
   "theme": "theme.json",
   "updater": {
-    "github": "fuyucn/douyin-singer-board",
+    "url": "https://gh-proxy.com/https://github.com/fuyucn/douyin-singer-board/releases/latest/download/latest.json",
     "publicKey": "/mg2DCiu7KzF/hRF+l7s8JQNZzb2Jph7447Ha8J4Uqk="
   }
 }
