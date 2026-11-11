@@ -40,6 +40,17 @@ If a migration was edited by mistake during early development, the dev fix is
 to delete the DB file and let the migration re-run from scratch (the path is
 the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 
+## NSH app (branch `nsh`) (important)
+
+The repo ships two apps. The versioning, branch and release rules above describe the Tauri app on `main` and `feat/susu`. The native rewrite lives on the `nsh` branch and shares neither its versioning nor its data layer.
+
+- **Where**: `nsh/` (`Board.tsx` is the entry, `nsh/native` is the Rust crate behind `app/sqlite`), built and packaged by the NSH CLI. Docs: `nsh/README.md`, parity notes in `nsh/docs/PARITY.md`.
+- **Build/test**: run from `nsh/`, never from the repo root (cargo discovers `nsh/.cargo/config.toml` by walking up from the current directory): `nsh build Board.tsx`, `nsh test <file>.test.tsx`, `nsh test <file>.test.tsx --target macos` for the real renderer, `nsh package Board.tsx --target macos -o dist`.
+- **Version sources** (kept in sync by `python3 nsh/scripts/check_versions.py`, which CI runs): `nsh/nsh.json` (`version`, `build`), `nsh/Board.tsx`'s `APP_VERSION`, `nsh/installer/installer.nsi` and `portable.nsi` (`APP_VERSION`, `APP_BUILD`, `VIProductVersion`), the artifact names in `.github/workflows/nsh-windows.yml` and `nsh/README.md`, and the version string in `nsh/parity.test.tsx`. Bump all of them together.
+- **Releases**: tag `v<version>` on `nsh` (the tag must match `nsh.json`) and `NSH Release` builds macOS arm64, macOS Intel and Windows archives on their own runners, signs `latest.json` with the `NSH_UPDATE_KEY` secret (its public half is `nsh.json`'s `updater.publicKey`) and attaches everything to the GitHub release. The app updates itself from `releases/latest/download/`.
+- **Storage**: the app owns its SQLite schema (`config`, `blacklist`, `kugou_session`, `settings`, `meta`, `PRAGMA user_version`), in `${dataDir}/sususongboard.db`. The first launch imports the old Tauri database through a verified temp copy and snapshots it into `sqlite-backups/`. Never write `storage.json`, never reintroduce the old `nsh_kv` table, and change the schema only by bumping `user_version`/`meta.schema` plus a migration in `nsh/native/src/store.rs`.
+- **Tests that must stay green**: `cargo test --locked` in `nsh/native`, the headless `nsh test` suites, the `--target macos` renderer tests, `scripts/check_icon_buttons.py`, `scripts/check_versions.py`, and the playlist KAT (`nsh test scripts/kat-playlist.test.ts > kat.txt 2>&1 && node scripts/kat-playlist.mjs kat.txt`; the KAT prints on stderr).
+
 ## Branch rules (important)
 
 `feat/susu` is a **permanently custom development edition** — it contains special customizations that must never be merged back into `main`.

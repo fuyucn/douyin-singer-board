@@ -47,6 +47,16 @@ the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 - The only allowed direction is `main` → `feat/kugou-search`, and **only** when the user explicitly asks to bring a specific feature from `main` into `feat/kugou-search`.
 - If asked to do a general merge or sync between these two branches, refuse and ask the user to clarify which specific commits from `main` they want cherry-picked.
 
+## NSH app (branch `nsh`)
+
+`AGENTS.md` is authoritative when this file and the code disagree. Since 0.8.x the repo also ships a native rewrite on the `nsh` branch:
+
+- `nsh/Board.tsx` is the entry; `nsh/native` is the Rust crate behind the `app/sqlite` module.
+- Build and test from `nsh/`: `nsh build Board.tsx`, `nsh test <file>.test.tsx`, `nsh test <file>.test.tsx --target macos`, `nsh package Board.tsx --target macos -o dist`. Cargo discovers `nsh/.cargo/config.toml` from the working directory, so the repo root builds differently.
+- Its version lives in `nsh/nsh.json` plus the strings `python3 nsh/scripts/check_versions.py` checks (`Board.tsx`'s `APP_VERSION`, both `.nsi` files, workflow artifact names, `parity.test.tsx`, `nsh/README.md`). `pnpm bump` does not touch it.
+- Tag `v<version>` on `nsh` publishes a release through `NSH Release` (signed `latest.json` + macOS/Windows archives); the app updates itself from `releases/latest/download/`.
+- Storage is the app's own SQLite schema in `${dataDir}/sususongboard.db` (`config`, `blacklist`, `kugou_session`, `settings`, `meta`). Old Tauri data is imported once at first launch. Do not write `storage.json` and do not restore the old `nsh_kv` table.
+
 ## Workflow
 
 1. Make code changes

@@ -8,6 +8,13 @@ When a streamer goes live, viewers type things like `点歌 周杰伦` in chat. 
 
 ## Stack
 
+Two apps ship from this repo:
+
+- **NSH rewrite** (`nsh/`, branch `nsh`): TSX rendered by [Native Shell](https://nsh.dev) with its own Rust SQLite module, no WebView. Build and test: `cd nsh && nsh build Board.tsx` / `nsh test board.test.tsx`; see `nsh/README.md`. It updates itself from GitHub Releases.
+- **Tauri build** (`main`, `feat/susu`): below.
+
+### Tauri
+
 - Tauri 2 (Rust shell + WebView frontend)
 - React + Vite + TypeScript + Zustand
 - SQLite via `tauri-plugin-sql` (config + history persistence)

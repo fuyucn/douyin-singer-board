@@ -230,6 +230,40 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
   per-plugin storage/permissions. Until then, Kugou is a directly imported
   module (`plugins/kugou/`), not an isolated plugin.
 
+## 0.8.x own SQLite schema + updates
+
+> 0.8.0 replaces the `nsh_kv` bridge with the app's own database. The main
+> store is `${process.dataDir}/sususongboard.db` (the same file the Tauri app
+> used) with tables `config` (one row, typed columns + `extra` JSON for
+> unknown keys), `blacklist` (one row per entry, with `created_at`),
+> `kugou_session`, `settings` (theme, markers, leftovers) and `meta`
+> (`schema`, import source/time); `PRAGMA user_version` tracks the schema.
+> `board.config` stays one JSON document to TSX, so nothing in `Board.tsx`
+> changed shape.
+>
+> Import is one shot: snapshot the old file with SQLite's backup API (WAL
+> pages included, into `sqlite-backups/`), build the new database beside it,
+> verify the room id and blacklist row count against the source, swap it in,
+> then delete the old file. An unreadable legacy file is renamed
+> `.unreadable-<time>` instead. `storage.json` is never read or written again.
+>
+> 0.8.0 also adds the in-app updater (设置 → 关于 → 检查更新): `nsh.json`
+> names the repository and manifest key, `NSH Release` publishes signed
+> `latest.json` plus macOS arm64/Intel and Windows archives on a
+> `v<version>` tag, and the download checks signature, app id, version,
+> size and SHA-256 before swapping the app and restarting.
+>
+> 0.8.1 fixes the start button: `token()` keeps the appearance the app
+> started in and `If`'s `else` element is built once, so the play icon
+> stayed dark on the dark button in light mode. It now reads the palette per
+> scheme and start/stop are two `If`s. The same release drops the header's
+> About icon (the tab remains), removes the manual 导入原版数据 picker
+> (the first launch imports by itself), moves the sidebar version from a
+> fixed footer into the scroll content, replaces the bottom-line `flash`
+> text with `nsh/base` toasts (bottom-right, tone dot, swipeable, 3.2 s /
+> 6 s for errors), and gives 点歌指令模板's ⓘ the placeholder tooltip
+> (`[song]`/`[歌曲]`, `[space]`/`[空格]`, both examples).
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

@@ -131,11 +131,11 @@ What migrates: room id, 点歌指令模板, 点歌规则, 歌单名/id, 黑名�
 freshness (re-scan if expired), 歌单列表 (re-fetched on login), auto-sync
 (defaults to off), 队列/已点/日志/history (session data).
 
-Manual paths remain: **设置 → 关于 → 导入原版数据** can still pick a `.db`
-or migration JSON. Imported keys commit together into SQLite, not JSON. The
-TS read-only parser is retained only for user-picked legacy `.db` files and
-their conversion tests; automatic startup uses real SQLite, including WAL.
-The old Python JSON exporter is not the main storage backend.
+The manual **导入原版数据** picker is gone: the first launch imports the old
+database itself, so a second path could only duplicate or overwrite it.
+`src/legacyMigration.ts` and `plugins/kugou/sqliteReader.ts` remain for their
+unit tests only; nothing in `Board.tsx` imports them. The old Python JSON
+exporter is not the main storage backend.
 
 ## Updates
 
