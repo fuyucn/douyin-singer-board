@@ -125,6 +125,8 @@ fn legacy_database_is_imported_once_and_replaced() {
              UPDATE config SET room_id='wal-room';",
         )
         .unwrap();
+    // Windows refuses to rename a database another connection still holds.
+    drop(legacy);
     let old_json =
         json!({"board.config": config("stale-json"), "legacyMigrationDone": "old-marker"})
             .to_string();
