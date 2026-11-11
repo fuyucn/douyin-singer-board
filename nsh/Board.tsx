@@ -2,7 +2,7 @@ import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openU
 import { Icon, IconButton, PALETTE } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
-import { Button, Dialog, Input, Toast, ToastManager, ToastStack } from "nsh/base";
+import { Button, Dialog, Input, Toast, ToastManager, ToastStack, Tooltip } from "nsh/base";
 import { Menu } from "nsh/desktop";
 import { checkForUpdate, downloadUpdate, installAndRestart } from "nsh/updater";
 import Client from "./listener-bundle.js";
@@ -1144,7 +1144,33 @@ function Board() {
                 <View class="gap-1.5">
                   <View class="flex-row items-center gap-1">
                     <Text class="text-xs text-muted-foreground">点歌指令模板</Text>
-                    {Icon({ scheme: colorScheme(), name: "info", class: "h-3 w-3", color: "faint" })}
+                    <View
+                      testID="sing-prefix-tip"
+                      class="p-[2px]"
+                      tooltip={
+                        <Tooltip placement="right" offset={8} class="max-w-[260px] gap-2 rounded-[8px] border border-line bg-popover p-3 shadow-md">
+                          <Text class="text-[12px] font-semibold text-foreground">占位符说明</Text>
+                          <View class="gap-1">
+                            <Text class="text-[11px] leading-4 text-muted-foreground">
+                              [song] 或 [歌曲] — 歌曲名
+                            </Text>
+                            <Text class="text-[11px] leading-4 text-muted-foreground">
+                              [space] 或 [空格] — 空格
+                            </Text>
+                          </View>
+                          <View class="h-px bg-line" />
+                          <View class="gap-1">
+                            <Text class="text-[11px] font-medium text-foreground">示例</Text>
+                            <Text class="text-[11px] leading-4 text-foreground">点歌[space][song]</Text>
+                            <Text class="text-[11px] leading-4 text-faint">→ 「点歌 七里香」</Text>
+                            <Text class="text-[11px] leading-4 text-foreground">点歌[song]</Text>
+                            <Text class="text-[11px] leading-4 text-faint">→ 「点歌七里香」</Text>
+                          </View>
+                        </Tooltip>
+                      }
+                    >
+                      {Icon({ scheme: colorScheme(), name: "info", class: "h-3 w-3", color: "faint" })}
+                    </View>
                   </View>
                   <Input style={inputStyle()}
                     value={config().sing_prefix}
