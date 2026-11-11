@@ -1,0 +1,214 @@
+name: NSH Release
+
+# One release per tag: the archives the app updates from, plus the signed
+# manifest `latest.json` that `nsh/updater` reads from
+# `releases/latest/download/`. Tag and `nsh.json` version must agree.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (must match nsh/nsh.json's version)"
+        required: true
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: nsh
+
+jobs:
+  build:
+    name: Archive (${{ matrix.artifact }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            artifact: macos-arm64
+          - os: macos-15-intel
+            artifact: macos-intel
+          - os: windows-latest
+            artifact: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install NSH nightly (macOS)
+        if: runner.os == 'macOS'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Verify the checksum here: the release CDN's .sha256 sidecar 504s.
+          if [ "$(uname -m)" = "arm64" ]; then arch=arm64; else arch=x86_64; fi
+          tmp=$(mktemp -d)
+          asset="nsh-macos-${arch}.tar.gz"
+          gh release download nightly --repo longbridge/nsh \
+            --pattern "$asset" --pattern "$asset.sha256" --dir "$tmp" --clobber
+          cd "$tmp"
+          shasum -a 256 -c "$asset.sha256"
+          mkdir -p "$HOME/.nsh"
+          tar -xzf "$asset"
+          cp -R nsh/. "$HOME/.nsh/"
+          echo "$HOME/.nsh/bin" >> "$GITHUB_PATH"
+
+      - name: Install NSH nightly (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tmp = "$env:TEMP\nsh-unpack"
+          $zip = "$env:TEMP\nsh-windows-x86_64.zip"
+          $dest = "$env:LOCALAPPDATA\nsh"
+          $ok = $false
+          for ($i = 1; $i -le 3 -and -not $ok; $i++) {
+            try {
+              gh release download nightly --repo longbridge/nsh `
+                --pattern "nsh-windows-x86_64.zip" --pattern "nsh-windows-x86_64.zip.sha256" `
+                --dir $env:TEMP --clobber
+              $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+              $expected = (Get-Content "$zip.sha256").Split(" ")[0].ToLower()
+              if ($hash -ne $expected) { throw "checksum mismatch" }
+              $ok = $true
+            } catch { Start-Sleep -Seconds 5 }
+          }
+          if (-not $ok) { throw "NSH nightly download failed after 3 attempts" }
+          Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force $dest -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
+          if (-not (Test-Path (Join-Path $dest "bin\nsh.exe"))) { throw "nsh.exe missing after unpack" }
+          (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Check NSH and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          nsh -V
+          version=$(python3 -c 'import json;print(json.load(open("nsh.json"))["version"])' 2>/dev/null || \
+            python -c 'import json;print(json.load(open("nsh.json"))["version"])')
+          tag=${{ inputs.tag || github.ref_name }}
+          if [ "v${version}" != "${tag}" ]; then
+            echo "nsh.json version ${version} does not match tag ${tag}"; exit 1
+          fi
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Package app
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            nsh package Board.tsx --target windows -o dist
+          else
+            nsh package Board.tsx --target macos -o dist
+          fi
+
+      - name: Collect archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # The updater archive is named <name>-<version>-<os>-<arch>.<ext>;
+          # the plain zip is the same payload and is not published.
+          for f in dist/*.tar.gz dist/*.zip; do
+            [ -e "$f" ] || continue
+            case "$f" in
+              dist/SUSUSongBoard-[0-9]*-*.tar.gz|*SUSUSongBoard-[0-9]*-*.zip) cp "$f" release/ ;;
+            esac
+          done
+          ls -lh release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact }}
+          path: nsh/release/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Install NSH nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          asset=nsh-linux-x86_64.tar.gz
+          gh release download nightly --repo longbridge/nsh \
+            --pattern "$asset" --pattern "$asset.sha256" --dir "$tmp" --clobber
+          cd "$tmp"
+          sha256sum -c "$asset.sha256"
+          mkdir -p "$HOME/.nsh"
+          tar -xzf "$asset"
+          cp -R nsh/. "$HOME/.nsh/"
+          echo "$HOME/.nsh/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Write the signed manifest
+        env:
+          UPDATE_KEY: ${{ secrets.NSH_UPDATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_KEY" ]; then
+            echo "NSH_UPDATE_KEY is not set: the manifest would be unsigned"; exit 1
+          fi
+          umask 077
+          printf '%s' "$UPDATE_KEY" > key.secret
+          trap 'rm -f key.secret' EXIT
+          nsh update-manifest dist/*.tar.gz dist/*.zip \
+            --notes notes.md --key key.secret -o dist
+          cat dist/latest.json
+
+      - name: Release notes
+        run: |
+          set -euo pipefail
+          tag=${{ inputs.tag || github.ref_name }}
+          {
+            echo "SUSUSongBoard $tag"
+            echo
+            if prev=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null); then
+              echo "Changes since $prev:"
+              git log --pretty='- %s (%h)' "$prev..$tag"
+            else
+              echo "First release of the NSH app."
+              git log --pretty='- %s (%h)' -20 "$tag"
+            fi
+            echo
+            echo "macOS: unzip or drag SUSUSongBoard.app to /Applications. The app updates itself from these releases (设置 → 关于 → 检查更新)."
+          } > notes.md
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=${{ inputs.tag || github.ref_name }}
+          files="$(ls dist/*.tar.gz dist/*.zip dist/latest.json dist/latest.json.sig)"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" $files --clobber
+          else
+            gh release create "$tag" $files --title "SUSUSongBoard $tag" --notes-file notes.md
+          fi

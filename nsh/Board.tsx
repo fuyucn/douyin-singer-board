@@ -1,10 +1,10 @@
-import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, Picker, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
+import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Picker, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
 import { Icon, IconButton } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
 import { Button, Dialog, Input } from "nsh/base";
 import { Menu } from "nsh/desktop";
-import { checkForUpdate } from "nsh/updater";
+import { checkForUpdate, downloadUpdate, installAndRestart } from "nsh/updater";
 import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
 import { SyncLedger, formatDuration, isAuthFailure, nextDelay, pickNextSync, type SearchState } from "./src/autoSync";
@@ -117,6 +117,8 @@ function Board() {
   const blackType = signal<"song" | "singer">("song");
   const aboutMsg = signal("");
   const aboutBusy = signal(false);
+  const updateInfo = signal<any>(null);
+  const updateProgress = signal<number | null>(null);
   const nowTick = signal(Math.floor(Date.now() / 1000));
   let loginGen = 0;
 
@@ -548,13 +550,50 @@ function Board() {
   const checkUpdate = async () => {
     aboutBusy.set(true);
     aboutMsg.set("正在检查…");
+    updateInfo.set(null);
+    updateProgress.set(null);
     try {
       const update = await checkForUpdate();
-      aboutMsg.set(update ? `发现新版本 ${update.version}` : "已是最新版本");
+      if (!update) {
+        aboutMsg.set(`已是最新版本 v${APP_VERSION}`);
+        return;
+      }
+      updateInfo.set(update);
+      aboutMsg.set(
+        update.canInstall
+          ? `发现新版本 ${update.version}，可直接下载安装`
+          : `发现新版本 ${update.version}，请到 GitHub Releases 下载`,
+      );
     } catch (e: any) {
-      aboutMsg.set("暂无更新源：" + String(e?.message ?? e));
+      aboutMsg.set("检查更新失败：" + String(e?.message ?? e));
     } finally {
       aboutBusy.set(false);
+    }
+  };
+
+  // One button does both steps: download the archive, then swap it in and
+  // restart. On iOS/Android (canInstall false) it opens the download page.
+  const installUpdate = async () => {
+    const found = updateInfo();
+    if (!found || aboutBusy()) return;
+    if (!found.canInstall) {
+      await openUrl(found.url);
+      return;
+    }
+    aboutBusy.set(true);
+    updateProgress.set(0);
+    try {
+      aboutMsg.set(`正在下载 ${found.version}…`);
+      await downloadUpdate(({ received, total }: { received: number; total?: number | null }) => {
+        updateProgress.set(total ? Math.min(1, received / total) : null);
+      });
+      aboutMsg.set("下载完成，正在安装并重启…");
+      await installAndRestart();
+    } catch (e: any) {
+      aboutMsg.set("更新失败：" + String(e?.message ?? e));
+    } finally {
+      aboutBusy.set(false);
+      updateProgress.set(null);
     }
   };
   const num = (value: string, fallback = 0) => {
@@ -1748,15 +1787,30 @@ function Board() {
                   <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
                   <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
                   <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
-                  <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
-                    <Text class="text-[12px] text-primary-foreground">{aboutBusy() ? "检查中…" : "检查更新"}</Text>
-                  </Button>
+                  <View class="flex-row items-center gap-2">
+                    <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                      <Text class="text-[12px] text-primary-foreground">{aboutBusy() && updateProgress() === null ? "处理中…" : "检查更新"}</Text>
+                    </Button>
+                    <If when={updateInfo()}>
+                      <Button testID="about-install" onPress={installUpdate} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
+                        <Text class="text-[12px] text-foreground">{updateInfo()?.canInstall ? "下载并安装" : "打开下载页"}</Text>
+                      </Button>
+                    </If>
+                  </View>
                   <Text class="text-[11px] text-muted-foreground">{aboutMsg()}</Text>
+                  <If when={updateProgress() !== null}>
+                    <View class="gap-1">
+                      <View class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <View class="h-full rounded-full bg-primary" style={{ width: `${Math.round((updateProgress() ?? 0) * 100)}%` }} />
+                      </View>
+                      <Text testID="about-progress" class="text-[10px] text-faint">下载中 {Math.round((updateProgress() ?? 0) * 100)}%</Text>
+                    </View>
+                  </If>
                   <Button testID="about-import-legacy" onPress={importLegacy} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
                     <Text class="text-[12px] text-foreground">导入原版数据 (Tauri SQLite → JSON)</Text>
                   </Button>
                   <Text class="text-[11px] text-faint">选择 migrate-tauri-to-nsh.py 生成的 storage.json 或等价 JSON；会覆盖当前配置与登录。</Text>
-                  <Text class="text-[10px] text-faint">更新源尚未配置时，请到 GitHub Releases 手动下载。</Text>
+                  <Text class="text-[10px] text-faint">更新会校验清单签名与安装包 SHA-256；失败时保持当前版本，可到 GitHub Releases 手动下载。</Text>
                 </View>
               </If>
             </View>

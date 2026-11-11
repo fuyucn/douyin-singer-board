@@ -40,5 +40,9 @@
     "statusBar": true,
     "clipboard": true
   },
-  "theme": "theme.json"
+  "theme": "theme.json",
+  "updater": {
+    "github": "fuyucn/douyin-singer-board",
+    "publicKey": "/mg2DCiu7KzF/hRF+l7s8JQNZzb2Jph7447Ha8J4Uqk="
+  }
 }

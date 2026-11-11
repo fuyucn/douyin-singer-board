@@ -137,6 +137,28 @@ TS read-only parser is retained only for user-picked legacy `.db` files and
 their conversion tests; automatic startup uses real SQLite, including WAL.
 The old Python JSON exporter is not the main storage backend.
 
+## Updates
+
+The app updates itself from GitHub Releases (`nsh.json` `"updater"` names the
+repository and the manifest signing key). 设置 → 关于 → 检查更新 reads
+`latest.json` from `releases/latest/download/`, verifies its signature, the
+app id and the version, then 下载并安装 streams the archive (SHA-256 checked),
+swaps the running app and restarts. A failed download or a refused archive
+leaves the installed version untouched.
+
+Publishing is `NSH Release` on a `v<version>` tag: it builds the macOS arm64,
+macOS Intel and Windows archives on their own runners, writes the signed
+`latest.json` with the key in the `NSH_UPDATE_KEY` secret, and attaches the
+archives plus `latest.json`/`latest.json.sig` to the release. Tag and
+`nsh.json`'s version must match. The manifest signing key is
+`nsh keys/update` (gitignored): `keys/update.secret` signs, `keys/update.pub`
+is embedded in `nsh.json`. Losing it means releasing a new key with a new
+manifest, so keep it backed up.
+
+Only a TSX change could ship as an OTA package (`.nshpkg`), which is smaller
+than the 24 MB app but cannot carry native Rust changes; this app ships the
+full archive, which is the same flow the old Tauri build used.
+
 Build prerequisites: NSH 0.4.0, Rust >= 1.97 and a native C compiler (Xcode
 Command Line Tools on macOS; MSVC Build Tools on Windows) for the bundled
 SQLite amalgamation. Run build commands from `nsh/`, not the repository
