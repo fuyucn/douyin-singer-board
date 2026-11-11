@@ -23,7 +23,7 @@ import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.3";
+const APP_VERSION = "0.8.4";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -1766,7 +1766,7 @@ function Board() {
                       <Text testID="about-progress" class="text-[10px] text-faint">下载中 {Math.round((updateProgress() ?? 0) * 100)}%</Text>
                     </View>
                   </If>
-                  <Text class="text-[10px] text-faint">更新会校验清单签名与安装包 SHA-256；失败时保持当前版本，可到 GitHub Releases 手动下载。</Text>
+                  <Text testID="about-update-source" class="text-[10px] text-faint">更新源：gh-proxy.com（清单验签、包校验 SHA-256；失败时保持当前版本）</Text>
                 </View>
               </If>
             </View>
