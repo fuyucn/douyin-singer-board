@@ -171,21 +171,6 @@ jobs:
           pattern: release-*
           merge-multiple: true
 
-      - name: Write the signed manifest
-        env:
-          UPDATE_KEY: ${{ secrets.NSH_UPDATE_KEY }}
-        run: |
-          set -euo pipefail
-          if [ -z "$UPDATE_KEY" ]; then
-            echo "NSH_UPDATE_KEY is not set: the manifest would be unsigned"; exit 1
-          fi
-          umask 077
-          printf '%s' "$UPDATE_KEY" > key.secret
-          trap 'rm -f key.secret' EXIT
-          nsh update-manifest dist/*.tar.gz dist/*.zip \
-            --entry nsh --notes notes.md --key key.secret -o dist
-          cat dist/latest.json
-
       - name: Release notes
         run: |
           set -euo pipefail
@@ -204,6 +189,21 @@ jobs:
             echo "macOS: unzip or drag SUSUSongBoard.app to /Applications. The app updates itself from these releases (设置 → 关于 → 检查更新)."
           } > notes.md
           cat notes.md
+
+      - name: Write the signed manifest
+        env:
+          UPDATE_KEY: ${{ secrets.NSH_UPDATE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$UPDATE_KEY" ]; then
+            echo "NSH_UPDATE_KEY is not set: the manifest would be unsigned"; exit 1
+          fi
+          umask 077
+          printf '%s' "$UPDATE_KEY" > key.secret
+          trap 'rm -f key.secret' EXIT
+          nsh update-manifest dist/*.tar.gz dist/*.zip \
+            --entry nsh --notes notes.md --key key.secret -o dist
+          cat dist/latest.json
 
       - name: Publish
         env:
