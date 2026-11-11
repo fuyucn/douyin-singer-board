@@ -270,6 +270,13 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > a restart; the bar (复制 / 清空 / 展开) only renders when it is on and the
 > log has lines.
 
+> 0.8.6 draws the blacklist type badge as a wrapper `View` (「歌曲」/「歌手」
+> used to clip their second glyph when the background sat on the `Text`),
+> and 0.8.7 restores the room preview the Tauri build had: a valid 抖音直播间
+> ID fetches `live.douyin.com/<id>` after a 600 ms debounce and shows the
+> streamer's nickname with a live dot (green for `status: 2`, grey otherwise,
+> title as tooltip) — no 开始 press needed. 开始 re-parses the same page.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

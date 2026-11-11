@@ -23,7 +23,40 @@ import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.6";
+
+/** Next.js streams the room page as escaped JSON: `nickname\":\"…`.
+ *  Reading it by index keeps the backslashes out of RegExp sources, where
+ *  a mis-escaped class silently throws and the preview never appears. */
+function parseRoomInfo(html: string): { nickname: string; title: string; status: number } | null {
+  const text = (key: string) => {
+    const prefix = key + '\\":\\"';
+    const at = html.indexOf(prefix);
+    if (at < 0) return "";
+    let value = "";
+    for (let i = at + prefix.length; i < html.length; i++) {
+      const ch = html[i];
+      if (ch === '"' || ch === "\\") break;
+      value += ch;
+    }
+    return value.startsWith("$") ? "" : value;
+  };
+  const number = (key: string) => {
+    const prefix = key + '\\":';
+    const at = html.indexOf(prefix);
+    if (at < 0) return 0;
+    let digits = "";
+    for (let i = at + prefix.length; i < html.length; i++) {
+      const ch = html[i];
+      if (ch < "0" || ch > "9") break;
+      digits += ch;
+    }
+    return Number(digits || 0);
+  };
+  const nickname = text("nickname");
+  if (!nickname) return null;
+  return { nickname, title: text("title"), status: number("status") };
+}
+const APP_VERSION = "0.8.7";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -88,7 +121,9 @@ function Board() {
     active_plugin: "kugou",
   });
   const status = signal("未连接");
-  const roomName = signal("");
+  // Preview of the room's streamer (nickname/title/live status), fetched as
+  // the ID changes and refreshed on connect.
+  const roomInfo = signal<{ nickname: string; title: string; status: number } | null>(null);
   const songs = signal<DanmuInfo[]>([]);
   const played = signal<PlayedInfo[]>([]);
   const logs = signal<string[]>([]);
@@ -151,6 +186,29 @@ function Board() {
         showFlash("SQLite 初始化失败，旧数据未覆盖，请检查后重启");
       }
     })();
+  });
+
+  // A valid room ID previews its streamer without connecting (the Tauri app
+  // did the same with a 600 ms debounce). Failures stay silent.
+  effect(() => {
+    const rid = config().room_id.trim();
+    roomInfo.set(null);
+    if (!/^\d{6,}$/.test(rid)) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const html = await (await fetch(`https://live.douyin.com/${rid}`, { headers: { "User-Agent": UA } })).text();
+        if (cancelled) return;
+        const info = parseRoomInfo(html);
+        if (info) roomInfo.set(info);
+      } catch {
+        /* silent: the label simply stays empty */
+      }
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   });
 
   // Show first-run dialog only after config loading completes and no config was found.
@@ -716,8 +774,8 @@ function Board() {
         .map((m) => m[1])
         .filter((v) => /^\d{15,}$/.test(v));
       const roomId = ids[0] ?? rid;
-      const nick = html.match(/nickname\\":\\"([^"\\]+)/)?.[1];
-      if (nick && nick !== "$undefined") roomName.set(nick);
+      const info = parseRoomInfo(html);
+      if (info) roomInfo.set(info);
       status.set("连接中...");
       const c: any = new Client(roomId, { autoReconnect: 0, autoStart: false });
       client = c;
@@ -1138,10 +1196,18 @@ function Board() {
                 <View class="gap-1.5">
                   <View class="flex-row items-center justify-between gap-2">
                     <Text class="text-xs text-muted-foreground">抖音直播间 ID</Text>
-                    <If when={roomName()}>
-                      <View class="inline-flex max-w-[60%] items-center gap-1">
-                        <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
-                        <Text class="truncate text-[11px] text-foreground">{roomName()}</Text>
+                    <If when={roomInfo()}>
+                      <View
+                        class="inline-flex max-w-[60%] flex-row items-center gap-1"
+                        testID="room-info"
+                        tooltip={roomInfo()?.title
+                          ? <Tooltip placement="right" offset={8} class="max-w-[260px] rounded-[8px] border border-line bg-popover p-2 shadow-md">
+                              <Text class="text-[11px] leading-4 text-muted-foreground">{roomInfo()?.title}</Text>
+                            </Tooltip>
+                          : undefined}
+                      >
+                        <View class={`h-1.5 w-1.5 shrink-0 rounded-full ${roomInfo()?.status === 2 ? "bg-success" : "bg-faint"}`} />
+                        <Text class="truncate text-[11px] text-foreground">{roomInfo()?.nickname}</Text>
                       </View>
                     </If>
                   </View>
