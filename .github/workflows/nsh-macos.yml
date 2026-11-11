@@ -80,7 +80,8 @@ jobs:
 
       - name: Playlist crypto KAT (NSH vs Node)
         run: |
-          nsh test scripts/kat-playlist.test.ts > kat-nsh.txt
+          # The KAT prints on stderr, so the runner's own lines come along.
+          nsh test scripts/kat-playlist.test.ts > kat-nsh.txt 2>&1
           node scripts/kat-playlist.mjs kat-nsh.txt
 
       - name: Icon button and version guards
