@@ -23,7 +23,7 @@ import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.5";
+const APP_VERSION = "0.8.6";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -1532,8 +1532,13 @@ function Board() {
                       <Each of={blackRows()} key={(r: any) => r.key}>
                         {(item: any, index: any) => (
                           <View class="group flex-row items-center border-b border-line px-4 py-2 hover:bg-muted">
-                            <View class="w-12">
-                              <Text class="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{item().type === "singer" ? "歌手" : "歌曲"}</Text>
+                            <View class="w-12 flex-row">
+                              {/* The pill is the wrapper: a background on the
+                                  Text itself is measured narrower than the
+                                  glyphs at this size and clips 「曲」/「手」. */}
+                              <View class="rounded bg-muted px-1.5 py-0.5">
+                                <Text class="text-[11px] font-medium text-muted-foreground">{item().type === "singer" ? "歌手" : "歌曲"}</Text>
+                              </View>
                             </View>
                             <Text class="flex-1 truncate text-sm text-foreground">{item().type === "singer" ? "全部歌曲" : item().name}</Text>
                             <Text class="w-28 truncate text-xs text-muted-foreground">{item().singer}</Text>
@@ -1561,7 +1566,7 @@ function Board() {
               <View class="flex-row items-center bg-secondary px-3 py-[6px]">
                 <Button onPress={() => logOpen.update((v) => !v)} class="flex-1 flex-row items-center gap-2 bg-transparent p-0 active:bg-transparent">
                   <Text class="text-[12px] font-medium text-muted-foreground">日志</Text>
-                  <Text class="ml-1 rounded bg-muted px-1.5 font-mono text-[10px] text-faint">{logs().length}</Text>
+                  <View class="ml-1 flex-row"><View class="rounded bg-muted px-1.5"><Text class="font-mono text-[10px] text-faint">{logs().length}</Text></View></View>
                 </Button>
                 {IconButton({ testID: "log-copy", name: "copy", label: "复制日志", text: "复制", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => copyText(logs().join("\n"), `日志 ${logs().length} 行`), class: "h-6 rounded px-1.5 bg-transparent active:bg-muted" })}
                 {IconButton({ testID: "log-clear", name: "trash", label: "清空日志", text: "清空", textClass: "text-[11px] text-faint", iconClass: "h-3 w-3", color: "faint", onPress: () => { logs.set([]); showFlash("日志已清空"); }, class: "h-6 rounded px-1.5 bg-transparent active:bg-danger-soft-bg" })}
