@@ -1,8 +1,8 @@
-import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
+import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Overlay, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
 import { Icon, IconButton, PALETTE } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
-import { Button, Dialog, Input } from "nsh/base";
+import { Button, Dialog, Input, Toast, ToastManager, ToastStack } from "nsh/base";
 import { Menu } from "nsh/desktop";
 import { checkForUpdate, downloadUpdate, installAndRestart } from "nsh/updater";
 import Client from "./listener-bundle.js";
@@ -101,9 +101,7 @@ function Board() {
   const themeMode = signal<"system" | "light" | "dark">("system");
   const playedQuery = signal("");
   const logOpen = signal(false);
-  const flash = signal("");
   const clearConfirm = signal<Tab | null>(null);
-  let flashTimer: number | null = null;
   let clearTimer: number | null = null;
 
   const kugou = signal<KugouSession | null>(null);
@@ -749,10 +747,26 @@ function Board() {
 
   // One shared, visible status line. It never covers a control, so it cannot
   // swallow a press; a test can assert it through app.texts().
-  const showFlash = (msg: string) => {
-    flash.set(msg);
-    if (flashTimer !== null) clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => flash.set(""), 3000);
+  // Toasts (`nsh/base`'s stack): kept by a manager whose clock the app drives,
+  // rendered newest-first from the bottom-right corner.
+  const toasts = new ToastManager();
+  const toastTick = signal(0);
+  const toastExpanded = signal(false);
+  let toastTimer: number | null = null;
+  let toastSeq = 0;
+
+  const advanceToasts = () => {
+    const advanced = toasts.advance(toastExpanded());
+    if (advanced.changed) toastTick.update((v) => v + 1);
+    if (toasts.isEmpty() && toastTimer !== null) {
+      clearInterval(toastTimer);
+      toastTimer = null;
+    }
+  };
+  const showFlash = (msg: string, tone: "info" | "success" | "error" = "info") => {
+    toasts.push(`toast-${++toastSeq}`, { msg, tone }, { timeout: tone === "error" ? 6000 : 3200 });
+    toastTick.update((v) => v + 1);
+    if (toastTimer === null) toastTimer = setInterval(advanceToasts, 200);
   };
 
   // Clipboard.writeText returns a Promise. Log only after it resolves, and
@@ -1546,9 +1560,6 @@ function Board() {
             </If>
           </View>
         </If>
-        <If when={flash()}>
-          <Text testID="flash" class="text-[11px] text-primary">{flash()}</Text>
-        </If>
         <View class="ml-auto flex-row items-center gap-4">
           <View class="flex-row items-center gap-1">
             <If when={status() === "已连接"} else={<View class="h-2 w-2 rounded-full bg-faint" />}>
@@ -1775,6 +1786,35 @@ function Board() {
           </Scroll>
         </View>
       </Dialog>
+
+      <Overlay style={{ position: "fixed", right: 16, bottom: 16 }}>
+        <ToastStack
+          class="w-[300px]"
+          placement="bottomRight"
+          onExpandedChange={({ expanded }: { expanded: boolean }) => toastExpanded.set(expanded)}
+        >
+          {(toastTick(), toasts.visible(4).map((entry) => {
+            const value = entry.value as { msg: string; tone: string };
+            return (
+              <Toast
+                key={entry.id}
+                transitionStatus={entry.status}
+                accessibilityLabel={value.msg}
+                swipeDirection="right"
+                onDismissRequest={() => {
+                  toasts.dismiss(entry.id);
+                  toastTick.update((v) => v + 1);
+                }}
+              >
+                <View class={`mb-2 flex-row items-center gap-2 rounded-[6px] border bg-card px-3 py-2 shadow-md ${value.tone === "error" ? "border-[#c5403c]" : "border-line"}`}>
+                  <View class={`h-[6px] w-[6px] shrink-0 rounded-full ${value.tone === "error" ? "bg-[#c5403c]" : value.tone === "success" ? "bg-success" : "bg-primary"}`} />
+                  <Text class="flex-1 text-[12px] leading-4 text-foreground">{value.msg}</Text>
+                </View>
+              </Toast>
+            );
+          }))}
+        </ToastStack>
+      </Overlay>
 
     </View>
   );
