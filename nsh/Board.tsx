@@ -1284,13 +1284,13 @@ function Board() {
               </View>
             </If>
 
+            {/* The version ends the sidebar's content, so it scrolls with
+                it instead of staying pinned to the window's bottom edge. */}
+            <View class="px-4 pb-4 pt-1">
+              <Text class="text-[11px] text-faint">SUSUSongBoard v{APP_VERSION}</Text>
+            </View>
           </View>
         </Scroll>
-        {/* Fixed footer, outside the scroll view: the version stays visible
-            in both platform and listener-only modes regardless of content. */}
-        <View class="shrink-0 px-4 pb-3 pt-1">
-          <Text class="text-[11px] text-faint">SUSUSongBoard v{APP_VERSION}</Text>
-        </View>
         </View>
 
         <View class="flex-1 flex-col min-h-0 bg-card">
