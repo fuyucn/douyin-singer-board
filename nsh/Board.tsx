@@ -23,7 +23,7 @@ import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-const APP_VERSION = "0.8.1";
+const APP_VERSION = "0.8.2";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
