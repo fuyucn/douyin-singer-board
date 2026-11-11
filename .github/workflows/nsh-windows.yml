@@ -59,24 +59,42 @@ jobs:
       - name: Check NSH
         run: nsh -V
 
+      - name: Install Rust for native SQLite
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: SQLite durability and recovery tests
+        run: cargo test --manifest-path native/Cargo.toml --locked
+
       - name: Unit tests
         run: |
           nsh test src/matcher.test.ts
           nsh test src/autoSync.test.ts
+          nsh test sqlite-bridge.test.tsx
+          nsh test sqlite-store.test.tsx
+          nsh test import-legacy.test.tsx
+          nsh test import-db.test.tsx
 
       - name: UI test
         run: |
           nsh test board.test.tsx
           nsh test parity.test.tsx
           nsh test actions.test.tsx
-          nsh test table-actions-target.test.tsx
+          nsh test table-actions-target.test.tsx --target windows
           nsh test text-layout.test.tsx
+          nsh test sqlite-store.test.tsx --target windows
 
       - name: Auto-sync worker test
         run: nsh test sync-worker.test.tsx
 
       - name: Icon button geometry
         run: nsh test geometry.test.tsx
+
+      - name: Playlist crypto KAT (NSH vs Node)
+        shell: pwsh
+        run: |
+          nsh test scripts/kat-playlist.test.ts 2>&1 | Out-File -Encoding utf8 kat-nsh.txt
+          if ($LASTEXITCODE -ne 0) { Get-Content kat-nsh.txt; throw "KAT test failed" }
+          node scripts/kat-playlist.mjs kat-nsh.txt
 
       - name: Icon button parity guard
         shell: pwsh
@@ -116,7 +134,7 @@ jobs:
       - name: Smoke portable exe
         shell: pwsh
         run: |
-          Start-Process "dist\SUSUSongBoard-Portable-0.7.2.exe"
+          Start-Process "dist\SUSUSongBoard-Portable-0.8.0.exe"
           Start-Sleep -Seconds 10
           $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
           if (-not $app) { throw "portable exe did not start the app" }
@@ -129,6 +147,6 @@ jobs:
           name: SUSUSongBoard-windows
           path: |
             nsh/dist/SUSUSongBoard.zip
-            nsh/dist/SUSUSongBoard-Setup-0.7.2.exe
-            nsh/dist/SUSUSongBoard-Portable-0.7.2.exe
+            nsh/dist/SUSUSongBoard-Setup-0.8.0.exe
+            nsh/dist/SUSUSongBoard-Portable-0.8.0.exe
           if-no-files-found: error

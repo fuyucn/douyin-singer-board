@@ -1,0 +1,18 @@
+[package]
+name = "sususongboard-sqlite"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+nsh-core = { git = "https://github.com/longbridge/nsh", rev = "a7addd84bb5f4dbfc6979549cc7429517e9bdca9" }
+nsh-base = { git = "https://github.com/longbridge/nsh", rev = "a7addd84bb5f4dbfc6979549cc7429517e9bdca9" }
+# Bundled everywhere: one SQLite version on macOS, Windows, Linux and Android,
+# no pkg-config/Homebrew leakage into the shipped binary.
+rusqlite = { version = "0.31", features = ["bundled", "backup"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

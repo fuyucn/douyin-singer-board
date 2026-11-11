@@ -32,7 +32,7 @@ function signature(params: Record<string, string>, salt: string): string {
   return md5(`${salt}${body}${salt}`);
 }
 
-function defaults(): Record<string, string> {
+export function defaults(): Record<string, string> {
   return {
     dfid: "-",
     mid: MID,
@@ -126,7 +126,7 @@ export async function qrCheck(key: string): Promise<{ status: number; token?: st
 
 const ANDROID_UA = "Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi";
 
-function signatureWithBody(params: Record<string, string>, salt: string, body: string): string {
+export function signatureWithBody(params: Record<string, string>, salt: string, body: string): string {
   const text = Object.keys(params)
     .sort()
     .map((key) => `${key}=${params[key]}`)
@@ -151,6 +151,10 @@ async function postJson(
     dfid: params.dfid ?? "-",
     mid: params.mid ?? MID,
     clienttime: params.clienttime ?? String(Math.floor(Date.now() / 1000)),
+    "kg-rc": "1",
+    "kg-thash": "5d816a0",
+    "kg-rec": "1",
+    "kg-rf": "B9EDA08A64250DEFFBCADDEE00F8F25F",
   };
   if (router) headers["x-router"] = router;
   const response = await fetch(`${base}?${query}`, { method: "POST", headers, body });
@@ -173,9 +177,17 @@ export async function playlists(token: string, userid: string, dfid = "-"): Prom
     total_ver: 979,
     type: 2,
     page: 1,
-    pagesize: 30,
+    pagesize: 100,
   };
   const json = await postJson("https://gateway.kugou.com/v7/get_all_list", params, data, "cloudlist.service.kugou.com");
+  // Fail closed on an application-level error: a token/SSA failure must never
+  // look like "no playlists" to resolvePlaylistByName (which would create one).
+  if (json?.status !== undefined && Number(json.status) !== 1) {
+    throw new Error(`get_all_list failed: status=${json.status}`);
+  }
+  if (json?.error_code !== undefined && Number(json.error_code) !== 0) {
+    throw new Error(`get_all_list failed: error_code=${json.error_code}`);
+  }
   const info = json?.data?.info ?? [];
   return info.map((item: any) => ({
     name: String(item.name ?? ""),

@@ -93,8 +93,9 @@ export class SyncLedger {
     });
   }
 
-  /** A manual press takes over an in-flight worker task: the worker's late
-   *  result must not move a row the user already moved. */
+  /** Legacy: 0.6.x/0.7.1 used this when a manual press moved a row itself.
+   *  0.7.3's manual press is one transaction (addTrack first, then move), so
+   *  production no longer calls it; a late success must still move the row. */
   manual(key: string): void {
     const r = this.records.get(key);
     if (r?.phase === "synced") return;

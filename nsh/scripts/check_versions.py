@@ -19,6 +19,18 @@ b = str(version["build"])
 major, minor, patch = v.split(".")
 errors = []
 
+# The app id must stay aligned with the old Tauri data directory; otherwise
+# the automatic SQLite bridge cannot find sususongboard.db.
+if version.get("id") != "com.sususongboard.app":
+    errors.append(f"nsh.json: id is {version.get('id')!r}, expected com.sususongboard.app")
+fs_caps = version.get("capabilities", {}).get("fs", {})
+read_roots = fs_caps.get("read", [])
+write_roots = fs_caps.get("write", [])
+if "${dataDir}" not in read_roots or "${homeDir}" not in read_roots:
+    errors.append("nsh.json: capabilities.fs.read must include ${dataDir} and ${homeDir}")
+if "${dataDir}" not in write_roots:
+    errors.append("nsh.json: capabilities.fs.write must include ${dataDir}")
+
 
 def has(path: Path, needle: str) -> bool:
     return needle in path.read_text(encoding="utf-8")
@@ -41,7 +53,7 @@ for path, needle in checks:
 
 # The desktop README is a delivery artifact, not in git: warn, do not fail.
 print(f"NSH version: {v} (build {b})")
-print(f"Checked {len(checks)} release references")
+print(f"Checked {len(checks)} release references, app id and fs capability")
 if errors:
     print("\nFAILED:")
     for e in errors:

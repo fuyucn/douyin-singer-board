@@ -57,12 +57,12 @@ for testid in ("start", "stop"):
         errors.append(f"Board.tsx: {testid} lost the original 30x30/6px box class")
 if 'color: "#ffffff"' not in board:
     errors.append("Board.tsx: Stop icon is no longer white (original text-white)")
-# User-requested palette: green start, red stop (the original Tauri app used a
-# neutral fg-base start button). Keep it guarded so it cannot drift back.
+# User-requested palette, reverted to the original in 0.7.3: neutral Start
+# (fg-base), unambiguous red Stop. Keep it guarded so it cannot drift back.
 # Locate the actual call sites, not a whole-file substring (which a stale
 # comment could satisfy).
 for testid, palette, label in (
-    ('testID: "start"', 'bg-success active:bg-success-hover', 'green Start'),
+    ('testID: "start"', 'bg-foreground active:bg-muted-foreground', 'neutral Start'),
     ('testID: "stop"', 'bg-[#c5403c] active:bg-danger-hover', 'red Stop'),
 ):
     pos = board.find(testid)
@@ -72,6 +72,33 @@ for testid, palette, label in (
         errors.append(f"Board.tsx: {label} lost its palette ({palette})")
 if 'props.color.startsWith("#")' not in ui:
     errors.append("ui.tsx: Icon() no longer accepts raw hex colors")
+
+# 3b. Settings plugin tab invariants (0.7.5): only the plugin switch and
+#    platform login, and auto-sync resolves the playlist before enabling.
+for stale in ("目标歌单", "搜索并加入", "设为目标", "加入列表", "启用酷狗服务", "kugou-toggle"):
+    if stale in board:
+        errors.append(f"Board.tsx: Settings plugin tab still contains {stale!r}")
+if "也可以都不开" not in board:
+    errors.append("Board.tsx: platform selection no longer allows all platforms off")
+if 'const pluginEnabled = () => config().active_plugin === "kugou";' not in board:
+    errors.append("Board.tsx: platform gating no longer follows active_plugin alone")
+# 0.7.7: listener-only mode. Without a Kugou platform the sidebar must show a
+# clear mode panel instead of the manual-add input (which is Kugou-only).
+if "仅弹幕监听" not in board:
+    errors.append("Board.tsx: listener-only mode panel is missing")
+# Structural: the mode panel and the manual-add block must be the two branches
+# of the SAME platform-gated <If>, not just two strings somewhere in the file.
+gate = board.find("If when={pluginEnabled()} else={")
+if gate < 0:
+    errors.append("Board.tsx: 手动点歌 is no longer gated on the Kugou platform")
+else:
+    region = board[gate:gate + 1800]
+    if "仅弹幕监听" not in region or "手动点歌" not in region:
+        errors.append("Board.tsx: platform <If> does not contain both the mode panel and 手动点歌")
+if "resolvePlaylistByName" not in board:
+    errors.append("Board.tsx: auto-sync no longer resolves the playlist (using exist or create)")
+if "autoSyncBusy" not in board:
+    errors.append("Board.tsx: playlist operations lost their mutual-exclusion guard")
 
 # 4. Sizes taken from the original Tauri app (src/components/...). Every
 #    icon-bearing call site must use one of these explicit sizes.

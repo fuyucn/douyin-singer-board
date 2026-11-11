@@ -13,6 +13,22 @@ Branches:
 - `feat/align-main` — this plan; port main's UI and features.
 - `feat/susu` — later: susu branding, defaults, kugou-on-by-default.
 
+## 0.7.9 app id + SQLite bridge
+
+> The NSH app id is now `com.sususongboard.app`, matching the old Tauri app.
+> `process.dataDir` therefore lands in the same app-data directory as
+> `sususongboard.db`. With `capabilities.fs.read = ["${dataDir}", "${homeDir}"]`
+> and `fs/promises.readFile`, the app can automatically read the old SQLite
+> file on first launch. `src/legacyMigration.ts` converts `config` /
+> `blacklist` / `kugou_session` into `board.config`, `board.theme` and
+> `kugou.session` through the read-only parser in
+> `plugins/kugou/sqliteReader.ts`, and writes a `legacyMigrationDone` marker.
+> Existing `com.sususongboard.nsh/storage.json` is kept as
+> `legacy.nshStorageBackup` when a Tauri database wins, and is used as the
+> source only when no Tauri database is found. The old SQLite file is never
+> written. This is a read-only migration bridge; a full SQL query API would
+> still require a mixed-mode Rust crate.
+
 ## Already validated (POC)
 
 - Douyin room HTML -> `id_str` -> MD5/X-Bogus signature -> WSS handshake
@@ -39,14 +55,88 @@ Branches:
 > `ui.tsx` `IconButton()` and every raw text button carries
 > `items-center justify-center`. The header right group is back to the original
 > `gap-1` + `ml-2` spacing, and the Stop icon is a white filled square again.
-> 0.7.2 uses a green Start and red Stop button at the user's request; the
-> original's Start button was neutral `fg-base`, so this is a deliberate
-> deviation from pixel parity.
+> 0.7.2 briefly used a green Start and red Stop button at the user's request;
+> 0.7.9 reverts Start to the original's neutral `fg-base` (Stop keeps the
+> unambiguous `#c5403c` red in both themes).
+>
+> 0.7.9 restores the original's auto-sync rainbow ring: NSH has no
+> pseudo-elements or `@keyframes`, so the `conic-gradient` ring is two real
+> views (an oversized spinning layer clipped by the button's `overflow: hidden`
+> + an inset card-colored cover), driven by one module-level `createMotion`
+> rotate loop (2 s, linear, infinite) shared with the refresh icon; the active
+> state adds the original's blue `boxShadow` glow, idle keeps `opacity 0.55`.
+>
+> 0.7.9 makes the feature boundary explicit. With no Kugou platform (or the
+> NetEase placeholder) the app is **listener-only**: 直播间配置 / 点歌规则 /
+> 点歌列表 / 黑名单 and the 已点歌单 tab (with its history) stay, but the
+> Kugou 歌单 block, 手动点歌 input, row ListPlus, song-match subtitle and the
+> right-click "复制歌名" item are hidden. A bordered 仅弹幕监听 panel replaces
+> the manual-add block and says where to enable a platform. The original three
+> tabs and rule fields are kept (hiding them would change the original layout);
+> cooldown / per-user-limit / singer-blacklist hints now say explicitly that
+> they only take effect once a platform is enabled, so listener-only mode makes
+> no false promise about collection-side rate limiting. `addManual()` has a
+> defensive guard, and `check_icon_buttons.py` checks the panel and the gate
+> are branches of the same `<If>`. Tests cover all three platform states.
+>
+> 0.7.9 also removes the separate `启用酷狗服务` master switch. The plugin
+> picker is now the only switch: one platform may be selected (`酷狗音乐` or
+> the `网易云音乐` placeholder), or **none**. Switching away / turning all
+> platforms off turns `auto_sync` off and hides every playlist/song-related
+> piece (sidebar 歌单 block, row ListPlus, search subtitle, Kugou status
+> line); the `酷狗登录` block is shown only for Kugou. A v2 config
+> with `kugou_enabled:false` migrates to an empty `active_plugin`.
+>
+> 0.7.9 also narrows the Settings plugin tab to what the user asked for: only
+> the plugin picker/enable switch and platform login. The `目标歌单` list,
+> `设为目标`, the duplicate auto-sync switch and `搜索并加入` were removed —
+> they were pieces of the original's separate KuGou API debug panel, not its
+> settings. Turning 自动同步 ON now runs the original's `using exist or
+> create` (`resolvePlaylistByName`: find the editable name in `get_all_list`
+> pagesize=100, else create, write the resulting listid, then enable sync);
+> a failed resolve leaves sync off. Tests cover both branches and the failure.
+>
+> 0.7.9 hardens the above: `get_all_list` fails closed on `status`/`error_code`
+> (so a token failure cannot be mistaken for an empty playlist and create one),
+> `kg-*` headers match kugou-api, playlist operations share a mutex+generation
+> (double press / 清理 interleaving cannot build duplicate playlists or point
+> sync at a deleted id), editing the name while sync is on turns sync off, and
+> the real-renderer suite presses `id:auto-sync`. A static guard now fails CI
+> if the settings debug blocks or the resolve call come back.
+>
+> 0.7.9 restores the sidebar's `清理` button (red outline + Trash2) next to
+> `自动同步`, removing the self-invented `管理酷狗` entry point. `清理` now
+> really deletes and recreates the playlist, in the original's order: delete
+> the same-name playlist FIRST, then create a new one and return its new
+> listid (which becomes `target_playlist_id`); a test asserts the request
+> order. `playlistOps.ts` calls `add_list` (plain android JSON) and
+> `delete_list` (the AES-CBC + RSAES-PKCS1-V1_5 protocol in
+> `playlistCrypto.ts`). Encodings are checked against Node's own crypto by
+> `scripts/kat-playlist.test.ts` / `kat-playlist.mjs`; no live account was
+> used. Only a same-name (and same-id) playlist is deleted (a stale id is
+> never trusted); writes are gated by zeroing `target_playlist_id` and stopping
+> the worker before the delete, then restoring the new id afterwards. A failed
+> lookup or a definite delete failure restores the old id; an unreadable
+> delete answer or a create failure after a successful delete leaves the id at
+> 0 so nothing writes into a deleted playlist.
+>
+> 0.7.9 also restores the original's inline row actions: 0.7.1's toolbar is
+> removed and the queue rows carry ListPlus (add to playlist, pending spinner,
+> disabled without login/target/track), Copy and Trash again, the played list
+> its Copy — as plain views, not `DataTable` cells (0.7.1's finding stands:
+> presses inside DataTable cells never reach `onPress` on a real renderer, and
+> keyed rows are not re-rendered when an item changes). Add-to-playlist is one
+> transaction again: `addTrack` succeeds and only then does the row move, and
+> the "标记已点" button is gone (0.6.x's split of that transaction was wrong).
+> The song cell carries the original's right-click menu via
+> `onContextMenu` + `Menu.popup`, and selection-by-index is gone — deletes and
+> adds are keyed by `msg_id`, never by row index (new songs are prepended, so
+> a stale index silently pointed at another row).
 >
 > 0.7.1 also moves row actions out of `DataTable.renderCell` into a toolbar:
 > NSH does not deliver presses to buttons inside a rendered cell on a real
 > renderer, so copy/mark/delete had been silent no-ops there even though
-> headless tests passed. The table now uses `onRowPress` selection.
+> headless tests passed. Superseded in 0.7.9 by the view-based row lists.
 >
 > 0.7.1 fixes the silent clipboard and row-action buttons: `capabilities.clipboard` was missing, so
 > every copy button rejected with ERR_ACCESS_DENIED and the log claimed success
@@ -57,7 +147,9 @@ Branches:
 >
 > 0.7.0 merges the Settings dialog and the About dialog into one modal with
 > three underline tabs (general / plugin / about). The header info button opens
-> Settings directly on the about tab; "管理酷狗" opens it on the plugin tab.
+> Settings directly on the about tab; "管理酷狗" opened it on the plugin tab
+> (0.7.0 wording — that sidebar button was removed in 0.7.9; the header
+> settings icon still reaches the plugin tab).
 > 0.6.3 matches the original's visible 30x30 start/stop box (its shadcn base
 > class has a 1px transparent border) and its 6px radius. Two headless
 > geometry tests plus a source guard (also on the Linux PR gate) protect it.

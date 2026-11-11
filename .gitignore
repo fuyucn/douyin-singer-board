@@ -22,6 +22,7 @@ src-tauri/gen/schemas/
 
 # Backup files
 *.bak
+_sqlite-main-snapshot-*/
 
 # kugou-api (nested repo / submodule)
 kugou-api/

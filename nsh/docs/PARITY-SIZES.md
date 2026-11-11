@@ -164,7 +164,14 @@ Checked against `src/AboutModal.tsx`, `src/components/AppHeader.tsx`,
 | Blacklist | song + singer entries, right-click add from table | song + singer via input bar | Right-click add not ported |
 | Kugou token | refresh via `/login/token`, `/user/listen` bias, playlist clear/recreate | QR login only | Previously documented gap |
 
-## 0.7.2 start/stop palette
+## 0.7.2 start/stop palette → 0.7.9 revert
+
+0.7.2 made Start green at the user's request. 0.7.9 reverts Start to the
+original's neutral `bg-foreground active:bg-muted-foreground` (measured:
+light rgb(35,37,39) on the light header, white on the dark header); Stop
+keeps 0.7.2's red.
+
+The 0.7.2 palette, kept for reference:
 
 The user asked for a green Start and red Stop button. Measured from
 `--target macos` screenshots (button box x 853..882, y 11..40):
@@ -196,19 +203,25 @@ Row copy/mark/delete buttons were drawn inside `DataTable.renderCell`. On a
 real renderer (`nsh test --target macos`) `app.press` finds the element but its
 `onPress` never fires, while headless tests call `onPress` directly and stayed
 green. Verified by target diagnostics: tab-bar `clear-list`, sidebar `添加` and
-blacklist `black-add` all worked; only table-cell buttons did not. Row actions
-now live in a toolbar above each table, driven by the native `onRowPress`
-callback. The actions column shows a read-only selection hint.
+blacklist `black-add` all worked; only table-cell buttons did not. 0.7.1
+worked around this with a toolbar above each table; 0.7.9 replaces both tables
+with plain view rows (`songRows().map(...)` inside a `Scroll` under a sticky
+header) and restores the original's inline actions per row. Column widths now
+mirror the original (`#40 / 用户120 / 点歌 grow / 时间72 / actions110`; played
+`#40 / 时间80 / 用户110 / 点歌 grow / actions48`), where 0.7.1 had fixed the
+song column at 260 instead of growing. Actions keep 60% opacity, full on
+hover. Caveat: the original virtualizes rows; these lists render every row.
 
 Copy/rename/delete/join/clear actions were only checked for appearance. The
 clipboard capability was undeclared, so `Clipboard.writeText` rejected silently;
 `log()` ran before the promise settled, which made the log claim a success that
 never happened. `actions.test.tsx` (8 cases) and `table-actions-target.test.tsx`
-(2 cases, also run with `--target macos`) assert the clipboard contents, that
+(3 cases, also run with `--target macos`) assert the clipboard contents, that
 the deleted row's text disappears, that clearing played resets the stale search
-filter, and that a non-first row can be selected and acted on. Coverage is
-limited to the buttons named in those tests; the remaining "no visible change"
-paths (theme, log fold, playlist selection) are not asserted.
+filter, and that a non-first row's inline buttons act on that row (0.7.9:
+selected-row state is gone; buttons are bound to their own row's `msg_id`).
+Coverage is limited to the buttons named in those tests; the remaining "no
+visible change" paths (theme, log fold, playlist selection) are not asserted.
 
 ## 0.7.0 Settings tabs
 

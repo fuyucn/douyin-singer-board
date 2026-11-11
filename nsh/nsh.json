@@ -1,8 +1,9 @@
 {
   "name": "SUSUSongBoard",
-  "id": "com.sususongboard.nsh",
-  "version": "0.7.2",
-  "build": 702,
+  "id": "com.sususongboard.app",
+  "version": "0.8.0",
+  "build": 800,
+  "rust": "native",
   "icon": "assets/icon.png",
   "window": {
     "title": "SUSUSongBoard",
@@ -16,6 +17,16 @@
     }
   },
   "capabilities": {
+    "fs": {
+      "read": [
+        "${dataDir}",
+        "${homeDir}"
+      ],
+      "write": [
+        "${dataDir}"
+      ]
+    },
+    "picker": true,
     "network": {
       "hosts": [
         "live.douyin.com",

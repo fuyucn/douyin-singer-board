@@ -133,7 +133,7 @@ test("manual mark during an in-flight worker write adds only once", async () => 
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
   await app.wait(2200);
-  await app.press("id:toolbar-mark");
+  await app.press("id:song-add-0");
   await app.wait(4000);
   expect(app.texts()).toContain("已点歌单 (1)");
   expect(adds).toBe(1);
@@ -164,11 +164,16 @@ test("worker restart during an in-flight write does not replay it", async () => 
   expect(adds).toBe(1);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  await app.press("id:kugou-toggle");
-  await app.press("id:kugou-toggle");
+  await app.press("id:plugin-kugou");
+  await app.press("id:plugin-kugou");
   await app.press("关闭");
   await app.wait(20000);
   expect(adds).toBe(1);
+  // The late success must still move the row: otherwise the ledger says
+  // "synced" forever and the song is stuck in the queue despite being in the
+  // Kugou playlist.
+  expect(app.texts()).toContain("已点歌单 (1)");
+  expect(app.texts()).toContain("点歌列表 (0)");
 });
 
 test("a transient search failure is retried and the song still syncs", async () => {

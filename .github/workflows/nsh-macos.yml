@@ -1,0 +1,117 @@
+name: NSH macOS
+
+# Packages the NSH app for Apple Silicon (and, when the runner exists, Intel)
+# and keeps the tests that only run on a real macOS renderer.
+on:
+  push:
+    branches: [nsh]
+    paths:
+      - "nsh/**"
+      - ".github/workflows/nsh-macos.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: nsh
+
+jobs:
+  build:
+    name: Package (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple Silicon and Intel. Both labels are current GitHub-hosted
+          # macOS images; `macos-13` has been retired.
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NSH nightly
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # nsh.dev's installer verifies a .sha256 sidecar on the release CDN,
+          # which currently returns 504. Fetch both assets through the GitHub
+          # API and verify the checksum here, as the Windows job does.
+          tmp=$(mktemp -d)
+          asset="nsh-macos-${{ matrix.arch }}.tar.gz"
+          gh release download nightly --repo longbridge/nsh \
+            --pattern "$asset" --pattern "$asset.sha256" \
+            --dir "$tmp" --clobber
+          cd "$tmp"
+          shasum -a 256 -c "$asset.sha256"
+          mkdir -p "$HOME/.nsh"
+          tar -xzf "$asset"
+          cp -R nsh/. "$HOME/.nsh/"
+          echo "$HOME/.nsh/bin" >> "$GITHUB_PATH"
+
+      - name: Check NSH
+        run: nsh -V
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust store tests
+        run: cargo test --manifest-path native/Cargo.toml --locked
+
+      - name: Headless tests
+        run: |
+          nsh test board.test.tsx
+          nsh test actions.test.tsx
+          nsh test parity.test.tsx
+          nsh test sqlite-store.test.tsx
+          nsh test sqlite-bridge.test.tsx
+          nsh test import-db.test.tsx
+          nsh test import-legacy.test.tsx
+          nsh test sync-worker.test.tsx
+          nsh test text-layout.test.tsx
+          nsh test geometry.test.tsx
+
+      - name: Real macOS renderer tests
+        run: |
+          nsh test table-actions-target.test.tsx --target macos
+          nsh test sqlite-bridge-target.test.tsx --target macos
+
+      - name: Playlist crypto KAT (NSH vs Node)
+        run: |
+          nsh test scripts/kat-playlist.test.ts > kat-nsh.txt
+          node scripts/kat-playlist.mjs kat-nsh.txt
+
+      - name: Icon button and version guards
+        run: |
+          python3 scripts/check_icon_buttons.py
+          python3 scripts/check_versions.py
+
+      - name: Package app
+        run: nsh package Board.tsx --target macos -o dist --name SUSUSongBoard
+
+      - name: Verify bundle
+        run: |
+          set -euo pipefail
+          app="dist/SUSUSongBoard.app/Contents/MacOS/SUSUSongBoard"
+          test -x "$app"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            dist/SUSUSongBoard.app/Contents/Info.plist | grep -qx "com.sususongboard.app"
+          # The bundled SQLite must not turn into a Homebrew dependency.
+          if otool -L "$app" | grep -q sqlite3; then
+            echo "the app links an external sqlite3"; exit 1
+          fi
+          version=$(python3 -c 'import json;print(json.load(open("nsh.json"))["version"])')
+          ditto -c -k --sequesterRsrc --keepParent dist/SUSUSongBoard.app \
+            "dist/SUSUSongBoard-${version}-macos-${{ matrix.arch }}.zip"
+          ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SUSUSongBoard-macos-${{ matrix.arch }}
+          path: nsh/dist/SUSUSongBoard-*-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error

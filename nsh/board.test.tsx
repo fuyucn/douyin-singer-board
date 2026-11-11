@@ -1,7 +1,35 @@
-import { expect, open, test } from "nsh/test";
+import { expect, test } from "nsh/test";
+import { openSqliteBoard as open } from "./sqlite-test-options";
+
+const loggedConfig = JSON.stringify({
+  room_id: "145997388006",
+  sing_prefix: "点歌[space][song]",
+  fans_level: 0,
+  sing_cd: 0,
+  cooldown_seconds: 1800,
+  max_songs_per_user: 3,
+  target_playlist_name: "测试4",
+  target_playlist_id: 27,
+  kugou_enabled: true,
+  blacklist: [],
+  blacklist_singers: [],
+  auto_sync: false,
+  active_plugin: "kugou",
+  config_version: 2,
+});
+const session = JSON.stringify({ token: "TESTTOKEN", userid: "123456", dfid: "-" });
+const network = {
+  "POST https://gateway.kugou.com/v7/get_all_list*": { body: { data: { info: [{ name: "测试4", listid: 27, count: 0 }] } } },
+  "GET https://gateway.kugou.com/v2/search/song*": { body: { data: { lists: [{ SongName: "晴天", SingerName: "周杰伦", FileHash: "HASH1", AlbumID: "1", MixSongID: "2", Duration: 200 }] } } },
+  "POST https://gateway.kugou.com/cloudlist.service/v6/add_song*": { body: { status: 1 } },
+};
 
 test("board shell, manual request, tabs and plugin settings", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await open("./Board.tsx", {
+    width: 900, height: 700,
+    storage: { "board.config": loggedConfig, "kugou.session": session },
+    network,
+  });
   expect(app.texts()).toContain("SUSUSongBoard");
   expect(app.texts()).toContain("抖音直播间 ID");
   expect(app.texts()).toContain("点歌列表 (0)");
@@ -11,7 +39,9 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("晴天");
   expect(app.texts()).toContain("点歌列表 (1)");
 
-  await app.press("id:toolbar-mark");
+  await app.wait(300);
+  await app.press("id:song-add-0");
+  await app.wait(500);
   expect(app.texts()).toContain("已点歌单 (1)");
   expect(app.texts()).toContain("点歌列表 (0)");
 
@@ -23,11 +53,12 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("平台插件");
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");
-  expect(app.texts()).toContain("同一时间只启用一个平台插件；切换后另一个平台的登录与自动同步会停用。");
-  await app.press("启用");
-  expect(app.texts()).toContain("尚未接入。切换回酷狗即可继续管理歌单；同一时间只启用一个平台。");
-  await app.press("启用");
-  expect(app.texts()).toContain("管理酷狗音乐");
+  expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
+  await app.press("id:plugin-netease");
+  expect(app.texts()).toContain("尚未接入；歌单与歌曲匹配暂不可用。");
+  expect(app.texts()).not.toContain("酷狗登录");
+  await app.press("id:plugin-kugou");
+  expect(app.texts()).toContain("酷狗登录");
   await app.press("关闭");
   expect(app.texts()).toContain("手动点歌");
 

@@ -5,10 +5,10 @@ Unicode true
 !include "LogicLib.nsh"
 
 !define APP_NAME "SUSUSongBoard"
-!define APP_VERSION "0.7.2"
+!define APP_VERSION "0.8.0"
 !define APP_PUBLISHER "SUSU"
 !define APP_EXE "SUSUSongBoard.exe"
-!define APP_ID "com.sususongboard.nsh"
+!define APP_ID "com.sususongboard.app"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_ID}"
 
 Name "${APP_NAME}"

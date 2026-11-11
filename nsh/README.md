@@ -47,25 +47,187 @@ The exe then keeps the default Explorer icon.
 
 CI builds three shapes:
 
-- `SUSUSongBoard-Portable-0.7.2.exe` — one file, ~15 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.8.0.exe` — one file, ~15 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.7.2.exe` — per-user NSIS installer, same directory.
+- `SUSUSongBoard-Setup-0.8.0.exe` — per-user NSIS installer, same directory.
 - `SUSUSongBoard.zip` — raw directory, ~22 MB.
 
 CI also smoke-runs the portable exe and checks the payload is extracted.
+
+## Listener-only mode (0.8.0)
+
+功能边界按「有没有启用酷狗平台」拆分，不改动原版左栏布局：
+
+| | 仅弹幕监听（无平台 / 网易云占位） | 启用酷狗音乐 |
+|---|---|---|
+| 弹幕监听与点歌指令收集 | ✅ 始终工作 | ✅ |
+| 直播间配置 / 点歌规则 / 点歌列表 / 黑名单 | ✅ 字段保留；两个限流字段仅在启用平台并同步时生效，歌手黑名单需平台匹配 | ✅ |
+| 已点歌单 tab（保留历史记录） | ✅ 仅查看历史，无平台时不能新增 | ✅ |
+| Kugou 歌单（名字 / 清理 / 自动同步） | ❌ | ✅（登录后） |
+| 手动点歌输入框 | ❌ | ✅ |
+| 行内 ListPlus / 歌曲匹配副标题 / 右键复制歌名 | ❌ | ✅ |
+
+无平台时，原「手动点歌」位置显示一块带边框的 **仅弹幕监听** 说明面板：
+点歌指令只进「点歌列表」，并提示「设置 → 插件 → 启用酷狗音乐」。
+网易云占位态显示同样的面板，文案改为「尚未接入」。三 tab、直播间配置、
+点歌规则一律保留（用户曾多次要求不要擅自重排原版布局）；规则里两处只与
+歌单相关的副标题，以及黑名单的歌手屏蔽说明，在无平台时都明确写成
+「仅监听模式不启用 / 需启用平台后生效」，避免承诺不存在的限流能力。
+`addManual()` 也有防御守卫，防止残留键盘提交在监听-only 模式注入歌曲。
+`check_icon_buttons.py` 会检查说明面板与 `<If when={pluginEnabled()}>` 门控
+是同一个条件分支，面板被删或门控被拆都会让 CI 红。
+
+## SQLite main storage
+
+The app id remains `com.sususongboard.app`. The main store is
+`${process.dataDir}/sususongboard.db`, not `storage.json`. `process.dataDir`
+is NSH's default per-app directory (system data directory + app id):
+
+| Platform | File |
+|---|---|
+| macOS | `~/Library/Application Support/com.sususongboard.app/sususongboard.db` |
+| Windows | `%APPDATA%\com.sususongboard.app\sususongboard.db` |
+| Linux | `$XDG_DATA_HOME/com.sususongboard.app/sususongboard.db` (`~/.local/share` when unset) |
+| Android | the app's files directory + the app id |
+
+`native/` uses `rusqlite` through NSH's existing Rust class bridge
+(`app/sqlite`), with the bundled SQLite C amalgamation on every target. That
+keeps one SQLite version on macOS, Windows, Linux and Android, and never
+picks up a Homebrew or distribution build at link time. No NSH fork is
+needed.
+
+The database is the app's own: `config` (one row), `blacklist` (one row per
+entry, so it can be queried), `kugou_session` (one row), `settings` (theme,
+migration markers, leftovers) and `meta` (`schema`, import source, import
+time). `board.config` is still one JSON document to TSX; the store splits it
+into those columns and keeps unknown keys in `config.extra`, so a new field
+needs no schema migration. `PRAGMA user_version = 1` tracks the schema.
+
+Before the first import, **quit the old Tauri app and leave it stopped**; it
+ows the file until the import replaces it. The source order is:
+
+1. `${dataDir}/sususongboard.db` (the old Tauri SQLite database),
+2. `com.fuyucn.sususongboard/sususongboard.db` (historical app id),
+3. current `storage.json`, then old NSH `com.sususongboard.nsh/storage.json`.
+
+Import is one shot: the source is snapshotted with SQLite's backup API
+(including WAL pages) into `${dataDir}/sqlite-backups/`, the new database is
+built beside it, its room id and blacklist row count are verified against the
+source, and only then does it take the file name. The old database is deleted
+at that point — it is not opened again, and `storage.json` is neither read
+nor written afterwards. `storage.json` itself is left on disk untouched; a
+conflicting copy is also kept as `legacy.nshStorageBackup.*`. An unreadable
+legacy file is renamed `sususongboard.db.unreadable-<time>` instead of being
+deleted.
+
+Schema creation, all keys and `sqliteMigrationDone` commit together; backup,
+validation or transaction failures abort before anything replaces the old
+file. Board does not persist defaults after a failed startup, and routine
+persistence errors appear in the UI and logs instead of being silently
+discarded.
+
+What migrates: room id, 点歌指令模板, 点歌规则, 歌单名/id, 黑名单 (歌曲 +
+歌手, 含添加时间), 平台选择, kugou token/userid/dfid. What does not: token
+freshness (re-scan if expired), 歌单列表 (re-fetched on login), auto-sync
+(defaults to off), 队列/已点/日志/history (session data).
+
+Manual paths remain: **设置 → 关于 → 导入原版数据** can still pick a `.db`
+or migration JSON. Imported keys commit together into SQLite, not JSON. The
+TS read-only parser is retained only for user-picked legacy `.db` files and
+their conversion tests; automatic startup uses real SQLite, including WAL.
+The old Python JSON exporter is not the main storage backend.
+
+Build prerequisites: NSH 0.4.0, Rust >= 1.97 and a native C compiler (Xcode
+Command Line Tools on macOS; MSVC Build Tools on Windows) for the bundled
+SQLite amalgamation. Run build commands from `nsh/`, not the repository
+root: cargo discovers `nsh/.cargo/config.toml` by walking up from the current
+directory, and a different cwd silently compiles with different flags into
+the same `target/`. A Rust-backed app makes `nsh build`/`nsh test` compile
+NSH's host crates from source the first time — about 1 minute here, seconds
+after that. That config drops debug info and incremental state, which keeps
+the shared `target/` around 2-4 GB instead of 13 GB. A pure-TSX app without
+`native/` compiles nothing at all (sub-second builds), which is why the Rust
+crate is the only build cost in this project.
+NSH dependencies
+are pinned to a Git revision in `native/Cargo.toml`; generated declarations
+and custom test/platform hosts come from `nsh build`/`nsh test`. Keep
+`native/Cargo.lock` checked in. `nsh package Board.tsx --target windows`
+builds the app-specific Rust executable with the SQLite class registered.
+Browser/WebAssembly builds are not covered by this native driver.
+
+Verification:
+
+```sh
+cargo test --manifest-path native/Cargo.toml --locked
+nsh build Board.tsx
+nsh test sqlite-store.test.tsx
+nsh test board.test.tsx --target macos
+```
+
+Headless engines have no app data directory and use per-instance in-memory
+SQLite. Existing `open({ storage })` fixtures are read once as seeds. Real
+renderer fixtures explicitly supply `host.params.sqliteTestSeed` through
+`sqlite-test-options.ts` to opt into isolated in-memory SQLite too: their
+virtual Storage seeds are not files. Normal launches have no such parameter.
+Tests do not mirror SQLite writes back to NSH Storage.
+Durability, WAL snapshots, one-shot migration, transactional rollback and
+failure recovery are tested against temporary on-disk databases in Rust.
+
+## Playlist clear (0.8.0)
+
+The sidebar now mirrors the original: `Kugou 歌单` has a name input + read-only
+`id`, and two equal buttons — red `清理` (Trash2) and `自动同步` (rainbow ring
+when active). The self-invented `管理酷狗` button is gone; plugin management
+stays reachable through the header settings → 插件 tab.
+
+`清理` = **先删除同名歌单，再按同名创建新歌单，返回新 listid**，顺序与
+原版 `clearPlaylistByName` 一致（测试断言 `delete_list` 早于 `add_list`）。
+新 id 会写进 `target_playlist_id`，界面右侧的 `id:` 随之更新；截图里是
+29 → 42。NSH 没有 Node sidecar，所以 `plugins/kugou/playlistOps.ts` 直连酷狗：
+`add_list` 走和 `add_song` 相同的 android 签名 JSON，`delete_list` 需要
+`playlistCrypto.ts` 里的 AES-CBC + RSAES-PKCS1-V1_5 协议。
+A network stub cannot validate an encrypted body or a binary encrypted
+response, so `scripts/kat-playlist.test.ts` emits deterministic values and
+`scripts/kat-playlist.mjs` recomputes them from **hardcoded reference
+constants** with Node's own crypto and SPKI parser (md5 / AES key+iv
+derivation / AES-CBC / RSA modulus+exponent / PKCS#1 v1.5 padding). The NSH
+random-PS branch is checked by exposing EM through a test exponent of 1, and
+`parseDeleteResponse` is exercised with binary ciphertext, plain JSON and
+base64 text. **This is a protocol KAT, not a live-account test.**
+只删「名字与可编辑歌单名一致、且 id 也一致」的那个（绝不按 stale
+`target_playlist_id` 删，避免改了名字就删错歌单）。点下清理时先把
+`target_playlist_id` 临时置 0 并停掉后台同步——worker、行内 ListPlus、设置页
+「加入歌单」全都读这个值，这样删除到切新 id 之间的窗口不会有人往已删歌单
+写歌；成功后再写入新 id，worker 自动重绑。查询失败 → 不删不建并恢复旧 id；
+删除明确失败 → 不创建、恢复旧 id；删除响应不可解析（服务端可能已删）或
+删除成功但重建失败 → id 保持 0 并移除本地条目，界面提示状态未知/重建失败；
+名字/id 不一致 → 只新建、不删并给出提示。`loadLists()` 不再用服务端列表
+覆盖你改的名字。所有失败都在底部明确提示。
 
 ## Table actions
 
 NSH's `DataTable` does not deliver presses to buttons drawn inside
 `renderCell` on a real renderer (headless tests call `onPress` directly and
-therefore looked green). Row operations therefore live in a toolbar above each
-table, driven by the table's native `onRowPress` selection:
-`toolbar-copy` / `toolbar-mark` / `toolbar-delete` for the queue, and
-`played-toolbar-copy` for the played list. The row's actions column now shows a
-read-only `已选中` / `点击选择` hint instead of unclickable icons.
-`table-actions-target.test.tsx` is also run with `--target macos` locally to
-verify presses and non-first-row selection on a real renderer; CI runs it
-headless.
+therefore looked green), and its keyed rows are not re-rendered when an item
+object changes, so both tables are plain views now: a sticky header outside a
+`Scroll`, one `View` row per song rendered with `songRows().map(...)` (read in
+JSX, so cache changes re-render), with the original's inline actions restored
+per row: ListPlus/Loader (add to playlist, pending spinner, disabled without
+login/target/track), Copy and Trash for the queue, Copy for the played list.
+Column widths mirror the original (`#40 / 用户120 / 点歌 grow / 时间72 /
+actions110`; played `#40 / 时间80 / 用户110 / 点歌 grow / actions48`). The
+song cell carries the original's right-click menu (copy danmu / copy track
+name / delete / blacklist song or singer) via `onContextMenu` + `Menu.popup`.
+The toolbar-with-selection hack is gone, and with it the row-selection
+semantics (`selectedRow`/`pickedRow`); deletion and add-to-played are keyed by
+`msg_id`, never by row index.
+`table-actions-target.test.tsx` runs with `--target macos` locally to verify
+presses, non-first-row actions and the context menu on a real renderer; CI
+runs it headless.
+
+Trade-off vs the original: the original virtualizes rows (TanStack
+`useVirtualizer`); these lists render every row. Song queues in normal use are
+tens of rows, so this is accepted for now.
 
 ## Current state
 
@@ -74,7 +236,8 @@ headless.
   add; config persisted with `Storage`; light/dark/system appearance; colors use the original shadcn tokens from `theme.json`.
 - Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
   cancel, blacklist, per-user max.
-- Played list: select a row and copy it from the toolbar above the table.
+- Played list: one Copy button per row (also in a right-click menu on the
+  song cell, together with copy-danmu / delete / blacklist).
 - 黑名单: song names and singer names (Kugou artist match), add/remove with
   timestamps; persisted in config with defaults for older configs.
 - Eager Kugou search cache (two concurrent lookups) shows the found artist,
@@ -82,17 +245,48 @@ headless.
 - Background auto-sync worker: one `SyncLedger` idempotency key per request,
   3–5 s cycle, exponential backoff, blacklist/cooldown/per-user-limit skips,
   auth-failure circuit breaker, and clean teardown on config/session changes.
-  Manual "mark played" takes over an in-flight worker task, never double-adds.
-- Footer elapsed-time stat; `kugou_enabled` gates all Kugou UI and workers.
+  Manual "add to playlist" (the row's ListPlus button) shares the ledger with
+  the worker so a song is never added twice; an in-flight write is waited out,
+  never taken over.
+- Footer elapsed-time stat; everything playlist/song-related follows the
+  selected platform.
 - One Settings modal with three underline tabs (0.7.2):
-  `general` (appearance, read-only runtime info), `plugin` (platform plugin
-  picker with exactly one active plugin — Kugou or the NetEase placeholder —
-  plus QR login, playlists, search, add, auto-sync), and `about` (version,
-  repository, `nsh/updater` check; no manifest yet). The old standalone About
-  dialog is gone: the header info button opens Settings on the `about` tab,
-  the sidebar Kugou button opens it on `plugin`.
+  `general` (appearance, read-only runtime info), `plugin` (**only** the
+  platform picker and the selected platform's login — QR code, status,
+  logout), and `about` (version, repository, `nsh/updater` check; no manifest
+  yet). 0.8.0 removes the separate `启用酷狗服务` master switch: the platform
+  picker IS the switch. One platform may be selected, or **none at all**.
+  Switching platforms or turning them all off disables auto-sync and hides
+  the sidebar `Kugou 歌单` block, the row's ListPlus button, the search-result
+  subtitle and the Kugou status line; selecting Kugou brings them back.
+  A v2 config with `kugou_enabled:false` migrates to "no platform".
+  A platform switch is a transaction boundary: it invalidates an in-flight
+  playlist resolve (which can never re-enable auto-sync afterwards), stops QR
+  polling, clears queued searches and disables auto-sync. Session restore is
+  deferred until config load and skipped entirely with no platform selected,
+  so a stale token cannot produce phantom warnings. Config migration is
+  written back to Storage immediately (`configLoaded` is a signal).
+  The 0.8.0 cleanup also removes the `目标歌单` list, `设为目标`, the duplicate
+  auto-sync switch and `搜索并加入` from the plugin tab: those came from the
+  original's separate **KuGou API 调试面板** (an About dialog sub-entry), not
+  from its settings. Playlist management lives in the left panel
+  (name / 清理 / 自动同步) only.
   Token/userid are kept in `Storage`, not in the repo. Icons are drawn as plain
   function calls so their SVG colors follow theme changes.
+- Turning 自动同步 ON performs the original's `using exist or create`:
+  `resolvePlaylistByName` looks up the editable name in the user's playlists
+  (`get_all_list`, pagesize 100, matching the original), uses its listid if
+  present, otherwise creates a fresh playlist and returns the new id; only
+  after a successful resolve is `auto_sync` enabled. A failed resolve leaves
+  it off with a visible message. `playlists()` no longer overwrites the
+  edited name/id from the server list. 0.8.0 hardens this path: `get_all_list`
+  fails closed on an application-level `status`/`error_code` (a token failure
+  must never look like "no playlists" and trigger a create), request headers
+  match kugou-api's `kg-*` set, a shared mutex+generation prevents double
+  presses and interleaving with 清理, and editing the name while sync is on
+  turns sync off instead of silently writing into the old playlist.
+  `--target macos` presses `id:auto-sync` to prove the View handler fires on a
+  real renderer, and `check_icon_buttons.py` guards the settings invariants.
 - Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
 - All icon-bearing buttons go through `ui.tsx` `IconButton()`; all raw text
   buttons carry `items-center justify-center` (NSH's Button is an unstyled

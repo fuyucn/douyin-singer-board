@@ -1,0 +1,6 @@
+# NSH compiles its host crates from source for every Rust-backed app build.
+# Dropping debug info and incremental state keeps the shared target dir ~6x
+# smaller and halves the first build without affecting behaviour.
+[build]
+rustflags = ["-C", "debuginfo=0"]
+incremental = false

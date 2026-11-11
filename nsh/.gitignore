@@ -1,3 +1,5 @@
 .nsh/
 dist/
 *.zip
+native/target/
+target/
