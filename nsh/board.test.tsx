@@ -31,6 +31,7 @@ test("board shell, manual request, tabs and plugin settings", async () => {
     storage: { "board.config": loggedConfig, "kugou.session": session },
     network,
   });
+  await new Promise((r) => setTimeout(r, 800));
   expect(app.texts()).toContain("SUSUSongBoard");
   expect(app.texts()).toContain("抖音直播间 ID");
   expect(app.texts()).toContain("点歌列表 (0)");

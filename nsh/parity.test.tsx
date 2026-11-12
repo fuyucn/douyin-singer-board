@@ -3,6 +3,7 @@ import { openSqliteBoard } from "./sqlite-test-options";
 
 test("settings modal opens on general", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
+  await new Promise((r) => setTimeout(r, 800));
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
   expect(app.texts()).toContain("外观");
@@ -14,6 +15,7 @@ test("settings modal opens on general", async () => {
 
 test("settings tabs switch between general, plugin and about", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
+  await new Promise((r) => setTimeout(r, 800));
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   expect(app.texts()).toContain("插件");
@@ -81,6 +83,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
 
 test("blacklist accepts singer entries", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
+  await new Promise((r) => setTimeout(r, 800));
   await app.press("黑名单 (0)");
   await app.press("id:black-type-singer");
   await app.type("输入歌手名…", "周杰伦");
