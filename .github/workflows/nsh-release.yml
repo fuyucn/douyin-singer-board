@@ -123,17 +123,36 @@ jobs:
             nsh package Board.tsx --target macos -o dist
           fi
 
+      # `nsh package` gives Windows a directory (and the zip the updater
+      # replaces it from), so the one-file download is an NSIS build of that
+      # directory: what `nsh-windows.yml` builds and smoke-tests on every push.
+      - name: Build the Windows single-exe and installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          choco install nsis -y --no-progress
+          $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          & $makensis installer\portable.nsi
+          if ($LASTEXITCODE -ne 0) { throw "portable exe build failed" }
+          & $makensis installer\installer.nsi
+          if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
+          Get-ChildItem dist\*.exe | Select-Object Name, Length
+          if (-not (Test-Path "dist\SUSUSongBoard-Portable-*.exe")) { throw "no portable exe" }
+
       - name: Collect archives
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p release
           # The updater archive is named <name>-<version>-<os>-<arch>.<ext>;
-          # the plain zip is the same payload and is not published.
-          for f in dist/*.tar.gz dist/*.zip; do
+          # the plain zip is the same payload and is not published. The two
+          # .exe shapes are hand-downloads, not updater archives.
+          for f in dist/*.tar.gz dist/*.zip dist/*.exe; do
             [ -e "$f" ] || continue
             case "$f" in
               dist/SUSUSongBoard-[0-9]*-*.tar.gz|*SUSUSongBoard-[0-9]*-*.zip) cp "$f" release/ ;;
+              dist/SUSUSongBoard-Portable-*.exe|dist/SUSUSongBoard-Setup-*.exe) cp "$f" release/ ;;
             esac
           done
           ls -lh release
@@ -197,6 +216,7 @@ jobs:
             fi
             echo
             echo "macOS: unzip or drag SUSUSongBoard.app to /Applications. The app updates itself from these releases (设置 → 关于 → 检查更新)."
+            echo "Windows: SUSUSongBoard-Portable-<version>.exe is one file (it unpacks to %LOCALAPPDATA%\\Programs on first run); SUSUSongBoard-Setup-<version>.exe is the installer. The .zip is what the updater uses."
           } > notes.md
           cat notes.md
 
@@ -221,7 +241,7 @@ jobs:
         run: |
           set -euo pipefail
           tag=${{ inputs.tag || github.ref_name }}
-          files="$(ls dist/*.tar.gz dist/*.zip dist/latest.json dist/latest.json.sig)"
+          files="$(ls dist/*.tar.gz dist/*.zip dist/*Portable-*.exe dist/*Setup-*.exe dist/latest.json dist/latest.json.sig)"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" $files --clobber
           else

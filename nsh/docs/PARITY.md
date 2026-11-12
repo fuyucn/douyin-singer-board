@@ -286,6 +286,15 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > `VIProductVersion` fourth field, and `check_versions.py` runs in the release
 > workflow and fails on stale version strings, not just missing ones.
 
+> 0.43.0-preview.2 publishes the Windows one-file exe. `nsh package --target
+> windows` only makes a directory (and the zip the updater replaces it from),
+> so the single-file `SUSUSongBoard-Portable-<version>.exe` is the NSIS build of
+> that directory: 0.43.0-preview.1 attached only the zip, which is why Windows
+> had no portable download. `NSH Release` now builds the portable exe and the
+> installer on the Windows runner and attaches both, as `nsh-windows.yml`
+> already did for its own artifacts. `makensis` cannot run on macOS
+> (Homebrew 3.13 aborts with `std::bad_alloc`), so this path is Windows-only.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

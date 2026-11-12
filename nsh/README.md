@@ -45,16 +45,27 @@ The exe then keeps the default Explorer icon.
 
 ## Windows artifacts
 
-CI builds three shapes:
+`nsh package --target windows` makes a directory (`SUSUSongBoard/`) plus the
+zip the updater replaces it from. The one-file download is an NSIS build of
+that directory, so both come from `installer/`:
 
-- `SUSUSongBoard-Portable-0.43.0-preview.1.exe` — one file, ~15 MB; first run extracts to
-  `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly.
-- `SUSUSongBoard-Setup-0.43.0-preview.1.exe` — per-user NSIS installer, same directory.
-- `SUSUSongBoard.zip` — raw directory, ~22 MB.
+- `SUSUSongBoard-Portable-0.43.0-preview.2.exe` — one file, ~26 MB; first run extracts to
+  `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly. A
+  registry build marker (`PortableBuild`) keeps an updated install from being
+  overwritten by an older launcher.
+- `SUSUSongBoard-Setup-0.43.0-preview.2.exe` — per-user NSIS installer, same directory
+  (`%LOCALAPPDATA%`, so `nsh/updater` can replace the app without elevation).
+- `SUSUSongBoard-0.43.0-preview.2-windows-x86_64.zip` — raw directory, and the
+  archive the updater uses. Not a hand-download.
 
-CI also smoke-runs the portable exe and checks the payload is extracted.
+`nsh-windows.yml` builds and smoke-runs both exes on every push; `NSH Release`
+builds the same two on the Windows runner and attaches them to the release
+next to the updater archives.
 
-## Listener-only mode (0.43.0-preview.1)
+`makensis` cannot build on macOS (Homebrew's 3.13 aborts with
+`std::bad_alloc`), so these two exes are only ever built on a Windows runner.
+
+## Listener-only mode (0.43.0-preview.2)
 
 功能边界按「有没有启用酷狗平台」拆分，不改动原版左栏布局：
 
@@ -199,7 +210,7 @@ Tests do not mirror SQLite writes back to NSH Storage.
 Durability, WAL snapshots, one-shot migration, transactional rollback and
 failure recovery are tested against temporary on-disk databases in Rust.
 
-## Playlist clear (0.43.0-preview.1)
+## Playlist clear (0.43.0-preview.2)
 
 The sidebar now mirrors the original: `Kugou 歌单` has a name input + read-only
 `id`, and two equal buttons — red `清理` (Trash2) and `自动同步` (rainbow ring
@@ -280,7 +291,7 @@ tens of rows, so this is accepted for now.
   `general` (appearance, read-only runtime info), `plugin` (**only** the
   platform picker and the selected platform's login — QR code, status,
   logout), and `about` (version, repository, `nsh/updater` check; no manifest
-  yet). 0.43.0-preview.1 removes the separate `启用酷狗服务` master switch: the platform
+  yet). 0.43.0-preview.2 removes the separate `启用酷狗服务` master switch: the platform
   picker IS the switch. One platform may be selected, or **none at all**.
   Switching platforms or turning them all off disables auto-sync and hides
   the sidebar `Kugou 歌单` block, the row's ListPlus button, the search-result
@@ -292,7 +303,7 @@ tens of rows, so this is accepted for now.
   deferred until config load and skipped entirely with no platform selected,
   so a stale token cannot produce phantom warnings. Config migration is
   written back to Storage immediately (`configLoaded` is a signal).
-  The 0.43.0-preview.1 cleanup also removes the `目标歌单` list, `设为目标`, the duplicate
+  The 0.43.0-preview.2 cleanup also removes the `目标歌单` list, `设为目标`, the duplicate
   auto-sync switch and `搜索并加入` from the plugin tab: those came from the
   original's separate **KuGou API 调试面板** (an About dialog sub-entry), not
   from its settings. Playlist management lives in the left panel
@@ -305,7 +316,7 @@ tens of rows, so this is accepted for now.
   present, otherwise creates a fresh playlist and returns the new id; only
   after a successful resolve is `auto_sync` enabled. A failed resolve leaves
   it off with a visible message. `playlists()` no longer overwrites the
-  edited name/id from the server list. 0.43.0-preview.1 hardens this path: `get_all_list`
+  edited name/id from the server list. 0.43.0-preview.2 hardens this path: `get_all_list`
   fails closed on an application-level `status`/`error_code` (a token failure
   must never look like "no playlists" and trigger a create), request headers
   match kugou-api's `kg-*` set, a shared mutex+generation prevents double
