@@ -92,11 +92,11 @@ What this costs:
 zip the updater replaces it from. The one-file download is an NSIS build of
 that directory, so both come from `installer/`:
 
-- `SUSUSongBoard-Portable-0.43.0-preview.6.exe` — one file, ~26 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.43.0-preview.7.exe` — one file, ~26 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly. A
   registry build marker (`PortableBuild`) keeps an updated install from being
   overwritten by an older launcher.
-- `SUSUSongBoard-Setup-0.43.0-preview.6.exe` — per-user NSIS installer, same directory
+- `SUSUSongBoard-Setup-0.43.0-preview.7.exe` — per-user NSIS installer, same directory
   (`%LOCALAPPDATA%`, so `nsh/updater` can replace the app without elevation).
 - `SUSUSongBoard-0.43.0-preview.6-windows-x86_64.zip` — raw directory, and the
   archive the updater uses. Not a hand-download.

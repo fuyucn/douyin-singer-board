@@ -61,7 +61,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.0-preview.6";
+const APP_VERSION = "0.43.0-preview.7";
 
 // "0.1.1" is newer than "0.1.0"; missing parts count as 0. Used to decide
 // whether the plugin copy in the data directory predates the bundled one.
