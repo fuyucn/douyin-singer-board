@@ -1,4 +1,5 @@
 import { expect, open, test } from "nsh/test";
+import { openSqliteBoard } from "./sqlite-test-options";
 
 const config = JSON.stringify({
   room_id: "145997388006",
@@ -35,7 +36,7 @@ const playlistsBody = { data: { info: [{ name: "测试4", listid: 27, count: 0 }
 
 test("background worker moves a found song to played with one playlist write", async () => {
   let adds = 0;
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -49,6 +50,8 @@ test("background worker moves a found song to played with one playlist write", a
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
@@ -63,7 +66,7 @@ test("background worker moves a found song to played with one playlist write", a
 
 test("auth failure stops the worker instead of retrying a dead token", async () => {
   let adds = 0;
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -77,6 +80,8 @@ test("auth failure stops the worker instead of retrying a dead token", async () 
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
@@ -89,7 +94,7 @@ test("auth failure stops the worker instead of retrying a dead token", async () 
 test("a singer blacklist entry blocks syncing and marks the row", async () => {
   let adds = 0;
   const withBlacklist = { ...JSON.parse(config), blacklist_singers: ["周杰伦"] };
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -103,6 +108,8 @@ test("a singer blacklist entry blocks syncing and marks the row", async () => {
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
@@ -115,7 +122,7 @@ test("a singer blacklist entry blocks syncing and marks the row", async () => {
 
 test("manual mark during an in-flight worker write adds only once", async () => {
   let adds = 0;
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -129,6 +136,8 @@ test("manual mark during an in-flight worker write adds only once", async () => 
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
@@ -143,7 +152,7 @@ test("manual mark during an in-flight worker write adds only once", async () => 
 
 test("worker restart during an in-flight write does not replay it", async () => {
   let adds = 0;
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -157,6 +166,8 @@ test("worker restart during an in-flight write does not replay it", async () => 
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");
@@ -179,7 +190,7 @@ test("worker restart during an in-flight write does not replay it", async () => 
 test("a transient search failure is retried and the song still syncs", async () => {
   let searches = 0;
   let adds = 0;
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     clock: {},
@@ -196,6 +207,8 @@ test("a transient search failure is retried and the song still syncs", async () 
       },
     },
   });
+  // The platform runs in a WebView: page load is real time, the app clock is not.
+  await new Promise((r) => setTimeout(r, 1800));
   await app.wait(200);
   await app.type("输入歌曲名称...", "晴天");
   await app.press("添加");

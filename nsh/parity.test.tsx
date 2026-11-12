@@ -1,7 +1,8 @@
 import { expect, open, test } from "nsh/test";
+import { openSqliteBoard } from "./sqlite-test-options";
 
 test("settings modal opens on general", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
   expect(app.texts()).toContain("外观");
@@ -12,10 +13,10 @@ test("settings modal opens on general", async () => {
 });
 
 test("settings tabs switch between general, plugin and about", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  expect(app.texts()).toContain("平台插件");
+  expect(app.texts()).toContain("插件");
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).not.toContain("运行信息");
   // The general-only appearance block must not leak into the plugin tab.
@@ -23,10 +24,10 @@ test("settings tabs switch between general, plugin and about", async () => {
   await app.press("id:settings-tab-general");
   expect(app.texts()).toContain("运行信息");
   await app.press("id:go-plugin");
-  expect(app.texts()).toContain("平台插件");
+  expect(app.texts()).toContain("插件");
   await app.press("id:settings-tab-about");
   expect(app.texts()).toContain("检查更新");
-  expect(app.texts()).toContain("v0.43.0-preview.5");
+  expect(app.texts()).toContain("v0.43.0-preview.6");
   await app.press("id:settings-close");
   expect(app.texts()).toContain("手动点歌");
 });
@@ -40,7 +41,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
     auto_sync: false, active_plugin: "kugou", config_version: 2,
   });
   const sess = JSON.stringify({ token: "TESTTOKEN", userid: "123456", dfid: "-" });
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg, "kugou.session": sess },
     network: {
@@ -79,7 +80,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
 });
 
 test("blacklist accepts singer entries", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await app.press("黑名单 (0)");
   await app.press("id:black-type-singer");
   await app.type("输入歌手名…", "周杰伦");
@@ -91,7 +92,7 @@ test("blacklist accepts singer entries", async () => {
 });
 
 test("no platform = listener-only: no manual add, clear mode panel", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": JSON.stringify({ ...baseConfig, active_plugin: "", config_version: 2 }) },
   });
@@ -121,7 +122,7 @@ test("no platform = listener-only: no manual add, clear mode panel", async () =>
 });
 
 test("NetEase placeholder stays listener-only (no manual add)", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": JSON.stringify({ ...baseConfig, active_plugin: "netease", config_version: 2 }) },
   });
@@ -138,7 +139,7 @@ test("已点歌单 tab keeps its history when the platform is turned off", async
     active_plugin: "kugou", config_version: 2,
   });
   const sess = JSON.stringify({ token: "TESTTOKEN", userid: "123456", dfid: "-" });
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg, "kugou.session": sess },
     network: {
@@ -170,7 +171,7 @@ test("no Kugou session means no search request at all", async () => {
     ...baseConfig, target_playlist_name: "测试4", target_playlist_id: 27,
     active_plugin: "kugou", config_version: 2,
   });
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg },
     network: {
@@ -206,7 +207,7 @@ const baseConfig = {
 };
 
 test("0.5.x configs are upgraded with Kugou selected", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     storage: { "board.config": JSON.stringify({ ...baseConfig, kugou_enabled: false }) },
@@ -219,7 +220,7 @@ test("0.5.x configs are upgraded with Kugou selected", async () => {
 });
 
 test("a v2 config with the service explicitly disabled selects no platform", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900,
     height: 700,
     storage: {

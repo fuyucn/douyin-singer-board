@@ -333,6 +333,26 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > AES-CBC vector and a 1024-bit RSA block against Node's crypto.
 > The built-in KuGou platform stays compiled in and unchanged.
 
+> 0.43.0-preview.6 makes the platform a plugin all the way: the compiled
+> KuGou engine (`plugins/kugou/*.ts`) is gone, the board calls the plugin over
+> the channel (`search`, `playlists`, `addTrack`, `resolve`, `clear`, QR
+> login), and "platform plugin" and "plugin channel" are one list —
+> 设置 → 插件, each row with 安装 / 启用·停用 / 移除, where 启用 is what selects
+> the platform. KuGou ships installed (auto-installed on first run unless the
+> user removed it, and installable again from the row) so a fresh app still
+> has point-song out of the box.
+> Tests follow: `board`, `parity`, `actions`, `sync-worker`, `kugou-ui` and
+> the plugin suites need a real WebView and a real data directory, so they run
+> with `--target`; the headless runner keeps the suites that never touch a
+> platform.
+> Config compatibility: a stored `active_plugin: "kugou"` becomes
+> `"kugou-web"` on load, and the platform card keeps the `plugin-kugou` test
+> id, so existing configs and automation still work.
+> Cost: platform features now need a WebView, so Windows without the WebView2
+> runtime is listener-only. Per-call bridge overhead measured at ~12–15 ms
+> including the page's crypto (a UI press in the test harness alone costs
+> ~270 ms, so the bridge itself is in the noise next to the network).
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;
