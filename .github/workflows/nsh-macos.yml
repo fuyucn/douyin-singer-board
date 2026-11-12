@@ -60,6 +60,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # Compiling rusqlite's bundled SQLite and the host crates is the only
+      # slow step here (cold: ~3 min for a package, ~50 s for the native tests;
+      # warm: 4 s and 0.5 s). Cached by Cargo.lock and the flags, which the
+      # config below fixes.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/nsh/target
+            ${{ github.workspace }}/nsh/native/target
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('nsh/native/Cargo.lock', 'nsh/.cargo/config.toml', 'nsh/native/Cargo.toml') }}-${{ hashFiles('nsh/native/src/**') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('nsh/native/Cargo.lock', 'nsh/.cargo/config.toml', 'nsh/native/Cargo.toml') }}-
+
       - name: Rust store tests
         run: cargo test --manifest-path native/Cargo.toml --locked
 
