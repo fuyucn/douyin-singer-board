@@ -563,9 +563,14 @@ async function createPlaylist(input) {
   return newId;
 }
 
-async function parseDeleteResponse(text, aes) {
+// The answer is either JSON or an AES ciphertext in base64. The old app's
+// port passed the raw bytes through when the body was not base64-looking, which
+// made atob throw "contains invalid characters"; encoding the bytes always
+// works, and a real JSON answer still parses above.
+async function parseDeleteResponse(bytes, aes) {
+  var text = new TextDecoder().decode(bytes);
   try { return JSON.parse(text); } catch (e) { /* not plain JSON */ }
-  var b64 = /^[A-Za-z0-9+/\s=]+$/.test(text) ? text.trim() : text;
+  var b64 = /^[A-Za-z0-9+/\s=]+$/.test(text) ? text.trim() : bytesToB64(bytes);
   return await aesDecryptB64(b64, aes);
 }
 
@@ -595,9 +600,10 @@ async function deletePlaylist(input) {
   }
   var json;
   try {
-    json = await parseDeleteResponse(new TextDecoder().decode(b64ToBytes(text)), aes);
+    json = await parseDeleteResponse(b64ToBytes(text), aes);
   } catch (e) {
-    var err2 = new Error("delete_list 响应不可解析：" + String((e && e.message) || e));
+    var snippet = String(text || "").slice(0, 60);
+    var err2 = new Error("delete_list 响应不可解析：" + String((e && e.message) || e) + "（响应前 60 字：" + snippet + "）");
     err2.unknownResult = true;
     throw err2;
   }
@@ -618,38 +624,49 @@ async function resolvePlaylist(input) {
 async function clearPlaylist(input) {
   var name = String(input.name || "").trim();
   if (!name) throw new Error("playlist name is empty");
-  var byName = null;
+  var ids = [];
   try {
     var all = await playlists(input);
-    for (var i = 0; i < all.length; i++) if (all[i].name.trim() === name) byName = all[i];
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].name.trim() === name && all[i].listid) ids.push(Number(all[i].listid));
+    }
   } catch (e) {
     throw new Error("歌单列表查询失败，未执行清理：" + String((e && e.message) || e));
   }
-  var oldId = byName && (!input.currentId || byName.listid === input.currentId) ? Number(byName.listid) : 0;
-  if (!oldId) {
+  if (!ids.length) {
     var listid = await createPlaylist(Object.assign({}, input, { name: name }));
-    return { listid: listid, deleted: false, warning: "未找到同名旧歌单（或名称与 id 不一致），未删除旧歌单" };
+    return { listid: listid, deleted: false, warning: "未找到同名旧歌单，未删除旧歌单" };
   }
-  try {
-    await deletePlaylist(Object.assign({}, input, { listid: oldId }));
-  } catch (e) {
-    if (e && e.unknownResult) {
-      var err = new Error("旧歌单删除状态未知，未创建新歌单：" + String(e.message || e));
-      err.deletedOld = true;
-      err.deletedId = oldId;
-      throw err;
+  // Every list with this name goes, not just the configured id: a run of
+  // failed clears leaves duplicates behind, and one press should end with a
+  // single clean playlist.
+  var deleted = [];
+  for (var k = 0; k < ids.length; k++) {
+    try {
+      await deletePlaylist(Object.assign({}, input, { listid: ids[k] }));
+      deleted.push(ids[k]);
+    } catch (e) {
+      if (e && e.unknownResult) {
+        var err = new Error("旧歌单删除状态未知，未创建新歌单：" + String(e.message || e));
+        err.deletedOld = true;
+        err.deletedId = ids[k];
+        err.deletedIds = deleted.concat([ids[k]]);
+        throw err;
+      }
+      throw new Error("旧歌单删除失败，未创建新歌单：" + String((e && e.message) || e));
     }
-    throw new Error("旧歌单删除失败，未创建新歌单：" + String((e && e.message) || e));
   }
+  var fresh;
   try {
-    var fresh = await createPlaylist(Object.assign({}, input, { name: name }));
+    fresh = await createPlaylist(Object.assign({}, input, { name: name }));
   } catch (e) {
     var err2 = new Error("旧歌单已删除但重建失败：" + String((e && e.message) || e));
     err2.deletedOld = true;
-    err2.deletedId = oldId;
+    err2.deletedId = deleted[0];
+    err2.deletedIds = deleted;
     throw err2;
   }
-  return { listid: fresh, deleted: true, deletedId: oldId };
+  return { listid: fresh, deleted: true, deletedId: deleted[0], deletedIds: deleted };
 }
 
 // --- what the app calls ---------------------------------------------------

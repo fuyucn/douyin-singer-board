@@ -51,9 +51,8 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
   expect(app.texts()).toContain("外观");
-  expect(app.texts().some((t: string) => t.includes("同一时间只启用一个平台"))).toBe(false);
   await app.press("id:settings-tab-plugin");
-  expect(app.texts().some((t: string) => t.includes("同一时间只启用一个平台"))).toBe(true);
+  expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");
   expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
