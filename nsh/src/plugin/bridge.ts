@@ -29,6 +29,17 @@ export class PluginChannel {
 
   /** The web view's ref, once it is mounted. */
   attach(view: any): void {
+    if (this.view !== view) {
+      // A re-enabled plugin mounts a new page; its readiness has to be waited
+      // for again, and calls that were in flight on the old page are gone.
+      for (const entry of this.pending.values()) {
+        clearTimeout(entry.timer);
+        entry.reject(new Error("插件页面已重新加载"));
+      }
+      this.pending.clear();
+      this.pageReady = false;
+      this.readySignal = new Promise<void>((resolve) => { this.markReady = resolve; });
+    }
     this.view = view;
   }
 
@@ -77,6 +88,8 @@ export class PluginChannel {
       if (fields.code) error.code = fields.code;
       if (fields.deletedOld) error.deletedOld = true;
       if (fields.deletedId) error.deletedId = fields.deletedId;
+      if (fields.deletedIds) error.deletedIds = fields.deletedIds;
+      if (fields.refused) error.refused = true;
       if (fields.unknownResult) error.unknownResult = true;
       entry.reject(error);
       return;
@@ -103,7 +116,11 @@ export class PluginChannel {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`插件超时（${method}）`));
+        const error: any = new Error(`插件超时（${method}）`);
+        // The call may still finish inside the page; a write that timed out is
+        // an unknown outcome, not a failure the app may undo.
+        error.timeout = true;
+        reject(error);
       }, timeoutMs) as unknown as number;
       this.pending.set(id, { resolve, reject, timer });
       const payload = JSON.stringify(JSON.stringify({ method, params }));

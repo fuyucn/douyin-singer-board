@@ -63,6 +63,17 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
 }
 const APP_VERSION = "0.43.0-preview.6";
 
+// "0.1.1" is newer than "0.1.0"; missing parts count as 0. Used to decide
+// whether the plugin copy in the data directory predates the bundled one.
+const versionParts = (v: string) => String(v || "0").split(/[.+-]/).map((x) => Number.parseInt(x, 10) || 0);
+const versionNewer = (a: string, b: string) => {
+  const pa = versionParts(a), pb = versionParts(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+  }
+  return false;
+};
+
 type Tab = "songs" | "played" | "blacklist";
 type PluginId = string;
 const PLUGINS = platforms();
@@ -393,30 +404,21 @@ function Board() {
     // later write drops the earlier line.
     const dir = dataDir();
     if (!dir) return;
-    if (dir !== lastLogDir) {
-      mkdir(`${dir}/logs`, { recursive: true }).catch(() => {});
-      lastLogDir = dir;
-    }
     logQueue = logQueue.then(async () => {
+      if (dir !== lastLogDir) {
+        await mkdir(`${dir}/logs`, { recursive: true });
+        lastLogDir = dir;
+      }
       const old = await readFile(`${dir}/logs/app.log`, "utf8").catch(() => "");
       const next = `${old}${entry}\n`;
-      await writeFile(`${dir}/logs/app.log`, next.length > 200_000 ? next.slice(-180_000) : next);
+      const bytes = new TextEncoder().encode(next).length;
+      await writeFile(`${dir}/logs/app.log`, bytes > 200_000 ? next.slice(-180_000) : next);
     }).catch(() => {});
   };
 
 
   // The platform is the plugin: every KuGou call below goes to its page.
-  // "0.1.1" is newer than "0.1.0"; missing parts count as 0.
-const versionParts = (v: string) => String(v || "0").split(/[.+-]/).map((x) => Number.parseInt(x, 10) || 0);
-const versionNewer = (a: string, b: string) => {
-  const pa = versionParts(a), pb = versionParts(b);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
-  }
-  return false;
-};
-
-const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
+  const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
 
   // At startup the session restore can ask before the plugin folder has been
   // listed, so "插件未安装" is not final: wait for `plugins()` to include it,
@@ -596,12 +598,16 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
     const next = !pluginsOn()[id];
     pluginsOn.update((v) => ({ ...v, [id]: next }));
     setPluginStatus(id, next ? "已启用，正在加载…" : "已停用");
+    if (!next) channels.delete(id);
     try {
       await storage.setItem(`plugin.${id}`, next ? "1" : "0");
       log(`插件 ${id} ${next ? "已启用" : "已停用"}`);
     } catch (e: any) {
       storageError(e);
     }
+    // A login restored at startup only happens when a platform was already
+    // selected; enabling one later must not ask the user to scan again.
+    if (next && !kugou()) restoreSession();
   };
 
   const uninstallPlugin = async (id: string) => {
@@ -689,7 +695,13 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
   // The card's test id keeps the platform's historical name, so tests and
   // anyone's automation do not have to know it became a plugin ("kugou-web").
   const platformTestId = (id: string) => (id === "kugou-web" ? "plugin-kugou" : `plugin-${id}`);
+  // What is on disk may be older (or newer) than what the app bundles; the
+  // card should describe the copy that actually runs.
+  const kugouMeta = () => plugins().find((p: any) => p.manifest.id === "kugou-web")?.manifest ?? KUGOU_WEB_MANIFEST;
+  const kugouBlocked = () => plugins().find((p: any) => p.manifest.id === "kugou-web")?.blocked;
   const selectPlugin = (id: PluginId) => {
+    const blocked = plugins().find((p: any) => p.manifest.id === id)?.blocked;
+    if (blocked) { showFlash(blocked); return; }
     const next = config().active_plugin === id ? "" : id;
     // A platform change is a transaction boundary: invalidate any in-flight
     // resolve (so it cannot re-enable auto-sync), QR polling and queued
@@ -700,6 +712,7 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
     searchQueue.length = 0;
     startedSearches.clear();
     patch({ active_plugin: next, kugou_enabled: next === "kugou-web", auto_sync: false });
+    if (next && !kugou()) restoreSession();
     showFlash(next ? `已启用${platform(next)!.name}` : "已停用所有平台插件");
   };
   const singers = () => config().blacklist_singers ?? [];
@@ -865,6 +878,35 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
       return false;
     }
   };
+
+  // Auto-sync left on from the last run resumes by itself — but the stored id
+  // can be zero (a failed clear) or point at a playlist deleted on the phone.
+  // Check the named playlist once per launch before the worker starts, the
+  // same resolve the toggle does; failures leave the worker idle.
+  let autoSyncChecked = false;
+  effect(() => {
+    if (autoSyncChecked) return;
+    if (!pluginEnabled() || !config().auto_sync || !kugou()) return;
+    const name = config().target_playlist_name.trim();
+    if (!name) { autoSyncChecked = true; return; }
+    autoSyncChecked = true;
+    const sess = kugou()!;
+    const gen = ++playlistOpGen;
+    resolvePlaylistByName({ token: sess.token, userid: sess.userid, dfid: sess.dfid, name }).then(
+      (res) => {
+        if (gen !== playlistOpGen || !pluginEnabled() || !kugou() || config().target_playlist_name.trim() !== name) return;
+        patch({ target_playlist_id: res.listid });
+        lists.update((v) => v.some((p) => p.listid === res.listid)
+          ? v
+          : [{ name, listid: res.listid, count: 0 }, ...v]);
+        const msg = res.created
+          ? `启动检查：歌单不存在，已创建 ${name} (id: ${res.listid})`
+          : `启动检查：找到同名歌单 ${name} (id: ${res.listid})`;
+        log(msg);
+      },
+      (e: any) => log("启动歌单检查失败: " + String(e?.message ?? e)),
+    );
+  });
 
   effect(() => {
     const enabled = pluginEnabled() && (config().auto_sync ?? false) && !!kugou() && !!config().target_playlist_id;
@@ -1345,18 +1387,27 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
     patch({ target_playlist_id: 0 });
     showFlash(`正在清理歌单：${name}…`);
     try {
-      const res = await clearPlaylistByName({
+      const res: any = await clearPlaylistByName({
         token: sess.token, userid: sess.userid, dfid: sess.dfid,
         name, currentId: oldId,
       });
+      if (res.refused) {
+        // The name was edited while the id still points at another playlist;
+        // nothing was deleted or created, so put the id back and say why.
+        patch({ target_playlist_id: oldId });
+        showFlash(`清理未执行：${res.warning}`);
+        log(`清理未执行：${res.warning}`);
+        return;
+      }
       patch({ target_playlist_id: res.listid, target_playlist_name: name });
       // Do not refetch: a fresh list may not contain the new id yet, and
       // loadLists would silently reset the config to the first old playlist.
       // Only remove the old entry when it was really deleted.
-      const removed = res.deleted ? (res.deletedId ?? oldId) : null;
+      const removedIds: number[] = res.deletedIds ?? [res.deletedId ?? oldId];
+      const removed = res.deleted ? removedIds[0] : null;
       lists.update((v) => [
         { name, listid: res.listid, count: 0 },
-        ...v.filter((p) => p.listid !== res.listid && p.listid !== removed),
+        ...v.filter((p) => p.listid !== res.listid && !removedIds.includes(p.listid)),
       ]);
       const msg = res.warning
         ? `新歌单已建 (id: ${res.listid})，${res.warning}`
@@ -1364,11 +1415,11 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
       showFlash(msg);
       log(msg);
     } catch (e: any) {
-      if (e?.deletedOld) {
+      if (e?.deletedOld || e?.unknownResult || e?.timeout) {
         // The old playlist is gone (or its state is unknown): leave the id at
         // 0 so auto-sync cannot write into a deleted list, and drop the entry.
-        const removed = e.deletedId ?? oldId;
-        lists.update((v) => v.filter((p) => p.listid !== removed));
+        const removedIds: number[] = e?.deletedIds ?? [e?.deletedId ?? oldId];
+        lists.update((v) => v.filter((p) => !removedIds.includes(p.listid)));
       } else {
         // A definite failure: nothing was deleted, restore the old target.
         patch({ target_playlist_id: oldId });
@@ -2084,7 +2135,7 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
                   <View class={`h-3 w-3 rounded-full border ${pluginEnabled() ? "border-primary bg-primary" : "border-line-strong"}`} />
                   <View class="flex-1">
                     <Text class="text-[13px] text-foreground">酷狗音乐</Text>
-                    <Text class="text-[11px] text-faint">{KUGOU_WEB_MANIFEST.version} · {KUGOU_WEB_MANIFEST.note}</Text>
+                    <Text class="text-[11px] text-faint">{kugouMeta().version} · {kugouMeta().note}</Text>
                   </View>
                   <If when={!kugouInstalled()}>
                     <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] bg-primary px-3 py-1 active:opacity-80">
@@ -2098,7 +2149,7 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
                       class={`items-center justify-center rounded-[6px] px-3 py-1 ${pluginEnabled() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
                     >
                       <Text class={`text-[12px] ${pluginEnabled() ? "text-primary-foreground" : "text-foreground"}`}>
-                        {pluginEnabled() ? "停用" : "启用"}
+                        {kugouBlocked() ? "不可用" : pluginEnabled() ? "停用" : "启用"}
                       </Text>
                     </Button>
                     <Button
@@ -2112,6 +2163,9 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
                 </View>
                 <If when={config().active_plugin === "kugou-web" && !plugins().some((p: any) => p.manifest.id === KUGOU_WEB_MANIFEST.id)}>
                   <Text class="text-[11px] text-[#c5403c]">插件未安装：请先点「安装」。</Text>
+                </If>
+                <If when={kugouBlocked()}>
+                  <Text testID="kw-blocked" class="text-[11px] text-[#c5403c]">{kugouBlocked()}；该插件不加载，文件夹保留。</Text>
                 </If>
 
                 <If when={pluginEnabled()}>

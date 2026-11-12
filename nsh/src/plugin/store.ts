@@ -52,10 +52,12 @@ export async function installPlugin(
   if (!validPluginId(manifest.id)) throw new Error(`插件 id 不合法: ${manifest.id}`);
   const dir = `${pluginsDir(dataDir)}/${manifest.id}`;
   await mkdir(dir, { recursive: true });
-  await writeFile(`${dir}/plugin.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+  // Manifest last: a half-written upgrade keeps the old version on disk, so
+  // the next launch tries again instead of believing it is already current.
   for (const [name, text] of Object.entries(files)) {
     await writeFile(`${dir}/${name}`, text);
   }
+  await writeFile(`${dir}/plugin.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   return { manifest, dir, source: files[manifest.entry] ?? "" };
 }
 

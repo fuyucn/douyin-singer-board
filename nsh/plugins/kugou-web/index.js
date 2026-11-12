@@ -624,16 +624,25 @@ async function resolvePlaylist(input) {
 async function clearPlaylist(input) {
   var name = String(input.name || "").trim();
   if (!name) throw new Error("playlist name is empty");
-  var ids = [];
+  var all;
   try {
-    var all = await playlists(input);
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].name.trim() === name && all[i].listid) ids.push(Number(all[i].listid));
-    }
+    all = await playlists(input);
   } catch (e) {
     throw new Error("歌单列表查询失败，未执行清理：" + String((e && e.message) || e));
   }
-  if (!ids.length) {
+  var sameName = [];
+  var bound = null;
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].name.trim() === name && all[i].listid) sameName.push(Number(all[i].listid));
+    if (input.currentId && Number(all[i].listid) === Number(input.currentId)) bound = all[i];
+  }
+  // The id in the config and the name on screen have to describe the same
+  // playlist. If the user edited the name and the bound list is named
+  // otherwise, deleting by that name could hit a playlist they did not mean.
+  if (input.currentId && (!bound || bound.name.trim() !== name)) {
+    return { listid: Number(input.currentId), deleted: false, refused: true, warning: "名称与 id 不一致，未删除旧歌单" };
+  }
+  if (!sameName.length) {
     var listid = await createPlaylist(Object.assign({}, input, { name: name }));
     return { listid: listid, deleted: false, warning: "未找到同名旧歌单，未删除旧歌单" };
   }
@@ -641,16 +650,16 @@ async function clearPlaylist(input) {
   // failed clears leaves duplicates behind, and one press should end with a
   // single clean playlist.
   var deleted = [];
-  for (var k = 0; k < ids.length; k++) {
+  for (var k = 0; k < sameName.length; k++) {
     try {
-      await deletePlaylist(Object.assign({}, input, { listid: ids[k] }));
-      deleted.push(ids[k]);
+      await deletePlaylist(Object.assign({}, input, { listid: sameName[k] }));
+      deleted.push(sameName[k]);
     } catch (e) {
       if (e && e.unknownResult) {
         var err = new Error("旧歌单删除状态未知，未创建新歌单：" + String(e.message || e));
         err.deletedOld = true;
-        err.deletedId = ids[k];
-        err.deletedIds = deleted.concat([ids[k]]);
+        err.deletedId = sameName[k];
+        err.deletedIds = deleted.concat([sameName[k]]);
         throw err;
       }
       throw new Error("旧歌单删除失败，未创建新歌单：" + String((e && e.message) || e));
