@@ -295,6 +295,21 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > already did for its own artifacts. `makensis` cannot run on macOS
 > (Homebrew 3.13 aborts with `std::bad_alloc`), so this path is Windows-only.
 
+> 0.43.0-preview.3 adds a plugin channel next to the built-in platforms.
+> A plugin is a folder in `${dataDir}/plugins/<id>/` (`plugin.json` + one JS
+> module) that the app runs in a **hidden WebView**: the only way an NSH app
+> may run code it did not compile (the main VM deletes `eval`, refuses
+> `.nshc` it did not build, and bundles everything at build time). The
+> bridge is `window.nsh.postMessage` / `injectJavaScript`, with the plugin
+> seeing `app.call(method, params)` (log, its own storage, and the app's
+> `fetch` so capabilities still apply) and `plugin.define({...})` for what
+> the app calls. Measured before building it: a `display: none` web view
+> still loads and runs its page with timers at full rate (15 ticks in 4 s at
+> 250 ms against 14 visible), and a two-call JSON round trip answers both
+> ways. The built-in KuGou platform stays compiled in and does not use this;
+> `plugin.test.tsx --target macos` installs, enables, calls, and removes the
+> bundled demo plugin through the real filesystem and a real web view.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

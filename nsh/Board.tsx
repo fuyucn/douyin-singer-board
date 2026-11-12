@@ -26,6 +26,14 @@ import "./plugins/netease/platform";
 import { hasPlaylists, platform, platforms } from "./src/platform/registry";
 import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
+// The plugin channel: a plugin is a folder under ${dataDir}/plugins that the
+// app runs in a hidden web view (see src/plugin/). Nothing here is on the path
+// of the built-in platforms.
+import { PluginChannel } from "./src/plugin/bridge";
+import { DEMO_PLUGIN, DEMO_SOURCE } from "./src/plugin/demo";
+import { PluginView } from "./src/plugin/PluginView";
+import { installPlugin, listPlugins, pluginsDir, removePlugin } from "./src/plugin/store";
+import type { InstalledPlugin } from "./src/plugin/types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
@@ -61,7 +69,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.0-preview.2";
+const APP_VERSION = "0.43.0-preview.3";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -106,6 +114,8 @@ function Board() {
   // file across an app restart; production always uses process.dataDir.
   const testDir = host.params.sqliteTestDir as string | undefined;
   const storage = createSqliteStore(testDir ?? process.dataDir, testSeed);
+  // Plugins live beside the database; a test may point both at a temp dir.
+  const dataDir = () => testDir ?? process.dataDir;
   const config = signal<Config>({
     room_id: "145997388006",
     sing_prefix: DEFAULT_SING_PREFIX,
@@ -382,6 +392,121 @@ function Board() {
     const t = clock(Math.floor(Date.now() / 1000));
     logs.update((v) => [...v.slice(-120), `${t} ${line}`]);
   };
+
+  // --- plugin channel (experimental) -------------------------------------
+  // A plugin is `${dataDir}/plugins/<id>/` with plugin.json and one JS module.
+  // The app runs that module in a hidden WebView, the only way an NSH app can
+  // run code it did not compile, and calls it over the bridge in src/plugin/.
+  const plugins = signal<InstalledPlugin[]>([]);
+  const pluginsOn = signal<Record<string, boolean>>({});
+  const pluginStatus = signal<Record<string, string>>({});
+  const channels = new Map<string, PluginChannel>();
+
+  const setPluginStatus = (id: string, text: string) =>
+    pluginStatus.update((v) => ({ ...v, [id]: text }));
+
+  // What a plugin may ask the app for. Deliberately small: logging, its own
+  // storage, and the app's own fetch (so the app's capabilities and headers
+  // still apply to what a plugin fetches through it).
+  const pluginPrimitives = (id: string) => ({
+    log: async ({ line }: any) => {
+      log(`[插件 ${id}] ${line}`);
+      return true;
+    },
+    "storage.get": async ({ key }: any) => {
+      const raw = await storage.getItem(`plugin.${id}.${key}`);
+      return raw == null ? null : JSON.parse(raw);
+    },
+    "storage.set": async ({ key, value }: any) => {
+      await storage.setItem(`plugin.${id}.${key}`, JSON.stringify(value ?? null));
+      return true;
+    },
+    "http.json": async ({ url, method, headers, body }: any) => {
+      if (typeof url !== "string" || !url.startsWith("https://")) throw new Error("插件只能通过应用请求 https 地址");
+      const res = await fetch(url, { method: method ?? "GET", headers, body });
+      return await res.json();
+    },
+  });
+
+  const channelFor = (plugin: InstalledPlugin) => {
+    const id = plugin.manifest.id;
+    let channel = channels.get(id);
+    if (!channel) {
+      channel = new PluginChannel(id, pluginPrimitives(id), log);
+      channels.set(id, channel);
+    }
+    return channel;
+  };
+
+  // `silent`: the first scan runs at startup, where a platform without a
+  // filesystem (the headless test runner) would only add a scary line.
+  const refreshPlugins = async (silent = false) => {
+    try {
+      const found = await listPlugins(dataDir());
+      plugins.set(found);
+      const on: Record<string, boolean> = {};
+      for (const p of found) on[p.manifest.id] = (await storage.getItem(`plugin.${p.manifest.id}`)) === "1";
+      pluginsOn.set(on);
+    } catch (e: any) {
+      if (!silent) log("插件目录读取失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const togglePlugin = async (id: string) => {
+    const next = !pluginsOn()[id];
+    pluginsOn.update((v) => ({ ...v, [id]: next }));
+    setPluginStatus(id, next ? "已启用，正在加载…" : "已停用");
+    try {
+      await storage.setItem(`plugin.${id}`, next ? "1" : "0");
+      log(`插件 ${id} ${next ? "已启用" : "已停用"}`);
+    } catch (e: any) {
+      storageError(e);
+    }
+  };
+
+  const installDemoPlugin = async () => {
+    try {
+      await installPlugin(dataDir(), DEMO_PLUGIN, { [DEMO_PLUGIN.entry]: DEMO_SOURCE });
+      await refreshPlugins();
+      setPluginStatus(DEMO_PLUGIN.id, "已安装，点「启用」开始");
+      log(`示例插件已安装到 ${pluginsDir(dataDir())}/${DEMO_PLUGIN.id}`);
+    } catch (e: any) {
+      log("示例插件安装失败: " + String(e?.message ?? e));
+      showFlash("示例插件安装失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const uninstallPlugin = async (id: string) => {
+    try {
+      channels.delete(id);
+      await removePlugin(dataDir(), id);
+      await storage.removeItem(`plugin.${id}`);
+      await refreshPlugins();
+      log(`插件 ${id} 已移除`);
+    } catch (e: any) {
+      log("插件移除失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const callPlugin = async (id: string, method: string, params: any) => {
+    const plugin = plugins().find((p) => p.manifest.id === id);
+    if (!plugin) { setPluginStatus(id, "插件不存在"); return; }
+    if (!pluginsOn()[id]) { setPluginStatus(id, "请先启用"); return; }
+    setPluginStatus(id, "调用中…");
+    try {
+      const result = await channelFor(plugin).invoke(method, params);
+      const text = Array.isArray(result)
+        ? result.length === 0 ? "(空)" : String(result[0]?.name ?? JSON.stringify(result[0]))
+        : JSON.stringify(result);
+      setPluginStatus(id, `${method} → ${text}`);
+      log(`插件 ${id} ${method} → ${text}`);
+    } catch (e: any) {
+      setPluginStatus(id, `${method} 失败: ${String(e?.message ?? e)}`);
+      log(`插件 ${id} ${method} 失败: ${String(e?.message ?? e)}`);
+    }
+  };
+
+  effect(() => { refreshPlugins(true); });
 
   const patch = (p: Partial<Config>) => config.update((c) => ({ ...c, ...p }));
 
@@ -1830,6 +1955,58 @@ function Board() {
                   </View>
                 </If>
               </If>
+              <View class="h-px bg-muted" />
+              <Text class="text-[13px] font-semibold text-foreground">插件通道（实验）</Text>
+              <Text class="text-[11px] text-faint">插件是数据目录下 plugins/&lt;id&gt;/ 的一个文件夹（plugin.json + 一个 JS 模块），在隐藏的 WebView 里运行，通过桥调用应用开放的接口（页面里的 `app.call`）。装与不装都不影响上面的内置平台。</Text>
+              <View class="flex-row items-center gap-2">
+                <Button testID="plugin-install-demo" onPress={installDemoPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">安装示例插件</Text>
+                </Button>
+                <Button testID="plugin-rescan" onPress={refreshPlugins} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">重新扫描</Text>
+                </Button>
+              </View>
+              <If when={plugins().length === 0}>
+                <Text class="text-[11px] text-faint">还没有插件。安装示例插件即可看到完整链路（安装 → 启用 → 调用）。</Text>
+              </If>
+              <Each of={plugins()} key={(p: any) => p.manifest.id}>
+                {(item: any) => (
+                  <View class="gap-1.5 rounded-[6px] border border-line px-3 py-2">
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[13px] text-foreground">{item().manifest.name}</Text>
+                      <Text class="text-[11px] text-faint">v{item().manifest.version} · api {item().manifest.api}</Text>
+                      <View class="flex-1" />
+                      <Button
+                        testID={`plugin-toggle-${item().manifest.id}`}
+                        onPress={() => togglePlugin(item().manifest.id)}
+                        class={`items-center justify-center rounded-[6px] px-2 py-1 ${pluginsOn()[item().manifest.id] ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                      >
+                        <Text class={`text-[11px] ${pluginsOn()[item().manifest.id] ? "text-primary-foreground" : "text-foreground"}`}>
+                          {pluginsOn()[item().manifest.id] ? "停用" : "启用"}
+                        </Text>
+                      </Button>
+                      <Button
+                        testID={`plugin-remove-${item().manifest.id}`}
+                        onPress={() => uninstallPlugin(item().manifest.id)}
+                        class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
+                      >
+                        <Text class="text-[11px] text-foreground">移除</Text>
+                      </Button>
+                    </View>
+                    <Text class="text-[11px] text-faint">{item().manifest.note ?? ""}</Text>
+                    <View class="flex-row items-center gap-2">
+                      <Button testID={`plugin-hello-${item().manifest.id}`} onPress={() => callPlugin(item().manifest.id, "hello", {})} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                        <Text class="text-[11px] text-foreground">调用 hello</Text>
+                      </Button>
+                      <Button testID={`plugin-search-${item().manifest.id}`} onPress={() => callPlugin(item().manifest.id, "search", { q: "晴天" })} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                        <Text class="text-[11px] text-foreground">调用 search</Text>
+                      </Button>
+                      <Text class="flex-1 text-[11px] text-muted-foreground">{pluginStatus()[item().manifest.id] ?? ""}</Text>
+                    </View>
+                  </View>
+                )}
+              </Each>
+
               <If when={config().active_plugin === "netease"}>
                 <Text class="text-[13px] font-semibold text-foreground">网易云音乐</Text>
                 <Text class="text-[12px] text-faint">尚未接入；歌单与歌曲匹配暂不可用。</Text>
@@ -1847,7 +2024,7 @@ function Board() {
                     </View>
                   </View>
                   <View class="h-px bg-line" />
-                  <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 WebView2 / Node 侧车。</Text>
+                  <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 Node 侧车；只有在启用插件时才会用到系统 WebView。</Text>
                   <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
                   <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
                   <View class="flex-row items-center gap-2">
@@ -1944,6 +2121,16 @@ function Board() {
           }))}
         </ToastStack>
       </Overlay>
+
+      <Each of={plugins().filter((p: any) => pluginsOn()[p.manifest.id])} key={(p: any) => p.manifest.id}>
+        {(item: any) => (
+          <PluginView
+            plugin={item()}
+            channel={channelFor(item())}
+            onError={(line: string) => log(line)}
+          />
+        )}
+      </Each>
 
     </View>
   );
