@@ -450,11 +450,14 @@ function Board() {
     return await channelFor(plugin).invoke(method, params, 15000);
   };
 
+  const kugouInstalled = () => plugins().some((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
+
   const installKugouPlugin = async () => {
     try {
       await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
       await refreshPlugins();
-      kwStatus.set("已安装，点「启用」开始");
+      kwStatus.set("酷狗插件已安装，点「启用」开始（启用即选中平台）");
+      showFlash("酷狗插件已安装");
       log("酷狗插件已安装");
     } catch (e: any) {
       kwStatus.set("安装失败: " + String(e?.message ?? e));
@@ -676,6 +679,7 @@ function Board() {
       await removePlugin(dataDir(), id);
       await storage.removeItem(`plugin.${id}`);
       await storage.setItem(`plugin.${id}.removed`, "1").catch(() => {});
+      showFlash(`已移除插件：${id}`);
       await refreshPlugins();
       log(`插件 ${id} 已移除`);
     } catch (e: any) {
@@ -718,6 +722,9 @@ function Board() {
         }
       }
       if (!installed && removed !== "1") await refreshPlugins(true);
+      // The session may have been read before the plugin existed; once it is
+      // on disk and mounted, restore it — a saved login must not ask again.
+      if (!kugou()) restoreSession();
       if (!pluginSeed) return;
       for (const item of pluginSeed) {
         try {
@@ -2135,25 +2142,29 @@ function Board() {
                     <Text class="text-[13px] text-foreground">酷狗音乐</Text>
                     <Text class="text-[11px] text-faint">{KUGOU_WEB_MANIFEST.version} · {KUGOU_WEB_MANIFEST.note}</Text>
                   </View>
-                  <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-2 py-1 active:bg-muted">
-                    <Text class="text-[11px] text-foreground">安装</Text>
-                  </Button>
-                  <Button
-                    testID={platformTestId("kugou-web")}
-                    onPress={() => selectPlugin("kugou-web")}
-                    class={`items-center justify-center rounded-[6px] px-3 py-1 ${pluginEnabled() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
-                  >
-                    <Text class={`text-[12px] ${pluginEnabled() ? "text-primary-foreground" : "text-foreground"}`}>
-                      {pluginEnabled() ? "停用" : "启用"}
-                    </Text>
-                  </Button>
-                  <Button
-                    testID="kw-remove"
-                    onPress={() => uninstallPlugin(KUGOU_WEB_MANIFEST.id)}
-                    class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
-                  >
-                    <Text class="text-[11px] text-foreground">移除</Text>
-                  </Button>
+                  <If when={!kugouInstalled()}>
+                    <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] bg-primary px-3 py-1 active:opacity-80">
+                      <Text class="text-[11px] text-primary-foreground">安装</Text>
+                    </Button>
+                  </If>
+                  <If when={kugouInstalled()}>
+                    <Button
+                      testID={platformTestId("kugou-web")}
+                      onPress={() => selectPlugin("kugou-web")}
+                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${pluginEnabled() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                    >
+                      <Text class={`text-[12px] ${pluginEnabled() ? "text-primary-foreground" : "text-foreground"}`}>
+                        {pluginEnabled() ? "停用" : "启用"}
+                      </Text>
+                    </Button>
+                    <Button
+                      testID="kw-remove"
+                      onPress={() => uninstallPlugin(KUGOU_WEB_MANIFEST.id)}
+                      class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
+                    >
+                      <Text class="text-[11px] text-foreground">移除</Text>
+                    </Button>
+                  </If>
                 </View>
                 <If when={config().active_plugin === "kugou-web" && !plugins().some((p: any) => p.manifest.id === KUGOU_WEB_MANIFEST.id)}>
                   <Text class="text-[11px] text-[#c5403c]">插件未安装：请先点「安装」。</Text>

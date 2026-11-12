@@ -99,7 +99,7 @@ test("the kugou plugin searches and adds through the channel", async () => {
 
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  await app.press("id:kw-install");
+  if (app.shows("id:kw-install")) await app.press("id:kw-install");
   await app.wait(900);
   // The seeded config already selects the platform; pressing would turn it off.
   if (app.texts().includes("启用")) await app.press("id:plugin-kugou");
