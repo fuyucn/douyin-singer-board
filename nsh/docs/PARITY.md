@@ -277,6 +277,15 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > streamer's nickname with a live dot (green for `status: 2`, grey otherwise,
 > title as tooltip) — no 开始 press needed. 开始 re-parses the same page.
 
+> 0.43.0-preview.1 renumbers the app away from the NSH branch's own `0.8.x`
+> line: the Tauri mainline is at `0.42.1`, so the native rewrite previews the
+> next minor as `0.43.0-preview.<n>` (`0.8.x` and `0.8.7` below are the same
+> code, released before the rename). The updater compares semver, so
+> `0.43.0-preview.1 > 0.8.7`; it never downgrades, so the jump is one-way for
+> an installed app. `build` now feeds NSIS's four-number
+> `VIProductVersion` fourth field, and `check_versions.py` runs in the release
+> workflow and fails on stale version strings, not just missing ones.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

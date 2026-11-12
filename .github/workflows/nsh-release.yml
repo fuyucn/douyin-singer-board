@@ -103,6 +103,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      # A release ships whatever the version sources say, and nothing below
+      # would notice a stale artifact name: check before building.
+      - name: Check version references
+        shell: bash
+        run: |
+          set -euo pipefail
+          # macOS runners have python3, Windows has python.
+          if command -v python3 >/dev/null 2>&1; then py=python3; else py=python; fi
+          "$py" scripts/check_versions.py
+
       - name: Package app
         shell: bash
         run: |

@@ -56,7 +56,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.8.7";
+const APP_VERSION = "0.43.0-preview.1";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
