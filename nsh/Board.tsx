@@ -69,7 +69,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.0-preview.3";
+const APP_VERSION = "0.43.0-preview.4";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -453,6 +453,8 @@ function Board() {
   };
 
   const togglePlugin = async (id: string) => {
+    const blocked = plugins().find((p) => p.manifest.id === id)?.blocked;
+    if (blocked) { setPluginStatus(id, blocked); return; }
     const next = !pluginsOn()[id];
     pluginsOn.update((v) => ({ ...v, [id]: next }));
     setPluginStatus(id, next ? "已启用，正在加载…" : "已停用");
@@ -491,6 +493,7 @@ function Board() {
   const callPlugin = async (id: string, method: string, params: any) => {
     const plugin = plugins().find((p) => p.manifest.id === id);
     if (!plugin) { setPluginStatus(id, "插件不存在"); return; }
+    if (plugin.blocked) { setPluginStatus(id, plugin.blocked); return; }
     if (!pluginsOn()[id]) { setPluginStatus(id, "请先启用"); return; }
     setPluginStatus(id, "调用中…");
     try {
@@ -506,7 +509,24 @@ function Board() {
     }
   };
 
-  effect(() => { refreshPlugins(true); });
+  // Tests seed a plugin folder through the app's own VM, which is the only
+  // side that has the filesystem: a test file's VM has no data directory.
+  const pluginSeed = host.params.pluginTestSeed as
+    | { manifest: any; files: Record<string, string> }[]
+    | undefined;
+  effect(() => {
+    refreshPlugins(true).then(async () => {
+      if (!pluginSeed) return;
+      for (const item of pluginSeed) {
+        try {
+          await installPlugin(dataDir(), item.manifest, item.files);
+        } catch (e: any) {
+          log("测试插件写入失败: " + String(e?.message ?? e));
+        }
+      }
+      await refreshPlugins(true);
+    });
+  });
 
   const patch = (p: Partial<Config>) => config.update((c) => ({ ...c, ...p }));
 
@@ -1982,7 +2002,7 @@ function Board() {
                         class={`items-center justify-center rounded-[6px] px-2 py-1 ${pluginsOn()[item().manifest.id] ? "bg-primary" : "border border-line-strong active:bg-background"}`}
                       >
                         <Text class={`text-[11px] ${pluginsOn()[item().manifest.id] ? "text-primary-foreground" : "text-foreground"}`}>
-                          {pluginsOn()[item().manifest.id] ? "停用" : "启用"}
+                          {item().blocked ? "不可用" : pluginsOn()[item().manifest.id] ? "停用" : "启用"}
                         </Text>
                       </Button>
                       <Button
@@ -1994,6 +2014,9 @@ function Board() {
                       </Button>
                     </View>
                     <Text class="text-[11px] text-faint">{item().manifest.note ?? ""}</Text>
+                    <If when={item().blocked}>
+                      <Text testID={`plugin-blocked-${item().manifest.id}`} class="text-[11px] text-[#c5403c]">{item().blocked}；该插件不加载，文件夹保留。</Text>
+                    </If>
                     <View class="flex-row items-center gap-2">
                       <Button testID={`plugin-hello-${item().manifest.id}`} onPress={() => callPlugin(item().manifest.id, "hello", {})} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
                         <Text class="text-[11px] text-foreground">调用 hello</Text>
@@ -2122,7 +2145,7 @@ function Board() {
         </ToastStack>
       </Overlay>
 
-      <Each of={plugins().filter((p: any) => pluginsOn()[p.manifest.id])} key={(p: any) => p.manifest.id}>
+      <Each of={plugins().filter((p: any) => pluginsOn()[p.manifest.id] && !p.blocked)} key={(p: any) => p.manifest.id}>
         {(item: any) => (
           <PluginView
             plugin={item()}

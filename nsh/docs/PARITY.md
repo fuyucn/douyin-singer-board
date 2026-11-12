@@ -310,6 +310,14 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > `plugin.test.tsx --target macos` installs, enables, calls, and removes the
 > bundled demo plugin through the real filesystem and a real web view.
 
+> 0.43.0-preview.4 keeps a plugin the app cannot run visible. Plugins live
+> in `${dataDir}/plugins/` — outside the app bundle — so an app update leaves
+> them in place; a plugin written for a newer bridge than the app now speaks
+> used to be skipped while reading the folder, which made it look deleted. It
+> stays in the list, says `需要 api N，当前应用支持 api M；该插件不加载，文件夹保留`,
+> and its buttons do nothing but report that. A plugin written for an older
+> bridge keeps running unchanged (`api` is only an upper bound).
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

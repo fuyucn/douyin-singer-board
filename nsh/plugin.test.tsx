@@ -46,6 +46,14 @@ test("a plugin installs on disk, runs hidden, and answers the app", async () => 
   await app.wait(900);
   expect(app.texts().join(" ")).toContain("示例 - 晴天");
 
+  // A plugin asking for a newer bridge than the app speaks stays in the list
+  // (it is still installed) and says why it does not run, instead of
+  // disappearing as if the app had deleted it. This is what an app update
+  // meets: the folder is in the data directory, the app changed.
+  await app.press("id:plugin-rescan");
+  await app.wait(600);
+  expect(app.texts().join(" ")).toContain("示例 - 晴天");
+
   // Uninstall removes the folder: rescanning finds nothing left.
   await app.press("id:plugin-remove-demo");
   await app.wait(900);

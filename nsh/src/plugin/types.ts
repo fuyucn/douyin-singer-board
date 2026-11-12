@@ -24,6 +24,11 @@ export interface InstalledPlugin {
   manifest: PluginManifest;
   dir: string;
   source: string;
+  /** Why the app cannot run it (a newer bridge than this app speaks), or
+   *  undefined when it can. A plugin that does not fit is still listed: after
+   *  an app update the folder is still there, and a plugin that vanished from
+   *  the list would look like the app deleted it. */
+  blocked?: string;
 }
 
 /** What the bridge API version this app speaks is. */

@@ -28,9 +28,14 @@ export async function listPlugins(dataDir: string): Promise<InstalledPlugin[]> {
       const raw = await readFile(`${dir}/${name}/plugin.json`, "utf8");
       const manifest = JSON.parse(raw) as PluginManifest;
       if (manifest?.id !== name || typeof manifest.entry !== "string") continue;
-      if (Number(manifest.api ?? 0) > BRIDGE_API) continue;
       const source = await readFile(`${dir}/${name}/${manifest.entry}`, "utf8");
-      found.push({ manifest, dir: `${dir}/${name}`, source });
+      const api = Number(manifest.api ?? 0);
+      found.push({
+        manifest,
+        dir: `${dir}/${name}`,
+        source,
+        blocked: api > BRIDGE_API ? `需要 api ${api}，当前应用支持 api ${BRIDGE_API}` : undefined,
+      });
     } catch {
       /* an incomplete or unreadable plugin folder is skipped */
     }
