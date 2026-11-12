@@ -50,6 +50,16 @@ The repo ships two apps. The versioning, branch and release rules above describe
 - **Releases**: tag `v<version>` on `nsh` (the tag must match `nsh.json`) and `NSH Release` builds macOS arm64, macOS Intel and Windows archives on their own runners, signs `latest.json` with the `NSH_UPDATE_KEY` secret (its public half is `nsh.json`'s `updater.publicKey`) and attaches everything to the GitHub release. The app updates itself from `releases/latest/download/`. **Never mark an NSH release as a GitHub prerelease**, whatever the version string says: `latest` skips prereleases, so the update chain would silently fall back to the previous release. The updater never downgrades either, so a version bump is one-way for installed apps.
 - **Plugin channel**: third-party code can only run in a **WebView** — the main VM has no `eval`, refuses `.nshc` it did not build, and bundles everything at build time, so there is no way to run a module loaded at runtime. `nsh/src/plugin/` wraps a plugin's module (`${dataDir}/plugins/<id>/plugin.json` + entry) in a page, runs it in a hidden `display: none` WebView (which still loads and keeps full-rate timers), and talks to it over `window.nsh.postMessage` / `injectJavaScript`. The app declares `capabilities.webview` for that alone; Windows needs the WebView2 runtime when a plugin is used. The built-in platforms are compiled in and must not depend on the bridge; `plugins/kugou-web/` is the same KuGou API as a plugin, embedded by `scripts/embed-plugin.mjs` and checked against Node's crypto by `scripts/kat-kugou-plugin.test.tsx` + `.mjs` (a plugin page has no Node `crypto`/`Buffer`, and WebKit gives it no `crypto.subtle` outside a secure context, so that module computes MD5 and AES itself).
 - **Storage**: the app owns its SQLite schema (`config`, `blacklist`, `kugou_session`, `settings`, `meta`, `PRAGMA user_version`), in `${dataDir}/sususongboard.db`. The first launch imports the old Tauri database through a verified temp copy and snapshots it into `sqlite-backups/`. Never write `storage.json`, never reintroduce the old `nsh_kv` table, and change the schema only by bumping `user_version`/`meta.schema` plus a migration in `nsh/native/src/store.rs`.
+- **Fast iteration loop (NSH)**: write a batch of changes first, then build once, then test by blast radius — not after every edit.
+  1. Edit everything for the step (no `nsh build` in between; a TSX build is ~1 s and tells you nothing until the batch is done).
+  2. One `nsh build Board.tsx` — it type-checks and catches the batch's errors together.
+  3. Targeted tests with `--filter` for the part you touched (`nsh test actions.test.tsx --filter "auto-sync"` ≈ 9 s instead of 70 s for the file).
+  4. One full sweep before committing: the headless suites, then the `--target macos` renderer suites, the KATs and the two guards.
+  5. One `nsh package`; one release. Never a release per small fix — the CI wait (~35 min) dominates and cannot be batched away.
+  - `nsh test` takes **one** path (a file or a directory), so list them one by one; a directory run is the only way to batch, and the app's test files live next to `Board.tsx` on purpose.
+  - A test file's VM has **no filesystem and no data directory**; anything that installs a plugin or reads `process.dataDir` must run with `--target`. Manual-clock (`clock: {}`) suites need a real-time wait before the first platform call, because the plugin page loads on real time while the app clock only moves when the test moves it.
+- **Build cache (never in `/tmp`)**: `source ~/.nsh-build/env.sh` first in every shell that builds; it sets `RUSTUP_HOME`, `CARGO_HOME`, `CARGO_TARGET_DIR=~/.nsh-build/target` and `PATH`. `/tmp` gets cleaned by the OS (it once wiped the workspace, the toolchain and `target`). Warm numbers: `nsh build` ≈ 1 s, `cargo test` in `nsh/native` ≈ 0.5 s, `nsh package` ≈ 3 s; cold ≈ 50 s / 3 min. Only Rust changes (`nsh/native/**`, `.cargo/config.toml`) force a recompile.
+- **Cleanup after a release**: `~/.nsh-build/clean.sh` removes probe folders, one-off clones and old package archives, then prints `du`/`df`. When the user asks to reclaim space, also remove `~/.nsh-build/target` (≈ 7 GB) and `~/.nsh-build/cargo/registry`+`git` (≈ 0.8 GB) — keeping the toolchain (`~/.nsh-build/rustup`) saves a reinstall, and the next cold build costs ~3–4 min. CI has `actions/cache` for `nsh/target` + `nsh/native/target` keyed by OS, arch and `Cargo.lock`; never cache across arm64 and Intel.
 - **Tests that must stay green**: `cargo test --locked` in `nsh/native`, the headless `nsh test` suites, the `--target macos` renderer tests, `scripts/check_icon_buttons.py`, `scripts/check_versions.py`, and the playlist KAT (`nsh test scripts/kat-playlist.test.ts > kat.txt 2>&1 && node scripts/kat-playlist.mjs kat.txt`; the KAT prints on stderr).
 
 ## Branch rules (important)
@@ -70,8 +80,10 @@ The repo ships two apps. The versioning, branch and release rules above describe
 
 ## Workflow
 
-1. Make code changes
-2. Bump version: on `feat/susu`, run `pnpm bump` (`0.<N>.0-susu.<x>` → `0.<N>.0-susu.<x+1>`); on `main`, set the user-specified `0.<N>.0` across all version sources.
-3. `git add -A && git commit -m "..."`
-4. `git push`
-5. (optional) trigger the Release GitHub Actions workflow; artifacts include the new version in their filenames
+1. Make the whole change (a batch, not one edit at a time) — for the NSH app follow **Fast iteration loop** above.
+2. Build once, then test: targeted first, one full sweep last. Do not rebuild after every file.
+3. Bump version: on `feat/susu`, run `pnpm bump` (`0.<N>.0-susu.<x>` → `0.<N>.0-susu.<x+1>`); on `main`, set the user-specified `0.<N>.0` across all version sources. On `nsh`, bump the sources `nsh/scripts/check_versions.py` checks and run it.
+4. `git add -A && git commit -m "..."`
+5. `git push` (on `nsh`, tag `v<version>` too, and never mark the release as a GitHub prerelease).
+6. (optional) trigger the Release GitHub Actions workflow; artifacts include the new version in their filenames.
+7. After a successful release, run `~/.nsh-build/clean.sh`; delete `~/.nsh-build/target` and the cargo registry when space is wanted, never `/tmp` caches (there are none).
