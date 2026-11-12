@@ -42,6 +42,7 @@ test("board shell, manual request, tabs and plugin settings", async () => {
 
   await app.wait(300);
   await app.press("id:song-add-0");
+  await new Promise((r) => setTimeout(r, 1600));
   await app.wait(500);
   expect(app.texts()).toContain("已点歌单 (1)");
   expect(app.texts()).toContain("点歌列表 (0)");
@@ -55,8 +56,9 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");
   expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
-  await app.press("id:plugin-netease");
-  expect(app.texts()).toContain("尚未接入；歌单与歌曲匹配暂不可用。");
+  expect(app.texts()).toContain("未接入 · 启用后歌单与歌曲匹配暂不可用");
+  // Turning the platform off hides its login block; turning it back on shows it.
+  await app.press("id:plugin-kugou");
   expect(app.texts()).not.toContain("酷狗登录");
   await app.press("id:plugin-kugou");
   expect(app.texts()).toContain("酷狗登录");

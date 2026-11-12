@@ -11,6 +11,13 @@ export type HostPrimitive = (params: any) => Promise<any>;
 
 export class PluginChannel {
   private view: any = null;
+  /** Declared before `readySignal`: the initializer assigns it, and a later
+   *  field definition would reset it to undefined. */
+  private markReady!: () => void;
+  /** Resolved by the page's `ready` message (not by a timer: a manual-clock
+   *  test must not race the page's real load). */
+  private readySignal = new Promise<void>((resolve) => { this.markReady = resolve; });
+  private pageReady = false;
   private nextId = 1;
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timer: number }>();
 
@@ -25,17 +32,31 @@ export class PluginChannel {
     this.view = view;
   }
 
-  /** Whether the app may call the plugin yet. */
+  /** Whether the app may call the plugin yet: the view is mounted *and* the
+   *  page said its methods are registered. */
   get ready(): boolean {
-    return this.view != null;
+    return this.view != null && this.pageReady;
   }
 
-  /** The page's `window.nsh.postMessage`: its calls, and its replies. */
+  /** Resolves once the page is ready; rejects when `ms` of real time passed
+   *  (a page that failed to load never posts it). */
+  waitForReady(ms: number): Promise<void> {
+    const timeout = new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error("插件页面未就绪")), ms));
+    return Promise.race([this.readySignal, timeout]);
+  }
+
+  /** The page's `window.nsh.postMessage`: its ready note, its calls, and its replies. */
   onPageMessage(raw: string): void {
     let msg: any;
     try {
       msg = JSON.parse(raw);
     } catch {
+      return;
+    }
+    if (msg?.ready) {
+      this.pageReady = true;
+      this.markReady();
       return;
     }
     if (typeof msg?.id !== "number") return;
@@ -44,8 +65,20 @@ export class PluginChannel {
       if (!entry) return;
       this.pending.delete(msg.id);
       clearTimeout(entry.timer);
-      if (msg.ok) entry.resolve(JSON.parse(String(msg.result)));
-      else entry.reject(new Error(String(msg.error ?? "插件调用失败")));
+      if (msg.ok) {
+        entry.resolve(JSON.parse(String(msg.result)));
+        return;
+      }
+      const raw = msg.error ?? "插件调用失败";
+      const fields = typeof raw === "object" ? raw : (() => {
+        try { return JSON.parse(String(raw)); } catch { return { message: String(raw) }; }
+      })();
+      const error: any = new Error(String(fields.message ?? raw));
+      if (fields.code) error.code = fields.code;
+      if (fields.deletedOld) error.deletedOld = true;
+      if (fields.deletedId) error.deletedId = fields.deletedId;
+      if (fields.unknownResult) error.unknownResult = true;
+      entry.reject(error);
       return;
     }
     const method = String(msg.method ?? "");

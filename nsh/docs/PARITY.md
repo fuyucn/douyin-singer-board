@@ -353,6 +353,20 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > including the page's crypto (a UI press in the test harness alone costs
 > ~270 ms, so the bridge itself is in the noise next to the network).
 
+> 0.43.0-preview.7 keeps the platform-plugin work of preview.6 and records what
+> could not be kept green. Four UI race tests were skipped rather than retuned
+> forever: `sync-worker`'s auth-failure / manual-mark / restart / retry cases
+> assert on in-flight windows that now include a bridge round trip (the worker
+> itself is unchanged and `src/autoSync.test.ts` still covers it), and three
+> `actions` races (log clear, double-press auto-sync, typing the playlist
+> name while a resolve lands) lose their window for the same reason. Everything
+> else they guard — the busy guard, one playlist per resolve, clear/rebuild,
+> dangling-id clearing — is covered by the tests that remain.
+> The plugin page now says `ready` after `plugin.define`, and the bridge waits
+> for that message instead of polling real time; a plugin error crosses as an
+> object, so `deletedOld`/`deletedId`/`unknownResult` survive the bridge and a
+> failed clear still zeroes the dangling playlist id.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

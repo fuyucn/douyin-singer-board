@@ -11,15 +11,15 @@ test("a plugin installs on disk, runs hidden, and answers the app", async () => 
 
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  expect(app.texts()).toContain("插件通道（实验）");
-  expect(app.texts().join(" ")).toContain("还没有插件");
+  expect(app.texts()).toContain("其它插件");
+  expect(app.texts().join(" ")).toContain("还没有其它插件");
 
   // Install writes the folder; the panel lists it because reading it back from
   // disk found a valid plugin.json.
   await app.press("id:plugin-install-demo");
   await app.wait(900);
   expect(app.texts()).toContain("示例插件");
-  expect(app.texts().join(" ")).not.toContain("还没有插件");
+  expect(app.texts().join(" ")).not.toContain("还没有其它插件");
 
   // Enable mounts the hidden web view and loads the page in it.
   await app.press("id:plugin-toggle-demo");
@@ -57,7 +57,7 @@ test("a plugin installs on disk, runs hidden, and answers the app", async () => 
   // Uninstall removes the folder: rescanning finds nothing left.
   await app.press("id:plugin-remove-demo");
   await app.wait(900);
-  expect(app.texts().join(" ")).toContain("还没有插件");
+  expect(app.texts().join(" ")).toContain("还没有其它插件");
 });
 
 test("calling a plugin that is not enabled says so instead of failing", async () => {
@@ -100,7 +100,8 @@ test("the kugou plugin searches and adds through the channel", async () => {
   await app.press("id:settings-tab-plugin");
   await app.press("id:kw-install");
   await app.wait(900);
-  await app.press("id:plugin-kugou");
+  // The seeded config already selects the platform; pressing would turn it off.
+  if (app.texts().includes("启用")) await app.press("id:plugin-kugou");
   await app.wait(1800);
 
   await app.type("搜索歌名", "晴天");

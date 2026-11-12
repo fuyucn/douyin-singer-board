@@ -16,14 +16,21 @@ export function pluginPage(source: string): string {
     receive: function (id, text) {
       var msg = JSON.parse(text);
       var answer = function (ok, value) {
-        window.nsh.postMessage(JSON.stringify({ id: id, reply: true, ok: ok, result: asText(value), error: ok ? null : String(value && value.message || value) }));
+        window.nsh.postMessage(JSON.stringify({ id: id, reply: true, ok: ok, result: asText(value), error: ok ? null : (value && typeof value === "object" ? value : String(value)) }));
       };
       var fn = listeners[msg.method];
       if (!fn) { answer(false, "no such method: " + msg.method); return; }
       Promise.resolve().then(function () { return fn(msg.params || {}); }).then(function (r) {
         answer(true, r === undefined ? null : r);
       }, function (e) {
-        answer(false, e);
+        answer(false, {
+          message: String((e && e.message) || e),
+          name: String((e && e.name) || "Error"),
+          code: (e && e.code) || null,
+          deletedOld: !!(e && e.deletedOld),
+          deletedId: (e && e.deletedId) || null,
+          unknownResult: !!(e && e.unknownResult)
+        });
       });
     },
     resolve: function (id, ok, text) {
@@ -44,7 +51,10 @@ export function pluginPage(source: string): string {
     }
   };
   window.plugin = {
-    define: function (methods) { for (var name in methods) { listeners[name] = methods[name]; } }
+    define: function (methods) {
+      for (var name in methods) { listeners[name] = methods[name]; }
+      window.nsh.postMessage(JSON.stringify({ ready: true }));
+    }
   };
 })();
 </script>

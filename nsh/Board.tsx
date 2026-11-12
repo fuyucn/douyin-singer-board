@@ -391,13 +391,12 @@ function Board() {
   const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
 
   const waitReady = async (ms: number) => {
-    const started = Date.now();
-    while (Date.now() - started < ms) {
-      const channel = channels.get(KUGOU_PLUGIN_ID);
-      if (channel?.ready) return channel;
-      await new Promise((r) => setTimeout(r, 40));
-    }
-    return null;
+    const plugin = plugins().find((p) => p.manifest.id === KUGOU_PLUGIN_ID);
+    if (!plugin) throw new Error("插件未安装");
+    const channel = channelFor(plugin);
+    if (channel.ready) return channel;
+    await channel.waitForReady(ms);
+    return channel;
   };
 
   async function search(input: { keyword: string; page?: number; pagesize?: number }): Promise<Track[]> {

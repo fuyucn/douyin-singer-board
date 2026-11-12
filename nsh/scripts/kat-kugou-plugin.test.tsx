@@ -10,7 +10,8 @@ test("kugou plugin computes the known answers", async () => {
   await app.press("id:settings-tab-plugin");
   await app.press("id:kw-install");
   await app.wait(900);
-  await app.press("id:plugin-kugou");
+  // The seeded config already selects the platform; pressing would turn it off.
+  if (app.texts().includes("启用")) await app.press("id:plugin-kugou");
   await app.wait(1800);
   await app.press("id:kw-selftest");
   await app.wait(1200);
