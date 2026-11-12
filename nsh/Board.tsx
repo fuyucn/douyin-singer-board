@@ -61,7 +61,6 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   return { nickname, title: text("title"), status: number("status") };
 }
 const APP_VERSION = "0.43.0-preview.6";
-const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
 type PluginId = string;
@@ -2106,7 +2105,6 @@ function Board() {
                   <View class="gap-1 rounded-[6px] border border-line px-3 py-2">
                     <Text class="text-[12px] text-muted-foreground">直播间 ID：{config().room_id || "—"}</Text>
                     <Text class="text-[12px] text-muted-foreground">版本：v{APP_VERSION}</Text>
-                    <Text class="text-[12px] text-muted-foreground">运行要求：Windows 10 1809+ / macOS 14+</Text>
                   </View>
                   <Text class="text-[11px] text-faint">直播间配置与点歌规则始终在左侧（弹幕监听）；歌单名、清理、自动同步与手动点歌仅在启用酷狗音乐后出现；平台选择与登录在插件页。</Text>
                   <Button testID="go-plugin" onPress={() => settingsTab.set("plugin")} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
@@ -2280,8 +2278,6 @@ function Board() {
                   </View>
                   <View class="h-px bg-line" />
                   <Text class="text-[12px] text-muted-foreground">抖音直播间点歌看板，原生渲染，无需 Node 侧车；只有在启用插件时才会用到系统 WebView。</Text>
-                  <Text class="text-[11px] text-faint">仓库：{APP_REPO} · 分支 nsh</Text>
-                  <Text class="text-[11px] text-faint">运行要求：Windows 10 1809+ / macOS 14+</Text>
                   <View class="flex-row items-center gap-2">
                     <Button testID="about-update" onPress={checkUpdate} class="items-center justify-center rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
                       <Text class="text-[12px] text-primary-foreground">{aboutBusy() && updateProgress() === null ? "处理中…" : "检查更新"}</Text>
@@ -2301,7 +2297,6 @@ function Board() {
                       <Text testID="about-progress" class="text-[10px] text-faint">下载中 {Math.round((updateProgress() ?? 0) * 100)}%</Text>
                     </View>
                   </If>
-                  <Text testID="about-update-source" class="text-[10px] text-faint">更新源：gh-proxy.com（清单验签、包校验 SHA-256；失败时保持当前版本）</Text>
                 </View>
               </If>
             </View>

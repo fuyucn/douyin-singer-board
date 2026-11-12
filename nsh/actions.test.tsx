@@ -502,7 +502,7 @@ test("about check-update and theme buttons respond", async () => {
   await app.press("id:settings-tab-about");
   await app.press("id:about-update");
   await app.wait(100);
-  expect(app.texts().some((t: string) => t.includes("最新") || t.includes("更新源") || t.includes("正在检查"))).toBe(true);
+  expect(app.texts().some((t: string) => t.includes("最新") || t.includes("正在检查"))).toBe(true);
   await app.press("id:settings-close");
   expect(app.texts()).toContain("手动点歌");
 });
