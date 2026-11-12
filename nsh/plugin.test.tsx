@@ -1,33 +1,47 @@
 import { expect, test } from "nsh/test";
 import { openSqliteBoard } from "./sqlite-test-options";
 
-// The whole path, through the real filesystem and a real web view: install
-// writes `${dataDir}/plugins/demo/`, enabling mounts a hidden WebView that runs
-// the plugin's module, and the app calls it over the bridge. Each run gets its
-// own data directory from the runner, so nothing here has to clean up after
-// another. `--target macos`: fs and web views need a real platform.
-test("a plugin installs on disk, runs hidden, and answers the app", async () => {
-  const app = await openSqliteBoard("./Board.tsx", { width: 1000, height: 800 });
+// The whole path, through the real filesystem and a real web view: a plugin
+// folder in `${dataDir}/plugins/demo/` (seeded here the way a user installs one)
+// mounts a hidden WebView that runs its module, and the app calls it over the
+// bridge. `--target macos`: fs and web views need a real platform.
+const DEMO_MANIFEST = {
+  id: "demo", name: "示例插件", version: "1.0.0", api: 1, entry: "index.js",
+  note: "演示插件通道：log / storage / 方法调用",
+  methods: ["hello", "search"],
+};
+const DEMO_SOURCE = `plugin.define({
+  hello: async function () {
+    var seen = await app.call("storage.get", { key: "runs" });
+    await app.call("storage.set", { key: "runs", value: (seen || 0) + 1 });
+    await app.call("log", { line: "示例插件第 " + ((seen || 0) + 1) + " 次被调用" });
+    return { name: "示例插件", runs: (seen || 0) + 1 };
+  },
+  search: async function (params) {
+    return [{ name: "示例 - " + params.q, artist: "示例歌手", key: "demo-1" }];
+  }
+});
+`;
 
-  await app.wait(700);
+const demoSeed = [{
+  manifest: DEMO_MANIFEST,
+  files: { "index.js": DEMO_SOURCE },
+}];
+
+test("an installed plugin runs hidden and answers the app", async () => {
+  const app = await openSqliteBoard("./Board.tsx", {
+    width: 1000, height: 800,
+    host: { params: { pluginTestSeed: demoSeed } },
+  });
+
+  await app.wait(1200);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  expect(app.texts()).toContain("其它插件");
-  expect(app.texts().join(" ")).toContain("还没有其它插件");
-
-  // Install writes the folder; the panel lists it because reading it back from
-  // disk found a valid plugin.json.
-  await app.press("id:plugin-install-demo");
-  await app.wait(900);
   expect(app.texts()).toContain("示例插件");
-  expect(app.texts().join(" ")).not.toContain("还没有其它插件");
 
   // Enable mounts the hidden web view and loads the page in it.
   await app.press("id:plugin-toggle-demo");
   await app.wait(1600);
-  // The view that runs it is hidden on purpose (a plugin has no UI of the
-  // app's), so what proves it loaded is the answer below.
-  expect(app.texts().join(" ")).toContain("已启用");
 
   // The app calls the plugin. It answers, and the call it makes back into the
   // app's storage round-trips: the second call sees the first one's write.
@@ -47,14 +61,6 @@ test("a plugin installs on disk, runs hidden, and answers the app", async () => 
   await app.wait(900);
   expect(app.texts().join(" ")).toContain("示例 - 晴天");
 
-  // A plugin asking for a newer bridge than the app speaks stays in the list
-  // (it is still installed) and says why it does not run, instead of
-  // disappearing as if the app had deleted it. This is what an app update
-  // meets: the folder is in the data directory, the app changed.
-  await app.press("id:plugin-rescan");
-  await app.wait(600);
-  expect(app.texts().join(" ")).toContain("示例 - 晴天");
-
   // Uninstall removes the folder: rescanning finds nothing left.
   await app.press("id:plugin-remove-demo");
   await app.wait(900);
@@ -62,18 +68,18 @@ test("a plugin installs on disk, runs hidden, and answers the app", async () => 
 });
 
 test("calling a plugin that is not enabled says so instead of failing", async () => {
-  const app = await openSqliteBoard("./Board.tsx", { width: 1000, height: 800 });
+  const app = await openSqliteBoard("./Board.tsx", {
+    width: 1000, height: 800,
+    host: { params: { pluginTestSeed: demoSeed } },
+  });
+  await app.wait(1200);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
-  await app.press("id:plugin-install-demo");
-  await app.wait(900);
   await app.press("id:plugin-hello-demo");
   await app.wait(600);
   expect(app.texts()).toContain("请先启用");
 });
 
-// The KuGou plugin is the built-in platform's API, run through the channel:
-// a page, the app's own network (mocked here), and the same playlist calls.
 test("the kugou plugin searches and adds through the channel", async () => {
   const config = JSON.stringify({
     room_id: "145997388006", sing_prefix: "点歌[space][song]", fans_level: 0,

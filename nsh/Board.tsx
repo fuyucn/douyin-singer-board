@@ -21,7 +21,6 @@ import { createSqliteStore } from "./src/sqliteStore";
 // app runs in a hidden web view (see src/plugin/). Nothing here is on the path
 // of the built-in platforms.
 import { PluginChannel } from "./src/plugin/bridge";
-import { DEMO_PLUGIN, DEMO_SOURCE } from "./src/plugin/demo";
 import { KUGOU_WEB_FILES, KUGOU_WEB_MANIFEST } from "./src/plugin/kugouPlugin";
 import { PluginView } from "./src/plugin/PluginView";
 import { installPlugin, listPlugins, pluginsDir, removePlugin } from "./src/plugin/store";
@@ -657,18 +656,6 @@ function Board() {
       log(`插件 ${id} ${next ? "已启用" : "已停用"}`);
     } catch (e: any) {
       storageError(e);
-    }
-  };
-
-  const installDemoPlugin = async () => {
-    try {
-      await installPlugin(dataDir(), DEMO_PLUGIN, { [DEMO_PLUGIN.entry]: DEMO_SOURCE });
-      await refreshPlugins();
-      setPluginStatus(DEMO_PLUGIN.id, "已安装，点「启用」开始");
-      log(`示例插件已安装到 ${pluginsDir(dataDir())}/${DEMO_PLUGIN.id}`);
-    } catch (e: any) {
-      log("示例插件安装失败: " + String(e?.message ?? e));
-      showFlash("示例插件安装失败: " + String(e?.message ?? e));
     }
   };
 
@@ -2228,15 +2215,12 @@ function Board() {
               {/* 其它插件：装与不装都与平台无关 */}
               <Text class="text-[12px] font-semibold text-foreground">其它插件</Text>
               <View class="flex-row items-center gap-2">
-                <Button testID="plugin-install-demo" onPress={installDemoPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">安装示例插件</Text>
-                </Button>
                 <Button testID="plugin-rescan" onPress={refreshPlugins} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
                   <Text class="text-[12px] text-foreground">重新扫描</Text>
                 </Button>
               </View>
               <If when={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id).length === 0}>
-                <Text class="text-[11px] text-faint">还没有其它插件。安装示例插件即可看到完整链路（安装 → 启用 → 调用）。</Text>
+                <Text class="text-[11px] text-faint">还没有其它插件。把插件文件夹放进数据目录的 plugins/ 下，点「重新扫描」即可识别；安装、启用、移除都在这里。</Text>
               </If>
               <Each of={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id)} key={(p: any) => p.manifest.id}>
                 {(item: any) => (

@@ -1,19 +1,6 @@
-import type { PluginManifest } from "./types";
-
-/** The example plugin the app ships: what "安装示例插件" writes into
- *  `${dataDir}/plugins/demo/`, and what `plugin.test.tsx` runs through the
- *  bridge. It makes no network calls, so the whole path is testable offline. */
-export const DEMO_PLUGIN: PluginManifest = {
-  id: "demo",
-  name: "示例插件",
-  version: "1.0.0",
-  api: 1,
-  entry: "index.js",
-  note: "演示插件通道：log / storage / 方法调用",
-  methods: ["hello", "search", "fetchDemo"],
-};
-
-export const DEMO_SOURCE = `// A plugin sees two globals: app.call(method, params) and plugin.define({...}).
+// Example plugin (NOT shipped): copy this folder into
+// `${dataDir}/plugins/demo/` to try the channel, or read it as the API's example.
+// A plugin sees two globals: app.call(method, params) and plugin.define({...}).
 plugin.define({
   hello: async function () {
     var seen = await app.call("storage.get", { key: "runs" });
@@ -37,4 +24,3 @@ plugin.define({
     return { note: body && body.note };
   }
 });
-`;

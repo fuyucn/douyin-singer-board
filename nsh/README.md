@@ -61,8 +61,12 @@ as a JSON string over `window.nsh.postMessage` / `injectJavaScript`.
 
 Settings → 插件 lists them. 酷狗音乐 ships as a plugin (installed on first
 run, installable again after 移除) and **启用 selects it as the platform**;
-there is one platform at a time. 安装示例插件 adds the demo; every row has
-安装 / 启用·停用 / 移除.
+there is one platform at a time. Every row has 安装 / 启用·停用 / 移除
+(安装 only while it is missing).
+
+A plugin that did not ship with the app is installed by putting its folder
+in `${dataDir}/plugins/<id>/` and pressing 重新扫描; `plugins/demo/` in this
+repository is the example to copy (it is not installed by the app).
 
 What this costs:
 
