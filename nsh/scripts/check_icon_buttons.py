@@ -80,8 +80,8 @@ for stale in ("目标歌单", "搜索并加入", "设为目标", "加入列表",
         errors.append(f"Board.tsx: Settings plugin tab still contains {stale!r}")
 if "也可以都不开" not in board:
     errors.append("Board.tsx: platform selection no longer allows all platforms off")
-if 'const pluginEnabled = () => config().active_plugin === "kugou";' not in board:
-    errors.append("Board.tsx: platform gating no longer follows active_plugin alone")
+if 'const pluginEnabled = () => hasPlaylists(config().active_plugin);' not in board:
+    errors.append("Board.tsx: platform gating no longer follows the platform registry")
 # 0.7.7: listener-only mode. Without a Kugou platform the sidebar must show a
 # clear mode panel instead of the manual-add input (which is Kugou-only).
 if "仅弹幕监听" not in board:

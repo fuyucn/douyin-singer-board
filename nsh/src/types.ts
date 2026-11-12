@@ -14,7 +14,7 @@ export interface Config {
   blacklist_singers?: string[];
   blacklist_meta?: Record<string, number>;
   auto_sync?: boolean;
-  active_plugin?: "kugou" | "netease" | "";
+  active_plugin?: string;
   config_version?: number;
 }
 

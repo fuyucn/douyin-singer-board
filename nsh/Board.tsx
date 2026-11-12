@@ -19,6 +19,11 @@ import {
   type Track,
 } from "./plugins/kugou";
 import { clearPlaylistByName, resolvePlaylistByName } from "./plugins/kugou/playlistOps";
+// Registering the platforms is what `PLUGINS` and `pluginEnabled()` read: a
+// new platform is one more import here plus its own folder under `plugins/`.
+import "./plugins/kugou/platform";
+import "./plugins/netease/platform";
+import { hasPlaylists, platform, platforms } from "./src/platform/registry";
 import process from "process";
 import { createSqliteStore } from "./src/sqliteStore";
 
@@ -60,11 +65,8 @@ const APP_VERSION = "0.43.0-preview.2";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
-type PluginId = "kugou" | "netease";
-const PLUGINS = [
-  { id: "kugou", name: "酷狗音乐", version: "内置 v0.1.0", note: "登录、歌单、搜索、自动同步" },
-  { id: "netease", name: "网易云音乐", version: "未接入", note: "启用后歌单与歌曲匹配暂不可用" },
-];
+type PluginId = string;
+const PLUGINS = platforms();
 type KugouSession = { token: string; userid: string; dfid?: string; nickname?: string };
 type PlayedInfo = DanmuInfo & { played_at: number };
 
@@ -228,7 +230,10 @@ function Board() {
       // "no platform selected" — the user may leave every platform off.
       const active = legacy
         ? (saved.active_plugin === "netease" || saved.active_plugin === "" ? saved.active_plugin : "kugou")
-        : (saved.active_plugin === "kugou" || saved.active_plugin === "netease" || saved.active_plugin === ""
+        : (typeof saved.active_plugin === "string"
+            // "" and any registered id are kept as they are, and so is an id
+            // whose platform is not here (a removed plugin): the registry
+            // decides what applies, so nothing is silently renamed to kugou.
             ? saved.active_plugin
             : saved.kugou_enabled === false ? "" : "kugou");
       config.set({
@@ -384,9 +389,8 @@ function Board() {
   // One platform at a time, and it may be empty (all platforms off). The
   // old standalone `kugou_enabled` switch is gone: selecting the platform IS
   // the switch, and every playlist/song feature follows this value.
-  const pluginEnabled = () => config().active_plugin === "kugou";
-  const platformName = () => config().active_plugin === "kugou" ? "酷狗"
-    : config().active_plugin === "netease" ? "网易云" : "平台";
+  const pluginEnabled = () => hasPlaylists(config().active_plugin);
+  const platformName = () => platform(config().active_plugin)?.short ?? "平台";
   const selectPlugin = (id: PluginId) => {
     const next = config().active_plugin === id ? "" : id;
     // A platform change is a transaction boundary: invalidate any in-flight
@@ -398,7 +402,7 @@ function Board() {
     searchQueue.length = 0;
     startedSearches.clear();
     patch({ active_plugin: next, kugou_enabled: next === "kugou", auto_sync: false });
-    showFlash(next ? `已启用${PLUGINS.find((p) => p.id === next)!.name}` : "已停用所有平台插件");
+    showFlash(next ? `已启用${platform(next)!.name}` : "已停用所有平台插件");
   };
   const singers = () => config().blacklist_singers ?? [];
   const blockedReason = (track: { name: string; artist: string }): string | null => {
