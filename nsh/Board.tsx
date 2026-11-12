@@ -9,19 +9,10 @@ import Client from "./listener-bundle.js";
 import { Matcher } from "./src/matcher";
 import { SyncLedger, formatDuration, isAuthFailure, nextDelay, pickNextSync, type SearchState } from "./src/autoSync";
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
-import {
-  addTrack,
-  playlists as fetchPlaylists,
-  qrCheck,
-  qrKey,
-  search,
-  type Playlist,
-  type Track,
-} from "./plugins/kugou";
-import { clearPlaylistByName, resolvePlaylistByName } from "./plugins/kugou/playlistOps";
+import type { Playlist, Track } from "./src/types";
 // Registering the platforms is what `PLUGINS` and `pluginEnabled()` read: a
 // new platform is one more import here plus its own folder under `plugins/`.
-import "./plugins/kugou/platform";
+import "./src/platform/kugou";
 import "./plugins/netease/platform";
 import { hasPlaylists, platform, platforms } from "./src/platform/registry";
 import process from "process";
@@ -70,7 +61,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.0-preview.5";
+const APP_VERSION = "0.43.0-preview.6";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -131,7 +122,7 @@ function Board() {
     blacklist_singers: [],
     blacklist_meta: {},
     auto_sync: false,
-    active_plugin: "kugou",
+    active_plugin: "kugou-web",
   });
   const status = signal("未连接");
   // Preview of the room's streamer (nickname/title/live status), fetched as
@@ -239,25 +230,26 @@ function Board() {
       // flag was not wired up: upgrade those configs to the Kugou
       // platform. From v2 on, an explicitly disabled service means
       // "no platform selected" — the user may leave every platform off.
+      const rawActive = saved.active_plugin === "kugou" ? "kugou-web" : saved.active_plugin;
       const active = legacy
-        ? (saved.active_plugin === "netease" || saved.active_plugin === "" ? saved.active_plugin : "kugou")
-        : (typeof saved.active_plugin === "string"
+        ? (rawActive === "netease" || rawActive === "" ? rawActive : "kugou-web")
+        : (typeof rawActive === "string"
             // "" and any registered id are kept as they are, and so is an id
             // whose platform is not here (a removed plugin): the registry
             // decides what applies, so nothing is silently renamed to kugou.
-            ? saved.active_plugin
-            : saved.kugou_enabled === false ? "" : "kugou");
+            ? rawActive
+            : saved.kugou_enabled === false ? "" : "kugou-web");
       config.set({
         ...config(),
         ...saved,
         active_plugin: active,
-        kugou_enabled: active === "kugou",
+        kugou_enabled: active === "kugou-web",
         blacklist: Array.isArray(saved.blacklist) ? saved.blacklist : [],
         blacklist_singers: Array.isArray(saved.blacklist_singers) ? saved.blacklist_singers : [],
         blacklist_meta: saved.blacklist_meta && typeof saved.blacklist_meta === "object" ? saved.blacklist_meta : {},
         config_version: 2,
       });
-      if (active !== "kugou") patch({ auto_sync: false });
+      if (active !== "kugou-web") patch({ auto_sync: false });
     } catch {}
   }
   effect(() => {
@@ -395,6 +387,56 @@ function Board() {
   };
 
 
+  // The platform is the plugin: every KuGou call below goes to its page.
+  const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
+
+  const waitReady = async (ms: number) => {
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      const channel = channels.get(KUGOU_PLUGIN_ID);
+      if (channel?.ready) return channel;
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    return null;
+  };
+
+  async function search(input: { keyword: string; page?: number; pagesize?: number }): Promise<Track[]> {
+    await waitReady(4000);
+    const tracks = await kwCall("search", input);
+    return tracks as Track[];
+  }
+
+  async function fetchPlaylists(token: string, userid: string, dfid = "-"): Promise<Playlist[]> {
+    await waitReady(4000);
+    return (await kwCall("playlists", { token, userid, dfid })) as Playlist[];
+  }
+
+  async function qrKey(): Promise<{ key: string; image: string }> {
+    await waitReady(4000);
+    return (await kwCall("loginQrKey", {})) as { key: string; image: string };
+  }
+
+  async function qrCheck(key: string): Promise<{ status: number; token?: string; userid?: string; nickname?: string }> {
+    await waitReady(4000);
+    const r = (await kwCall("loginQrCheck", { key })) as any;
+    return { status: r.status, token: r.token ?? undefined, userid: r.userid ?? undefined, nickname: r.nickname ?? undefined };
+  }
+
+  async function addTrack(token: string, userid: string, listid: number, track: Track, dfid = "-"): Promise<{ status: number; msg?: string }> {
+    await waitReady(6000);
+    return (await kwCall("addTrack", { token, userid, listid, track, dfid })) as { status: number; msg?: string };
+  }
+
+  async function resolvePlaylistByName(input: { token: string; userid: string; name: string; dfid?: string }): Promise<{ listid: number; created: boolean }> {
+    await waitReady(8000);
+    return (await kwCall("resolvePlaylist", input)) as { listid: number; created: boolean };
+  }
+
+  async function clearPlaylistByName(input: { token: string; userid: string; name: string; currentId: number; dfid?: string }): Promise<{ listid: number; deleted: boolean; deletedId?: number; warning?: string }> {
+    await waitReady(10000);
+    return (await kwCall("clearPlaylist", input)) as { listid: number; deleted: boolean; deletedId?: number; warning?: string };
+  }
+
   // --- the KuGou plugin: the same API, run through the channel ------------
   const kwQr = signal<string | null>(null);
   const kwStatus = signal("");
@@ -405,7 +447,7 @@ function Board() {
   const kwCall = async (method: string, params: any = {}): Promise<any> => {
     const plugin = plugins().find((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
     if (!plugin) throw new Error("插件未安装");
-    if (!pluginsOn()[KUGOU_WEB_MANIFEST.id]) throw new Error("插件未启用");
+    if (!isPluginRunning(KUGOU_WEB_MANIFEST.id)) throw new Error("插件未启用");
     return await channelFor(plugin).invoke(method, params, 15000);
   };
 
@@ -538,6 +580,11 @@ function Board() {
   const pluginStatus = signal<Record<string, string>>({});
   const channels = new Map<string, PluginChannel>();
 
+  // Selecting a platform plugin is what enables it (there is one at a time);
+  // other plugins have their own switch.
+  const isPluginRunning = (id: string) =>
+    pluginsOn()[id] === true || config().active_plugin === id;
+
   const setPluginStatus = (id: string, text: string) =>
     pluginStatus.update((v) => ({ ...v, [id]: text }));
 
@@ -625,9 +672,11 @@ function Board() {
 
   const uninstallPlugin = async (id: string) => {
     try {
+      if (config().active_plugin === id) patch({ active_plugin: "", auto_sync: false });
       channels.delete(id);
       await removePlugin(dataDir(), id);
       await storage.removeItem(`plugin.${id}`);
+      await storage.setItem(`plugin.${id}.removed`, "1").catch(() => {});
       await refreshPlugins();
       log(`插件 ${id} 已移除`);
     } catch (e: any) {
@@ -661,6 +710,15 @@ function Board() {
     | undefined;
   effect(() => {
     refreshPlugins(true).then(async () => {
+      // KuGou ships as a plugin; install it once unless the user removed it.
+      const removed = await storage.getItem(`plugin.${KUGOU_WEB_MANIFEST.id}.removed`);
+      const installed = (await listPlugins(dataDir())).some((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
+      if (!installed && removed !== "1") {
+        try { await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES); } catch (e: any) {
+          log("酷狗插件安装失败: " + String(e?.message ?? e));
+        }
+      }
+      if (!installed && removed !== "1") await refreshPlugins(true);
       if (!pluginSeed) return;
       for (const item of pluginSeed) {
         try {
@@ -681,6 +739,9 @@ function Board() {
   // the switch, and every playlist/song feature follows this value.
   const pluginEnabled = () => hasPlaylists(config().active_plugin);
   const platformName = () => platform(config().active_plugin)?.short ?? "平台";
+  // The card's test id keeps the platform's historical name, so tests and
+  // anyone's automation do not have to know it became a plugin ("kugou-web").
+  const platformTestId = (id: string) => (id === "kugou-web" ? "plugin-kugou" : `plugin-${id}`);
   const selectPlugin = (id: PluginId) => {
     const next = config().active_plugin === id ? "" : id;
     // A platform change is a transaction boundary: invalidate any in-flight
@@ -691,7 +752,7 @@ function Board() {
     qr.set(null);
     searchQueue.length = 0;
     startedSearches.clear();
-    patch({ active_plugin: next, kugou_enabled: next === "kugou", auto_sync: false });
+    patch({ active_plugin: next, kugou_enabled: next === "kugou-web", auto_sync: false });
     showFlash(next ? `已启用${platform(next)!.name}` : "已停用所有平台插件");
   };
   const singers = () => config().blacklist_singers ?? [];
@@ -2063,66 +2124,99 @@ function Board() {
               <If when={settingsTab() === "plugin"}>
                 <View class="gap-3">
 
-              <Text class="text-[13px] font-semibold text-foreground">平台插件</Text>
+              <Text class="text-[13px] font-semibold text-foreground">插件</Text>
               <Text class="text-[11px] text-faint">可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。</Text>
-              <View class="gap-1">
-                <Each of={PLUGINS} key={(p: any) => p.id}>
-                  {(item: any) => (
-                    <View class={`flex-row items-center gap-2 rounded-[6px] border px-3 py-2 ${config().active_plugin === item().id ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
-                      <View class={`h-3 w-3 rounded-full border ${config().active_plugin === item().id ? "border-primary bg-primary" : "border-line-strong"}`} />
-                      <View class="flex-1">
-                        <Text class="text-[13px] text-foreground">{item().name}</Text>
-                        <Text class="text-[11px] text-faint">{item().version} · {item().note}</Text>
-                      </View>
-                      <Button
-                        testID={`plugin-${item().id}`}
-                        onPress={() => selectPlugin(item().id)}
-                        class={`items-center justify-center rounded-[6px] px-3 py-1 ${config().active_plugin === item().id ? "bg-primary" : "border border-line-strong active:bg-background"}`}
-                      >
-                        <Text class={`text-[12px] ${config().active_plugin === item().id ? "text-primary-foreground" : "text-foreground"}`}>
-                          {config().active_plugin === item().id ? "停用" : "启用"}
-                        </Text>
+              <Text class="text-[11px] text-faint">插件是数据目录下 plugins/&lt;id&gt;/ 的一个文件夹（plugin.json + 一个 JS 模块），在隐藏的 WebView 里运行。可安装、启用、移除；同一时间只启用一个平台。</Text>
+
+              {/* 酷狗音乐：平台插件，选中它才启用平台 */}
+              <View class={`gap-2 rounded-[6px] border px-3 py-2 ${pluginEnabled() ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
+                <View class="flex-row items-center gap-2">
+                  <View class={`h-3 w-3 rounded-full border ${pluginEnabled() ? "border-primary bg-primary" : "border-line-strong"}`} />
+                  <View class="flex-1">
+                    <Text class="text-[13px] text-foreground">酷狗音乐</Text>
+                    <Text class="text-[11px] text-faint">{KUGOU_WEB_MANIFEST.version} · {KUGOU_WEB_MANIFEST.note}</Text>
+                  </View>
+                  <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-2 py-1 active:bg-muted">
+                    <Text class="text-[11px] text-foreground">安装</Text>
+                  </Button>
+                  <Button
+                    testID={platformTestId("kugou-web")}
+                    onPress={() => selectPlugin("kugou-web")}
+                    class={`items-center justify-center rounded-[6px] px-3 py-1 ${pluginEnabled() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                  >
+                    <Text class={`text-[12px] ${pluginEnabled() ? "text-primary-foreground" : "text-foreground"}`}>
+                      {pluginEnabled() ? "停用" : "启用"}
+                    </Text>
+                  </Button>
+                  <Button
+                    testID="kw-remove"
+                    onPress={() => uninstallPlugin(KUGOU_WEB_MANIFEST.id)}
+                    class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background"
+                  >
+                    <Text class="text-[11px] text-foreground">移除</Text>
+                  </Button>
+                </View>
+                <If when={config().active_plugin === "kugou-web" && !plugins().some((p: any) => p.manifest.id === KUGOU_WEB_MANIFEST.id)}>
+                  <Text class="text-[11px] text-[#c5403c]">插件未安装：请先点「安装」。</Text>
+                </If>
+
+                <If when={pluginEnabled()}>
+                  <View class="h-px bg-muted" />
+                  <Text class="text-[12px] font-semibold text-foreground">酷狗登录</Text>
+                  <If when={!kugou()}>
+                    <View class="gap-2">
+                      <Button testID="kw-login" onPress={startLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                        <Text class="text-[12px] text-primary-foreground">生成登录二维码 / 刷新</Text>
                       </Button>
+                      <If when={qr()}>
+                        <Image src={qr()!.image} class="h-[160px] w-[160px] rounded-[6px] border border-line" />
+                      </If>
+                      <Text class="text-[12px] text-muted-foreground">状态：{kgLabel()}</Text>
+                      <Text class="text-[11px] text-faint">{kgMsg()}</Text>
                     </View>
-                  )}
-                </Each>
+                  </If>
+                  <If when={kugou()}>
+                    <View class="gap-2">
+                      <View class="flex-row items-center gap-2">
+                        <Text class="text-[12px] text-muted-foreground">已登录：{kugou()!.nickname ?? kugou()!.userid}</Text>
+                        <View class="flex-1" />
+                        <Button onPress={logout} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                          <Text class="text-[11px] text-foreground">退出登录</Text>
+                        </Button>
+                      </View>
+                      <Text class="text-[11px] text-faint">{kgMsg()}</Text>
+                    </View>
+                  </If>
+
+                  <View class="h-px bg-muted" />
+                  <Text class="text-[12px] font-semibold text-foreground">平台接口（经插件）</Text>
+                  <View class="flex-row items-center gap-2">
+                    <Input style={inputStyle()} value={kwQuery()} onChange={({ value }: any) => kwQuery.set(value)} placeholder="搜索歌名" class="flex-1" />
+                    <Button testID="kw-search" onPress={() => { kwSearch(); }} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                      <Text class="text-[12px] text-foreground">搜索</Text>
+                    </Button>
+                    <Button testID="kw-add" onPress={kwAdd} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                      <Text class="text-[12px] text-foreground">加入歌单</Text>
+                    </Button>
+                    <Button testID="kw-selftest" onPress={kwSelfTest} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                      <Text class="text-[12px] text-foreground">自检</Text>
+                    </Button>
+                    <Button testID="kw-playlists" onPress={kwPlaylists} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                      <Text class="text-[12px] text-foreground">歌单列表</Text>
+                    </Button>
+                  </View>
+                  <If when={kwQr()}>
+                    <Image src={kwQr()!} class="h-[140px] w-[140px] rounded-[6px] border border-line" />
+                  </If>
+                  <Text testID="kw-status" class="text-[11px] text-muted-foreground">{kwStatus()}</Text>
+                </If>
               </View>
               <If when={!config().active_plugin}>
                 <Text class="text-[11px] text-faint">未选择平台：仅弹幕监听并收集点歌指令；歌单、自动同步、歌曲匹配与手动点歌均已隐藏。</Text>
               </If>
 
-              <View class="h-px bg-muted" />
-              <If when={pluginEnabled()}>
-                <Text class="text-[13px] font-semibold text-foreground">酷狗登录</Text>
-                <If when={!kugou()}>
-                  <View class="gap-2">
-                    <Button onPress={startLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
-                      <Text class="text-[12px] text-primary-foreground">生成登录二维码 / 刷新</Text>
-                    </Button>
-                    <If when={qr()}>
-                      <Image src={qr()!.image} class="h-[160px] w-[160px] rounded-[6px] border border-line" />
-                    </If>
-                    <Text class="text-[12px] text-muted-foreground">状态：{kgLabel()}</Text>
-                    <Text class="text-[11px] text-faint">{kgMsg()}</Text>
-                  </View>
-                </If>
-                <If when={kugou()}>
-                  <View class="gap-2">
-                    <View class="flex-row items-center gap-2">
-                      <Text class="text-[12px] text-muted-foreground">已登录：{kugou()!.nickname ?? kugou()!.userid}</Text>
-                      <View class="flex-1" />
-                      <Button onPress={logout} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
-                        <Text class="text-[11px] text-foreground">退出登录</Text>
-                      </Button>
-                    </View>
-
-                    <Text class="text-[11px] text-faint">{kgMsg()}</Text>
-                  </View>
-                </If>
-              </If>
-              <View class="h-px bg-muted" />
-              <Text class="text-[13px] font-semibold text-foreground">插件通道（实验）</Text>
-              <Text class="text-[11px] text-faint">插件是数据目录下 plugins/&lt;id&gt;/ 的一个文件夹（plugin.json + 一个 JS 模块），在隐藏的 WebView 里运行，通过桥调用应用开放的接口（页面里的 `app.call`）。装与不装都不影响上面的内置平台。</Text>
+              {/* 其它插件：装与不装都与平台无关 */}
+              <Text class="text-[12px] font-semibold text-foreground">其它插件</Text>
               <View class="flex-row items-center gap-2">
                 <Button testID="plugin-install-demo" onPress={installDemoPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
                   <Text class="text-[12px] text-foreground">安装示例插件</Text>
@@ -2131,10 +2225,10 @@ function Board() {
                   <Text class="text-[12px] text-foreground">重新扫描</Text>
                 </Button>
               </View>
-              <If when={plugins().length === 0}>
-                <Text class="text-[11px] text-faint">还没有插件。安装示例插件即可看到完整链路（安装 → 启用 → 调用）。</Text>
+              <If when={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id).length === 0}>
+                <Text class="text-[11px] text-faint">还没有其它插件。安装示例插件即可看到完整链路（安装 → 启用 → 调用）。</Text>
               </If>
-              <Each of={plugins()} key={(p: any) => p.manifest.id}>
+              <Each of={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id)} key={(p: any) => p.manifest.id}>
                 {(item: any) => (
                   <View class="gap-1.5 rounded-[6px] border border-line px-3 py-2">
                     <View class="flex-row items-center gap-2">
@@ -2175,53 +2269,10 @@ function Board() {
                 )}
               </Each>
 
-              <View class="h-px bg-muted" />
-              <Text class="text-[13px] font-semibold text-foreground">酷狗音乐（插件版）</Text>
-              <Text class="text-[11px] text-faint">同一套酷狗接口，跑在插件通道里：安装 → 启用 → 扫码登录 → 搜索 → 加入左栏歌单。不取代内置酷狗。</Text>
-              <View class="flex-row items-center gap-2">
-                <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">安装酷狗插件</Text>
-                </Button>
-                <If when={plugins().some((p: any) => p.manifest.id === KUGOU_WEB_MANIFEST.id)}>
-                  <Button
-                    testID="kw-toggle"
-                    onPress={() => togglePlugin(KUGOU_WEB_MANIFEST.id)}
-                    class={`items-center justify-center rounded-[6px] px-3 py-1.5 ${pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "bg-primary" : "border border-line-strong active:bg-background"}`}
-                  >
-                    <Text class={`text-[12px] ${pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "text-primary-foreground" : "text-foreground"}`}>
-                      {pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "停用" : "启用"}
-                    </Text>
-                  </Button>
-                </If>
-                <Button testID="kw-login" onPress={kwLogin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">扫码登录</Text>
-                </Button>
+              <View class="gap-1 rounded-[6px] border border-line px-3 py-2">
+                <Text class="text-[13px] text-foreground">网易云音乐</Text>
+                <Text class="text-[11px] text-faint">未接入 · 启用后歌单与歌曲匹配暂不可用</Text>
               </View>
-              <If when={kwQr()}>
-                <Image src={kwQr()!} class="h-[140px] w-[140px] rounded-[6px] border border-line" />
-              </If>
-              <View class="flex-row items-center gap-2">
-                <Input style={inputStyle()} value={kwQuery()} onChange={({ value }: any) => kwQuery.set(value)} placeholder="搜索歌名" class="flex-1" />
-                <Button testID="kw-search" onPress={() => { kwSearch(); }} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">搜索</Text>
-                </Button>
-                <Button testID="kw-add" onPress={kwAdd} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">加入歌单</Text>
-                </Button>
-                <Button testID="kw-selftest" onPress={kwSelfTest} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">自检</Text>
-                </Button>
-                <Button testID="kw-playlists" onPress={kwPlaylists} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
-                  <Text class="text-[12px] text-foreground">歌单列表</Text>
-                </Button>
-              </View>
-              <Text testID="kw-status" class="text-[11px] text-muted-foreground">{kwStatus()}</Text>
-
-              <If when={config().active_plugin === "netease"}>
-                <Text class="text-[13px] font-semibold text-foreground">网易云音乐</Text>
-                <Text class="text-[12px] text-faint">尚未接入；歌单与歌曲匹配暂不可用。</Text>
-              </If>
-
                 </View>
               </If>
               <If when={settingsTab() === "about"}>
@@ -2291,7 +2342,7 @@ function Board() {
                 <Text class="text-[11px] text-faint">如需完整功能，请在插件页启用「酷狗音乐」。</Text>
               </View>
               <View class="gap-2">
-                <Button testID="firstrun-enable-kugou" onPress={() => { selectPlugin("kugou"); showFirstRunImport.set(false); }} class="items-center justify-center self-start w-full rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
+                <Button testID="firstrun-enable-kugou" onPress={() => { selectPlugin("kugou-web"); showFirstRunImport.set(false); }} class="items-center justify-center self-start w-full rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
                   <Text class="text-[12px] text-foreground">启用酷狗音乐，开始完整体验</Text>
                 </Button>
                 <Button testID="firstrun-continue-listener" onPress={() => showFirstRunImport.set(false)} class="items-center justify-center self-start w-full rounded-[6px] border border-line-strong bg-card px-3 py-2 active:bg-muted">
@@ -2332,7 +2383,7 @@ function Board() {
         </ToastStack>
       </Overlay>
 
-      <Each of={plugins().filter((p: any) => pluginsOn()[p.manifest.id] && !p.blocked)} key={(p: any) => p.manifest.id}>
+      <Each of={plugins().filter((p: any) => isPluginRunning(p.manifest.id) && !p.blocked)} key={(p: any) => p.manifest.id}>
         {(item: any) => (
           <PluginView
             plugin={item()}

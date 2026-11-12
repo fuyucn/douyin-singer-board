@@ -28,3 +28,20 @@ export interface DanmuInfo {
   medal_name: string;
   send_time: number;
 }
+
+/** A track a platform matched for a request: `key` is what the platform
+ *  dedupes by (KuGou's hash), `ref` its own payload for adding it. */
+export interface Track {
+  name: string;
+  artist: string;
+  key: string;
+  ref?: unknown;
+  duration?: number;
+}
+
+/** One playlist as a platform reports it. */
+export interface Playlist {
+  name: string;
+  listid: number;
+  count: number;
+}

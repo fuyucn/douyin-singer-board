@@ -45,49 +45,42 @@ The exe then keeps the default Explorer icon.
 
 ## Plugin channel
 
-A plugin is a folder in `${dataDir}/plugins/<id>/`:
+Every platform is a plugin. A plugin is a folder in `${dataDir}/plugins/<id>/`:
 
 ```
-plugin.json   { "id": "demo", "name": "…", "version": "1.0.0", "api": 1, "entry": "index.js" }
-index.js      plugin.define({ search: async ({q}) => [ … ] })
+plugin.json   { "id": "kugou-web", "name": "酷狗音乐", "version": "0.1.0", "api": 1, "entry": "index.js" }
+index.js      plugin.define({ search: async ({keyword}) => [ … ] })
 ```
 
 The app reads both, wraps the module in a page that gives it two globals
 (`app.call(method, params)` for logging, its own storage and the app's `fetch`;
-`plugin.define({...})` for what the app calls), and runs it in a **hidden
-WebView** — the only way an NSH app can run code it did not compile (the main
-VM has no `eval`, and bundles are compiled at build time). The app and the
-plugin talk over `window.nsh.postMessage` / `injectJavaScript`; every payload
-crosses as a JSON string.
+`plugin.define({...})` for what the app calls), and runs it in a hidden
+WebView — the only way an NSH app can run code it did not compile (the main VM
+has no `eval`, and bundles are compiled at build time). Every payload crosses
+as a JSON string over `window.nsh.postMessage` / `injectJavaScript`.
 
-Settings → 插件 → 插件通道：安装示例插件（writes the demo into the data
-directory), 启用, then 调用 hello / 调用 search to see the round trip.
+Settings → 插件 lists them. 酷狗音乐 ships as a plugin (installed on first
+run, installable again after 移除) and **启用 selects it as the platform**;
+there is one platform at a time. 安装示例插件 adds the demo; every row has
+安装 / 启用·停用 / 移除.
 
-The same panel installs **酷狗音乐（插件版）**: `plugins/kugou-web/` is the
-built-in platform's API as one plain-JS module (search, QR login, playlists,
-add, resolve, clear), embedded by `scripts/embed-plugin.mjs` so installing it
-needs no network. It runs in the same hidden WebView: MD5 and AES-128-CBC are
-implemented in JS (a plain page has no Node `crypto`, and WebKit gives it no
-`crypto.subtle` outside a secure context), and HTTP goes through the app's
-`fetch` (`app.call("http.json")`), which is why CORS never applies and the
-app's `network.hosts` still decides what is reachable. 扫码登录 → 搜索 → 加入歌单
-uses the app's own config playlist name; 自检 prints the numbers the Node KAT
-(`scripts/kat-kugou-plugin.mjs`) checks.
+What this costs:
 
-Limits worth knowing:
-
-- The app declares `capabilities.webview`, because a plugin needs one. Windows
-  needs the WebView2 runtime for this (Windows 11 has it; the app reports
-  `onError` when it is missing). The built-in platforms never touch a web view.
-- A plugin's page has a web engine's own network: an `app.call` request goes
-  through the app's `fetch` (so `network.hosts` applies), a bare `fetch`
-  inside the page does not.
-- `api: 1` is the bridge this app speaks. A plugin asking for a newer bridge stays in the list, labelled 不可用 with the reason and its folder kept — an update never makes a plugin look deleted — while an older `api` keeps running as before.
+- A WebView is needed for every platform feature, so **Windows needs the
+  WebView2 runtime** (Windows 11 has it; the row reports `onError` when it is
+  missing). With it missing the app runs in listener-only mode.
+- A plugin's page has a web engine's own network: `app.call("http.json")`
+  goes through the app's `fetch` (so `network.hosts` applies); a bare `fetch`
+  inside the page does not, and CORS blocks it anyway.
+- `api: 1` is the bridge this app speaks. A plugin asking for a newer bridge
+  stays in the list, labelled 不可用 with the reason and its folder kept — an
+  update never makes a plugin look deleted — while an older `api` keeps
+  running.
 - Plugins live in the data directory, not in the app: an update replaces the
   app only, so installed plugins survive it (and so does their enabled state).
-- Installing is "write the folder" for now (the demo does it); an install
-  from a file picker or a URL is not there yet, and neither is a page a plugin
-  shows for its own sign-in.
+- The suites that need the platform (`board`, `parity`, `actions`,
+  `sync-worker`, `kugou-ui`, `plugin*`) run with `--target`, because the
+  headless runner has no WebView or filesystem.
 
 ## Windows artifacts
 
@@ -95,13 +88,13 @@ Limits worth knowing:
 zip the updater replaces it from. The one-file download is an NSIS build of
 that directory, so both come from `installer/`:
 
-- `SUSUSongBoard-Portable-0.43.0-preview.5.exe` — one file, ~26 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.43.0-preview.6.exe` — one file, ~26 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly. A
   registry build marker (`PortableBuild`) keeps an updated install from being
   overwritten by an older launcher.
-- `SUSUSongBoard-Setup-0.43.0-preview.5.exe` — per-user NSIS installer, same directory
+- `SUSUSongBoard-Setup-0.43.0-preview.6.exe` — per-user NSIS installer, same directory
   (`%LOCALAPPDATA%`, so `nsh/updater` can replace the app without elevation).
-- `SUSUSongBoard-0.43.0-preview.5-windows-x86_64.zip` — raw directory, and the
+- `SUSUSongBoard-0.43.0-preview.6-windows-x86_64.zip` — raw directory, and the
   archive the updater uses. Not a hand-download.
 
 `nsh-windows.yml` builds and smoke-runs both exes on every push; `NSH Release`
@@ -111,7 +104,7 @@ next to the updater archives.
 `makensis` cannot build on macOS (Homebrew's 3.13 aborts with
 `std::bad_alloc`), so these two exes are only ever built on a Windows runner.
 
-## Listener-only mode (0.43.0-preview.5)
+## Listener-only mode (0.43.0-preview.6)
 
 功能边界按「有没有启用酷狗平台」拆分，不改动原版左栏布局：
 
@@ -256,7 +249,7 @@ Tests do not mirror SQLite writes back to NSH Storage.
 Durability, WAL snapshots, one-shot migration, transactional rollback and
 failure recovery are tested against temporary on-disk databases in Rust.
 
-## Playlist clear (0.43.0-preview.5)
+## Playlist clear (0.43.0-preview.6)
 
 The sidebar now mirrors the original: `Kugou 歌单` has a name input + read-only
 `id`, and two equal buttons — red `清理` (Trash2) and `自动同步` (rainbow ring
@@ -337,7 +330,7 @@ tens of rows, so this is accepted for now.
   `general` (appearance, read-only runtime info), `plugin` (**only** the
   platform picker and the selected platform's login — QR code, status,
   logout), and `about` (version, repository, `nsh/updater` check; no manifest
-  yet). 0.43.0-preview.5 removes the separate `启用酷狗服务` master switch: the platform
+  yet). 0.43.0-preview.6 removes the separate `启用酷狗服务` master switch: the platform
   picker IS the switch. One platform may be selected, or **none at all**.
   Switching platforms or turning them all off disables auto-sync and hides
   the sidebar `Kugou 歌单` block, the row's ListPlus button, the search-result
@@ -349,7 +342,7 @@ tens of rows, so this is accepted for now.
   deferred until config load and skipped entirely with no platform selected,
   so a stale token cannot produce phantom warnings. Config migration is
   written back to Storage immediately (`configLoaded` is a signal).
-  The 0.43.0-preview.5 cleanup also removes the `目标歌单` list, `设为目标`, the duplicate
+  The 0.43.0-preview.6 cleanup also removes the `目标歌单` list, `设为目标`, the duplicate
   auto-sync switch and `搜索并加入` from the plugin tab: those came from the
   original's separate **KuGou API 调试面板** (an About dialog sub-entry), not
   from its settings. Playlist management lives in the left panel
@@ -362,7 +355,7 @@ tens of rows, so this is accepted for now.
   present, otherwise creates a fresh playlist and returns the new id; only
   after a successful resolve is `auto_sync` enabled. A failed resolve leaves
   it off with a visible message. `playlists()` no longer overwrites the
-  edited name/id from the server list. 0.43.0-preview.5 hardens this path: `get_all_list`
+  edited name/id from the server list. 0.43.0-preview.6 hardens this path: `get_all_list`
   fails closed on an application-level `status`/`error_code` (a token failure
   must never look like "no playlists" and trigger a create), request headers
   match kugou-api's `kg-*` set, a shared mutex+generation prevents double

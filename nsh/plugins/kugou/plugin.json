@@ -1,9 +1,0 @@
-{
-  "id": "kugou",
-  "name": "酷狗音乐",
-  "version": "0.1.0",
-  "minAppVersion": "0.1.0",
-  "permissions": { "network": ["gateway.kugou.com", "login-user.kugou.com", "*.kugou.com"] },
-  "settings": [],
-  "notes": "Direct Kugou API adapter: no Node/express server."
-}

@@ -10,7 +10,7 @@ test("kugou plugin computes the known answers", async () => {
   await app.press("id:settings-tab-plugin");
   await app.press("id:kw-install");
   await app.wait(900);
-  await app.press("id:kw-toggle");
+  await app.press("id:plugin-kugou");
   await app.wait(1800);
   await app.press("id:kw-selftest");
   await app.wait(1200);

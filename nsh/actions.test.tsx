@@ -1,4 +1,5 @@
 import { expect, open, test } from "nsh/test";
+import { openSqliteBoard } from "./sqlite-test-options";
 
 const loggedConfig = JSON.stringify({
   room_id: "145997388006",
@@ -50,7 +51,7 @@ const addToPlayed = async (app: any, name: string) => {
 };
 
 test("row copy writes the clipboard and shows visible feedback", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700, clipboard: "INITIAL" });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700, clipboard: "INITIAL" });
   await add(app, "晴天");
   await app.press("id:song-copy-0");
   expect(app.clipboard()).toBe("晴天");
@@ -58,7 +59,7 @@ test("row copy writes the clipboard and shows visible feedback", async () => {
 });
 
 test("delete removes the row itself, not just the counter", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await add(app, "晴天");
   await add(app, "起风了");
   expect(app.texts()).toContain("点歌列表 (2)");
@@ -69,7 +70,7 @@ test("delete removes the row itself, not just the counter", async () => {
 });
 
 test("add-to-playlist, played-copy and the search clear button", async () => {
-  const app = await open("./Board.tsx", loggedOptions({ clipboard: "INITIAL" }));
+  const app = await openSqliteBoard("./Board.tsx", loggedOptions({ clipboard: "INITIAL" }));
   await addToPlayed(app, "晴天");
   expect(app.texts()).toContain("已点歌单 (1)");
   await app.press("已点歌单 (1)");
@@ -87,7 +88,7 @@ test("clear playlist recreates it and updates the target id", async () => {
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 1 } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(400);
@@ -109,7 +110,7 @@ test("create failure after a successful delete clears the dangling id", async ()
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 0, error: "nope" } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 1 } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(500);
@@ -123,7 +124,7 @@ test("a failed playlist write leaves the row in the queue", async () => {
     ...kugouNetwork,
     "POST https://gateway.kugou.com/cloudlist.service/v6/add_song*": { body: { status: 0, error: "nope" } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await add(app, "晴天");
   await app.wait(300);
   await app.press("id:song-add-0");
@@ -142,7 +143,7 @@ test("clear playlist refuses to delete a different playlist when the name was ed
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 1 } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(400);
@@ -158,7 +159,7 @@ test("a failed delete does not switch the target id", async () => {
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 0, error: "nope" } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(500);
@@ -176,7 +177,7 @@ test("a failed playlist lookup creates nothing and restores the id", async () =>
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 1 } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(500);
@@ -194,7 +195,7 @@ test("a delete with an unreadable answer clears the id instead of assuming it su
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { error: "connection reset" } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(500);
@@ -213,7 +214,7 @@ test("a real name/id mismatch deletes nothing", async () => {
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
     "POST https://gateway.kugou.com/v2/delete_list*": { body: { status: 1 } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:kugou-clear");
   await app.wait(400);
@@ -223,7 +224,7 @@ test("a real name/id mismatch deletes nothing", async () => {
 });
 
 test("clear list asks for confirmation and resets the played search", async () => {
-  const app = await open("./Board.tsx", loggedOptions());
+  const app = await openSqliteBoard("./Board.tsx", loggedOptions());
   await add(app, "晴天");
   await add(app, "起风了");
   await app.press("id:clear-list");
@@ -254,7 +255,7 @@ async function showLogPanel(app: any) {
 }
 
 test("log copy does not lie about its own success", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700, clipboard: "INITIAL" });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700, clipboard: "INITIAL" });
   await add(app, "晴天");
   await showLogPanel(app);
   await app.press("id:log-copy");
@@ -267,7 +268,7 @@ test("log copy does not lie about its own success", async () => {
 });
 
 test("blacklist add/remove and log chevron still respond", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await app.press("黑名单 (0)");
   await app.type("输入歌曲名…", "坏歌");
   await app.press("id:black-add");
@@ -281,7 +282,7 @@ test("blacklist add/remove and log chevron still respond", async () => {
 });
 
 test("settings plugin tab only manages the plugin switch and platform login", async () => {
-  const app = await open("./Board.tsx", loggedOptions());
+  const app = await openSqliteBoard("./Board.tsx", loggedOptions());
   await app.wait(200);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
@@ -309,7 +310,7 @@ test("turning auto-sync on uses an existing same-name playlist", async () => {
       return { body: { status: 1, data: { info: { listid: 42 } } } };
     },
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -325,7 +326,7 @@ test("turning auto-sync on creates the playlist when the name does not exist", a
     "POST https://gateway.kugou.com/v7/get_all_list*": { body: { data: { info: [] } } } as any,
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -340,7 +341,7 @@ test("a failed playlist resolve leaves auto-sync off", async () => {
     ...kugouNetwork,
     "POST https://gateway.kugou.com/v7/get_all_list*": { error: "timeout" } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -360,7 +361,7 @@ test("an application-level playlist lookup error does not create a playlist", as
       return { body: { status: 1, data: { info: { listid: 42 } } } };
     },
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -380,7 +381,7 @@ test("double-pressing auto-sync while resolving creates only one playlist", asyn
       return { body: { status: 1, data: { info: { listid: 42 } } }, delay: 400 };
     },
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.press("id:auto-sync");
@@ -390,7 +391,7 @@ test("double-pressing auto-sync while resolving creates only one playlist", asyn
 });
 
 test("editing the playlist name while sync is on turns sync off", async () => {
-  const app = await open("./Board.tsx", loggedOptions());
+  const app = await openSqliteBoard("./Board.tsx", loggedOptions());
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -403,7 +404,7 @@ test("editing the playlist name while sync is on turns sync off", async () => {
 
 test("disabling the platform while sync is on turns auto-sync off", async () => {
   const opts = loggedOptions();
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.wait(400);
@@ -430,7 +431,7 @@ test("a resolve that finishes after the platform is disabled cannot re-enable sy
     "POST https://gateway.kugou.com/v7/get_all_list*": { body: { status: 1, data: { info: [] } }, delay: 700 } as any,
     "POST https://gateway.kugou.com/cloudlist.service/v5/add_list*": { body: { status: 1, data: { info: { listid: 42 } } } } as any,
   };
-  const app = await open("./Board.tsx", opts);
+  const app = await openSqliteBoard("./Board.tsx", opts);
   await app.wait(200);
   await app.press("id:auto-sync");
   await app.press("id:settings");
@@ -447,7 +448,7 @@ test("a resolve that finishes after the platform is disabled cannot re-enable sy
 });
 
 test("about check-update and theme buttons respond", async () => {
-  const app = await open("./Board.tsx", { width: 900, height: 700 });
+  const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await app.press("id:theme");
   await app.press("id:settings");
   await app.press("id:settings-tab-about");

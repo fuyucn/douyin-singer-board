@@ -9,7 +9,7 @@
 // This is a migration bridge, not a general SQL engine: it reads the three
 // tables the old app used and never writes to the old database.
 import { dirname, join } from "path";
-import { parseSqlite, rowsAsObjects, type SqliteDb } from "../plugins/kugou/sqliteReader";
+import { parseSqlite, rowsAsObjects, type SqliteDb } from "./legacy/sqliteReader";
 
 export type LegacySource = "nsh-storage" | "tauri-sqlite";
 export interface LegacyMigration {

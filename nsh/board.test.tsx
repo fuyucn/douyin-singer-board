@@ -1,4 +1,5 @@
 import { expect, test } from "nsh/test";
+import { openSqliteBoard } from "./sqlite-test-options";
 import { openSqliteBoard as open } from "./sqlite-test-options";
 
 const loggedConfig = JSON.stringify({
@@ -25,7 +26,7 @@ const network = {
 };
 
 test("board shell, manual request, tabs and plugin settings", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": loggedConfig, "kugou.session": session },
     network,
@@ -48,9 +49,9 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
   expect(app.texts()).toContain("外观");
-  expect(app.texts()).not.toContain("平台插件");
+  expect(app.texts().some((t: string) => t.includes("同一时间只启用一个平台"))).toBe(false);
   await app.press("id:settings-tab-plugin");
-  expect(app.texts()).toContain("平台插件");
+  expect(app.texts().some((t: string) => t.includes("同一时间只启用一个平台"))).toBe(true);
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");
   expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
