@@ -76,22 +76,28 @@ jobs:
       - name: Rust store tests
         run: cargo test --manifest-path native/Cargo.toml --locked
 
+      # No WebView here: only suites that never touch a platform.
       - name: Headless tests
         run: |
-          nsh test board.test.tsx
-          nsh test actions.test.tsx
-          nsh test parity.test.tsx
           nsh test sqlite-store.test.tsx
           nsh test platform.test.tsx
           nsh test log.test.tsx
           nsh test sqlite-bridge.test.tsx
-          nsh test sync-worker.test.tsx
           nsh test text-layout.test.tsx
           nsh test geometry.test.tsx
 
+      # The platform is a plugin now: its suites need a real WebView and a real
+      # data directory, so they run on the renderer instead.
       - name: Real macOS renderer tests
         run: |
           nsh test table-actions-target.test.tsx --target macos
+          nsh test board.test.tsx --target macos
+          nsh test parity.test.tsx --target macos
+          nsh test actions.test.tsx --target macos
+          nsh test sync-worker.test.tsx --target macos
+          nsh test kugou-ui.test.tsx --target macos
+          nsh test plugin.test.tsx --target macos
+          nsh test plugin-compat.test.tsx --target macos
           nsh test plugin.test.tsx --target macos
           nsh test plugin-compat.test.tsx --target macos
 

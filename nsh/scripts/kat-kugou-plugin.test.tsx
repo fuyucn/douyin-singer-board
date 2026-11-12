@@ -6,6 +6,7 @@ import { openSqliteBoard } from "../sqlite-test-options";
 // against Node's crypto.
 test("kugou plugin computes the known answers", async () => {
   const app = await openSqliteBoard("../Board.tsx", { width: 1000, height: 800 });
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   await app.press("id:kw-install");

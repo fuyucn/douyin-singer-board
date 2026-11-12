@@ -9,6 +9,7 @@ import { openSqliteBoard } from "./sqlite-test-options";
 test("a plugin installs on disk, runs hidden, and answers the app", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 1000, height: 800 });
 
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   expect(app.texts()).toContain("其它插件");

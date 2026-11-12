@@ -15,6 +15,7 @@ test("a plugin newer than the bridge is listed as incompatible", async () => {
       },
     },
   });
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   await app.wait(500);
