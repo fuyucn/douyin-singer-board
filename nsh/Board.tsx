@@ -447,6 +447,9 @@ function Board() {
   const installKugouPlugin = async () => {
     try {
       await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
+      // A 移除 earlier left the "do not auto-install" mark behind; an explicit
+      // install is the user asking for it back.
+      await storage.setItem(`plugin.${KUGOU_WEB_MANIFEST.id}.removed`, "0").catch(() => {});
       await refreshPlugins();
       showFlash("酷狗插件已安装");
       log("酷狗插件已安装");
