@@ -31,6 +31,7 @@ import { createSqliteStore } from "./src/sqliteStore";
 // of the built-in platforms.
 import { PluginChannel } from "./src/plugin/bridge";
 import { DEMO_PLUGIN, DEMO_SOURCE } from "./src/plugin/demo";
+import { KUGOU_WEB_FILES, KUGOU_WEB_MANIFEST } from "./src/plugin/kugouPlugin";
 import { PluginView } from "./src/plugin/PluginView";
 import { installPlugin, listPlugins, pluginsDir, removePlugin } from "./src/plugin/store";
 import type { InstalledPlugin } from "./src/plugin/types";
@@ -69,7 +70,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.0-preview.4";
+const APP_VERSION = "0.43.0-preview.5";
 const APP_REPO = "fuyucn/douyin-singer-board";
 
 type Tab = "songs" | "played" | "blacklist";
@@ -393,6 +394,141 @@ function Board() {
     logs.update((v) => [...v.slice(-120), `${t} ${line}`]);
   };
 
+
+  // --- the KuGou plugin: the same API, run through the channel ------------
+  const kwQr = signal<string | null>(null);
+  const kwStatus = signal("");
+  const kwQuery = signal("");
+  const kwSession = signal<{ token: string; userid: string; dfid?: string; nickname?: string } | null>(null);
+  const kwTrack = signal<any>(null);
+
+  const kwCall = async (method: string, params: any = {}): Promise<any> => {
+    const plugin = plugins().find((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
+    if (!plugin) throw new Error("插件未安装");
+    if (!pluginsOn()[KUGOU_WEB_MANIFEST.id]) throw new Error("插件未启用");
+    return await channelFor(plugin).invoke(method, params, 15000);
+  };
+
+  const installKugouPlugin = async () => {
+    try {
+      await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
+      await refreshPlugins();
+      kwStatus.set("已安装，点「启用」开始");
+      log("酷狗插件已安装");
+    } catch (e: any) {
+      kwStatus.set("安装失败: " + String(e?.message ?? e));
+      log("酷狗插件安装失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const kwPollLogin = async (key: string, gen: number) => {
+    if (gen !== pluginLoginGen || !pluginsOn()[KUGOU_WEB_MANIFEST.id]) return;
+    try {
+      const r = await kwCall("loginQrCheck", { key });
+      if (gen !== pluginLoginGen) return;
+      if (r.status === 4 && r.token && r.userid) {
+        const session = { token: String(r.token), userid: String(r.userid), dfid: "-", nickname: r.nickname ?? undefined };
+        kwSession.set(session);
+        kwQr.set(null);
+        kwStatus.set(`已登录：${session.nickname ?? session.userid}`);
+        await storage.setItem(`plugin.${KUGOU_WEB_MANIFEST.id}.session`, JSON.stringify(session)).catch(storageError);
+        log(`酷狗插件登录成功: ${session.nickname ?? session.userid}`);
+        return;
+      }
+      if (r.status === 0) { kwStatus.set("二维码已过期，请刷新"); return; }
+      kwStatus.set(r.status === 2 ? "已扫码，请在手机上确认" : "等待扫码…");
+      setTimeout(() => kwPollLogin(key, gen), 2000);
+    } catch (e: any) {
+      kwStatus.set("扫码状态失败: " + String(e?.message ?? e));
+    }
+  };
+
+  // A previous run's login, kept with the plugin's id like any plugin data.
+  effect(() => {
+    storage.getItem(`plugin.${KUGOU_WEB_MANIFEST.id}.session`).then((raw) => {
+      if (!raw || kwSession()) return;
+      try {
+        const saved = JSON.parse(raw);
+        if (saved?.token && saved?.userid) kwSession.set(saved);
+      } catch {}
+    }).catch(() => {});
+  });
+
+  let pluginLoginGen = 0;
+  const kwLogin = async () => {
+    const gen = ++pluginLoginGen;
+    kwStatus.set("正在获取二维码…");
+    try {
+      const r = await kwCall("loginQrKey");
+      if (gen !== pluginLoginGen) return;
+      kwQr.set(r.image || null);
+      kwStatus.set("等待扫码…");
+      kwPollLogin(r.key, gen);
+    } catch (e: any) {
+      kwStatus.set("二维码生成失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const kwSearch = async (): Promise<any[]> => {
+    const keyword = kwQuery().trim();
+    if (!keyword) { kwStatus.set("请输入歌名"); return []; }
+    kwStatus.set("搜索中…");
+    try {
+      const tracks = await kwCall("search", { keyword, pagesize: 5 });
+      kwTrack.set(tracks[0] ?? null);
+      kwStatus.set(tracks.length
+        ? `找到 ${tracks.length} 首，第一首：${tracks[0].artist} - ${tracks[0].name}`
+        : "没有找到");
+      return tracks;
+    } catch (e: any) {
+      kwStatus.set("搜索失败: " + String(e?.message ?? e));
+      return [];
+    }
+  };
+
+  const kwPlaylists = async () => {
+    const session = kwSession();
+    if (!session) { kwStatus.set("请先扫码登录"); return; }
+    try {
+      const list = await kwCall("playlists", session);
+      kwStatus.set(`歌单 ${list.length} 个：${list.slice(0, 4).map((p: any) => p.name).join("、")}`);
+    } catch (e: any) {
+      kwStatus.set("歌单加载失败: " + String(e?.message ?? e));
+    }
+  };
+
+  // The plugin's own known-answer check (scripts/kat-kugou-plugin.mjs): the
+  // same numbers have to come out of a page and out of Node.
+  const kwSelfTest = async () => {
+    try {
+      const result = await kwCall("selftest");
+      kwStatus.set(JSON.stringify(result));
+    } catch (e: any) {
+      kwStatus.set(JSON.stringify({ error: String(e?.message ?? e) }));
+    }
+  };
+
+  // The whole point of the plugin: resolve the editable playlist name through
+  // it, then add the first search result. Nothing here is compiled in.
+  const kwAdd = async () => {
+    const session = kwSession();
+    if (!session) { kwStatus.set("请先扫码登录"); return; }
+    const track = kwTrack();
+    if (!track) { const found = await kwSearch(); if (!found.length) return; }
+    const name = config().target_playlist_name.trim();
+    if (!name) { kwStatus.set("请先在左栏填写歌单名"); return; }
+    try {
+      kwStatus.set(`解析歌单「${name}」…`);
+      const resolved = await kwCall("resolvePlaylist", { ...session, name });
+      kwStatus.set(`歌单 id ${resolved.listid}${resolved.created ? "（新建）" : ""}，正在加入…`);
+      const res = await kwCall("addTrack", { ...session, listid: resolved.listid, track: kwTrack() });
+      kwStatus.set(res.status === 1 ? `已加入：${kwTrack().name}` : `加入失败：status=${res.status}`);
+      log(`酷狗插件加入歌单: ${kwTrack().name} (${res.status})`);
+    } catch (e: any) {
+      kwStatus.set("加入失败: " + String(e?.message ?? e));
+    }
+  };
+
   // --- plugin channel (experimental) -------------------------------------
   // A plugin is `${dataDir}/plugins/<id>/` with plugin.json and one JS module.
   // The app runs that module in a hidden WebView, the only way an NSH app can
@@ -421,9 +557,18 @@ function Board() {
       await storage.setItem(`plugin.${id}.${key}`, JSON.stringify(value ?? null));
       return true;
     },
-    "http.json": async ({ url, method, headers, body }: any) => {
+    // A plugin's page cannot read a cross-origin answer (CORS), so its HTTP
+    // goes through the app: same capabilities, same hosts, no preflight.
+    "http.json": async ({ url, method, headers, body, as }: any) => {
       if (typeof url !== "string" || !url.startsWith("https://")) throw new Error("插件只能通过应用请求 https 地址");
-      const res = await fetch(url, { method: method ?? "GET", headers, body });
+      const res = await fetch(url, { method: method ?? "GET", headers: headers ?? undefined, body: body ?? undefined });
+      if (as === "text") return await res.text();
+      if (as === "base64") {
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+      }
       return await res.json();
     },
   });
@@ -2029,6 +2174,48 @@ function Board() {
                   </View>
                 )}
               </Each>
+
+              <View class="h-px bg-muted" />
+              <Text class="text-[13px] font-semibold text-foreground">酷狗音乐（插件版）</Text>
+              <Text class="text-[11px] text-faint">同一套酷狗接口，跑在插件通道里：安装 → 启用 → 扫码登录 → 搜索 → 加入左栏歌单。不取代内置酷狗。</Text>
+              <View class="flex-row items-center gap-2">
+                <Button testID="kw-install" onPress={installKugouPlugin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">安装酷狗插件</Text>
+                </Button>
+                <If when={plugins().some((p: any) => p.manifest.id === KUGOU_WEB_MANIFEST.id)}>
+                  <Button
+                    testID="kw-toggle"
+                    onPress={() => togglePlugin(KUGOU_WEB_MANIFEST.id)}
+                    class={`items-center justify-center rounded-[6px] px-3 py-1.5 ${pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                  >
+                    <Text class={`text-[12px] ${pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "text-primary-foreground" : "text-foreground"}`}>
+                      {pluginsOn()[KUGOU_WEB_MANIFEST.id] ? "停用" : "启用"}
+                    </Text>
+                  </Button>
+                </If>
+                <Button testID="kw-login" onPress={kwLogin} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">扫码登录</Text>
+                </Button>
+              </View>
+              <If when={kwQr()}>
+                <Image src={kwQr()!} class="h-[140px] w-[140px] rounded-[6px] border border-line" />
+              </If>
+              <View class="flex-row items-center gap-2">
+                <Input style={inputStyle()} value={kwQuery()} onChange={({ value }: any) => kwQuery.set(value)} placeholder="搜索歌名" class="flex-1" />
+                <Button testID="kw-search" onPress={() => { kwSearch(); }} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">搜索</Text>
+                </Button>
+                <Button testID="kw-add" onPress={kwAdd} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">加入歌单</Text>
+                </Button>
+                <Button testID="kw-selftest" onPress={kwSelfTest} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">自检</Text>
+                </Button>
+                <Button testID="kw-playlists" onPress={kwPlaylists} class="items-center justify-center rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                  <Text class="text-[12px] text-foreground">歌单列表</Text>
+                </Button>
+              </View>
+              <Text testID="kw-status" class="text-[11px] text-muted-foreground">{kwStatus()}</Text>
 
               <If when={config().active_plugin === "netease"}>
                 <Text class="text-[13px] font-semibold text-foreground">网易云音乐</Text>

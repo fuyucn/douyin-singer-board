@@ -318,6 +318,21 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
 > and its buttons do nothing but report that. A plugin written for an older
 > bridge keeps running unchanged (`api` is only an upper bound).
 
+> 0.43.0-preview.5 ships KuGou as a plugin: `plugins/kugou-web/index.js` is
+> the built-in platform's API (search, QR login, playlists, add, resolve,
+> clear) rewritten as one plain-JS module and embedded at build time
+> (`scripts/embed-plugin.mjs`), so 设置 → 插件 can install it with no network.
+> A plugin page gets a WebKit page's globals only: Node's `crypto` and
+> `Buffer` are gone, so MD5 is implemented in JS and AES-128-CBC by hand
+> (WebKit gives a plain page no `crypto.subtle`, it needs a secure context),
+> and its HTTP goes through `app.call("http.json")` — the app's own network,
+> so CORS never applies and `network.hosts` still decides what is reachable.
+> The port is checked number by number: `scripts/kat-kugou-plugin.test.tsx`
+> runs the plugin's `selftest` in a real WebView and
+> `scripts/kat-kugou-plugin.mjs` compares MD5, the signed-params key, an
+> AES-CBC vector and a 1024-bit RSA block against Node's crypto.
+> The built-in KuGou platform stays compiled in and unchanged.
+
 ## Known constraints
 
 - NSH nightly (0.4.0, `36b9168`) is required for WebSocket `Cookie` headers;

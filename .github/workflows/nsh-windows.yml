@@ -102,6 +102,9 @@ jobs:
         run: |
           nsh test plugin.test.tsx --target windows
           nsh test plugin-compat.test.tsx --target windows
+          nsh test scripts/kat-kugou-plugin.test.tsx --target windows > kat-kugou.txt 2>&1
+          if ($LASTEXITCODE -ne 0) { Get-Content kat-kugou.txt; throw "plugin KAT failed" }
+          node scripts/kat-kugou-plugin.mjs kat-kugou.txt
 
       - name: Auto-sync worker test
         run: nsh test sync-worker.test.tsx
@@ -154,7 +157,7 @@ jobs:
       - name: Smoke portable exe
         shell: pwsh
         run: |
-          Start-Process "dist\SUSUSongBoard-Portable-0.43.0-preview.4.exe"
+          Start-Process "dist\SUSUSongBoard-Portable-0.43.0-preview.5.exe"
           Start-Sleep -Seconds 10
           $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
           if (-not $app) { throw "portable exe did not start the app" }
@@ -167,6 +170,6 @@ jobs:
           name: SUSUSongBoard-windows
           path: |
             nsh/dist/SUSUSongBoard.zip
-            nsh/dist/SUSUSongBoard-Setup-0.43.0-preview.4.exe
-            nsh/dist/SUSUSongBoard-Portable-0.43.0-preview.4.exe
+            nsh/dist/SUSUSongBoard-Setup-0.43.0-preview.5.exe
+            nsh/dist/SUSUSongBoard-Portable-0.43.0-preview.5.exe
           if-no-files-found: error
