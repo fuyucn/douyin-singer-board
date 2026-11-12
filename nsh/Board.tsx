@@ -16,6 +16,7 @@ import "./src/platform/kugou";
 import "./plugins/netease/platform";
 import { hasPlaylists, platform, platforms } from "./src/platform/registry";
 import process from "process";
+import { mkdir, readFile, writeFile } from "fs/promises";
 import { createSqliteStore } from "./src/sqliteStore";
 // The plugin channel: a plugin is a folder under ${dataDir}/plugins that the
 // app runs in a hidden web view (see src/plugin/). Nothing here is on the path
@@ -296,7 +297,7 @@ function Board() {
       kgState.set(auth ? "expired" : "error");
       kgMsg.set(auth ? "酷狗登录已失效，请重新扫码" : "歌单加载失败: " + String(e?.message ?? e));
       showFlash(auth ? "酷狗登录已失效" : "歌单加载失败");
-      log(auth ? "酷狗登录已失效" : "酷狗歌单加载失败");
+      log(auth ? "酷狗登录已失效" : "酷狗歌单加载失败: " + String(e?.message ?? e));
     }
   };
 
@@ -379,22 +380,61 @@ function Board() {
   let client: any = null;
   let generation = 0;
 
+  let lastLogDir = "";
   const log = (line: string) => {
     const t = clock(Math.floor(Date.now() / 1000));
-    logs.update((v) => [...v.slice(-120), `${t} ${line}`]);
+    const entry = `${t} ${line}`;
+    logs.update((v) => [...v.slice(-120), entry]);
+    // The panel is memory-only, so a failure the user reports arrives without
+    // its detail. Keep a small file in the data directory as well.
+    const dir = dataDir();
+    if (dir && dir !== lastLogDir) {
+      // fs/promises here has no append; keep one line per read+write, capped so
+      // the file cannot grow without bound.
+      mkdir(`${dir}/logs`, { recursive: true }).catch(() => {});
+      lastLogDir = dir;
+    }
+    if (dir) {
+      readFile(`${dir}/logs/app.log`, "utf8").catch(() => "").then((old) => {
+        const next = `${old}${entry}\n`;
+        return writeFile(`${dir}/logs/app.log`, next.length > 200_000 ? next.slice(-180_000) : next);
+      }).catch(() => {});
+    }
   };
 
 
   // The platform is the plugin: every KuGou call below goes to its page.
-  const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
+  // "0.1.1" is newer than "0.1.0"; missing parts count as 0.
+const versionParts = (v: string) => String(v || "0").split(/[.+-]/).map((x) => Number.parseInt(x, 10) || 0);
+const versionNewer = (a: string, b: string) => {
+  const pa = versionParts(a), pb = versionParts(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+  }
+  return false;
+};
 
+const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
+
+  // At startup the session restore can ask before the plugin folder has been
+  // listed, so "插件未安装" is not final: wait for `plugins()` to include it,
+  // then for its page to say ready.
   const waitReady = async (ms: number) => {
-    const plugin = plugins().find((p) => p.manifest.id === KUGOU_PLUGIN_ID);
-    if (!plugin) throw new Error("插件未安装");
-    const channel = channelFor(plugin);
-    if (channel.ready) return channel;
-    await channel.waitForReady(ms);
-    return channel;
+    const deadline = Date.now() + ms;
+    while (true) {
+      const plugin = plugins().find((p) => p.manifest.id === KUGOU_PLUGIN_ID);
+      if (plugin) {
+        const channel = channelFor(plugin);
+        if (channel.ready) return channel;
+        const left = deadline - Date.now();
+        if (left > 0) {
+          await channel.waitForReady(left);
+          return channel;
+        }
+      }
+      if (Date.now() >= deadline) throw new Error("插件未安装");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   };
 
   async function search(input: { keyword: string; page?: number; pagesize?: number }): Promise<Track[]> {
@@ -404,7 +444,7 @@ function Board() {
   }
 
   async function fetchPlaylists(token: string, userid: string, dfid = "-"): Promise<Playlist[]> {
-    await waitReady(4000);
+    await waitReady(8000);
     return (await kwCall("playlists", { token, userid, dfid })) as Playlist[];
   }
 
@@ -603,18 +643,27 @@ function Board() {
     | undefined;
   effect(() => {
     refreshPlugins(true).then(async () => {
-      // KuGou ships as a plugin; install it once unless the user removed it.
+      // KuGou ships as a plugin; install it once unless the user removed it,
+      // and refresh a copy an older app left in the data directory: plugins
+      // live outside the bundle, so an app update alone does not replace them.
       const removed = await storage.getItem(`plugin.${KUGOU_WEB_MANIFEST.id}.removed`);
-      const installed = (await listPlugins(dataDir())).some((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
-      if (!installed && removed !== "1") {
-        try { await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES); } catch (e: any) {
+      const found = (await listPlugins(dataDir())).find((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
+      const upgrade = found && versionNewer(KUGOU_WEB_MANIFEST.version, found.manifest.version);
+      if ((!found && removed !== "1") || upgrade) {
+        try {
+          await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
+          if (upgrade) log(`酷狗插件已更新 ${found!.manifest.version} → ${KUGOU_WEB_MANIFEST.version}`);
+        } catch (e: any) {
           log("酷狗插件安装失败: " + String(e?.message ?? e));
         }
       }
-      if (!installed && removed !== "1") await refreshPlugins(true);
+      if ((!found && removed !== "1") || upgrade) await refreshPlugins(true);
       // The session may have been read before the plugin existed; once it is
       // on disk and mounted, restore it — a saved login must not ask again.
+      // An already-restored session still needs its playlist load retried: that
+      // call ran while `plugins()` was empty ("插件未安装") and only failed once.
       if (!kugou()) restoreSession();
+      else loadLists();
       if (!pluginSeed) return;
       for (const item of pluginSeed) {
         try {
