@@ -2117,7 +2117,6 @@ function Board() {
 
               <Text class="text-[13px] font-semibold text-foreground">插件</Text>
               <Text class="text-[11px] text-faint">可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。</Text>
-              <Text class="text-[11px] text-faint">插件是数据目录下 plugins/&lt;id&gt;/ 的一个文件夹（plugin.json + 一个 JS 模块），在隐藏的 WebView 里运行。可安装、启用、移除；同一时间只启用一个平台。</Text>
 
               {/* 酷狗音乐：平台插件，选中它才启用平台 */}
               <View class={`gap-2 rounded-[6px] border px-3 py-2 ${pluginEnabled() ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
@@ -2218,7 +2217,7 @@ function Board() {
                 </Button>
               </View>
               <If when={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id).length === 0}>
-                <Text class="text-[11px] text-faint">还没有其它插件。把插件文件夹放进数据目录的 plugins/ 下，点「重新扫描」即可识别；安装、启用、移除都在这里。</Text>
+                <Text class="text-[11px] text-faint">还没有其它插件</Text>
               </If>
               <Each of={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id)} key={(p: any) => p.manifest.id}>
                 {(item: any) => (
