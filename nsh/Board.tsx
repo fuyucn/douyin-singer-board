@@ -381,25 +381,27 @@ function Board() {
   let generation = 0;
 
   let lastLogDir = "";
+  let logQueue: Promise<unknown> = Promise.resolve();
   const log = (line: string) => {
     const t = clock(Math.floor(Date.now() / 1000));
-    const entry = `${t} ${line}`;
+    // A comment can contain a newline; keep one event on one line in the file.
+    const entry = `${t} ${line.replace(/\s*\n\s*/g, " ")}`;
     logs.update((v) => [...v.slice(-120), entry]);
     // The panel is memory-only, so a failure the user reports arrives without
-    // its detail. Keep a small file in the data directory as well.
+    // its detail. Keep a small file in the data directory as well; writes go
+    // through one queue, otherwise two quick events read the same file and the
+    // later write drops the earlier line.
     const dir = dataDir();
-    if (dir && dir !== lastLogDir) {
-      // fs/promises here has no append; keep one line per read+write, capped so
-      // the file cannot grow without bound.
+    if (!dir) return;
+    if (dir !== lastLogDir) {
       mkdir(`${dir}/logs`, { recursive: true }).catch(() => {});
       lastLogDir = dir;
     }
-    if (dir) {
-      readFile(`${dir}/logs/app.log`, "utf8").catch(() => "").then((old) => {
-        const next = `${old}${entry}\n`;
-        return writeFile(`${dir}/logs/app.log`, next.length > 200_000 ? next.slice(-180_000) : next);
-      }).catch(() => {});
-    }
+    logQueue = logQueue.then(async () => {
+      const old = await readFile(`${dir}/logs/app.log`, "utf8").catch(() => "");
+      const next = `${old}${entry}\n`;
+      await writeFile(`${dir}/logs/app.log`, next.length > 200_000 ? next.slice(-180_000) : next);
+    }).catch(() => {});
   };
 
 
@@ -998,7 +1000,10 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
       const blocked = entry?.status === "found" ? blockedReason(entry.track) : null;
       const sub = blocked
         ? `黑名单 (${blocked === "singer" ? "歌手" : "歌曲"})`
-        : entry?.status === "found" ? `${platformName()}: ${entry.track.artist || "未知歌手"}`
+        // Show the song the search actually matched: the row title is the
+        // viewer's comment, which is often not the title Kugou returns.
+        : entry?.status === "found"
+          ? `${platformName()}: ${entry.track.name && entry.track.name.trim() !== s.song_name.trim() ? `${entry.track.name} · ` : ""}${entry.track.artist || "未知歌手"}`
         : entry?.status === "pending" ? "酷狗搜索中…"
         : entry?.status === "not_found" ? "酷狗未找到"
         : entry?.status === "error" ? "酷狗搜索失败"
@@ -1846,7 +1851,9 @@ const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
                               <View class="min-w-0 flex-1 px-2" onContextMenu={(e: any) => openRowMenu(e, song, "played")}>
                                 <View class="leading-snug">
                                   <Text class="truncate text-[13px] font-medium text-foreground">{song.song_name}</Text>
-                                  <Text class="truncate text-[11px] text-faint">{found && pluginEnabled() ? `${platformName()}: ${found.artist || "未知歌手"}` : "已点"}</Text>
+                                  <Text class="truncate text-[11px] text-faint">{found && pluginEnabled()
+                                    ? `${platformName()}: ${found.name && found.name.trim() !== song.song_name.trim() ? `${found.name} · ` : ""}${found.artist || "未知歌手"}`
+                                    : "已点"}</Text>
                                 </View>
                               </View>
                               <View class="w-[48px] flex-row items-center justify-end px-2" style={{ opacity: 0.6 }} hoverStyle={{ opacity: 1 }}>
