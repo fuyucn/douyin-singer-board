@@ -4,6 +4,7 @@ import { openSqliteBoard } from "./sqlite-test-options";
 test("settings modal opens on general", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await new Promise((r) => setTimeout(r, 800));
+  await app.wait(700);
   await app.press("id:settings");
   expect(app.texts()).toContain("常规");
   expect(app.texts()).toContain("外观");
@@ -16,6 +17,7 @@ test("settings modal opens on general", async () => {
 test("settings tabs switch between general, plugin and about", async () => {
   const app = await openSqliteBoard("./Board.tsx", { width: 900, height: 700 });
   await new Promise((r) => setTimeout(r, 800));
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   expect(app.texts()).toContain("插件");
@@ -59,6 +61,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
   expect(app.texts()).toContain("Kugou 歌单");
   expect(app.shows("id:song-add-0")).toBe(true);
 
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   await app.press("id:plugin-kugou");
@@ -73,6 +76,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
   expect(app.shows("id:song-add-0")).toBe(false);
   expect(app.texts()).toContain("手动添加");
 
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   await app.press("id:plugin-kugou");
@@ -159,6 +163,7 @@ test("已点歌单 tab keeps its history when the platform is turned off", async
   await app.wait(600);
   expect(app.texts()).toContain("已点歌单 (1)");
 
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   await app.press("id:plugin-kugou");
@@ -215,6 +220,7 @@ test("0.5.x configs are upgraded with Kugou selected", async () => {
     height: 700,
     storage: { "board.config": JSON.stringify({ ...baseConfig, kugou_enabled: false }) },
   });
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   expect(app.texts()).toContain("酷狗登录");
@@ -230,6 +236,7 @@ test("a v2 config with the service explicitly disabled selects no platform", asy
       "board.config": JSON.stringify({ ...baseConfig, kugou_enabled: false, config_version: 2, active_plugin: undefined }),
     },
   });
+  await app.wait(700);
   await app.press("id:settings");
   await app.press("id:settings-tab-plugin");
   expect(app.texts()).not.toContain("酷狗登录");

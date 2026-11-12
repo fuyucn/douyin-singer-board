@@ -1,4 +1,5 @@
-import { expect, open, test } from "nsh/test";
+import { expect, test } from "nsh/test";
+import { openSqliteBoard } from "./sqlite-test-options";
 
 // The config's `active_plugin` is the only place a platform is remembered, so
 // what the board does with an id it does not know is what decides whether a
@@ -18,7 +19,7 @@ const kugouUi = (texts: string[]) =>
   texts.some((t) => t === "Kugou 歌单" || t === "酷狗未登录" || t === "酷狗服务就绪");
 
 test("a registered platform other than kugou is kept, with no kugou UI", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg({ active_plugin: "netease", kugou_enabled: false }) },
   });
@@ -32,7 +33,7 @@ test("a registered platform other than kugou is kept, with no kugou UI", async (
 });
 
 test("an id whose platform is not installed is kept, not rewritten to kugou", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg({ active_plugin: "acme-music", kugou_enabled: false }) },
   });
@@ -42,7 +43,7 @@ test("an id whose platform is not installed is kept, not rewritten to kugou", as
 });
 
 test("a config without active_plugin still upgrades to kugou when it was on", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg({ kugou_enabled: true, config_version: 2 }) },
   });
@@ -52,7 +53,7 @@ test("a config without active_plugin still upgrades to kugou when it was on", as
 });
 
 test("a config without active_plugin and the service off selects nothing", async () => {
-  const app = await open("./Board.tsx", {
+  const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": cfg({ kugou_enabled: false, config_version: 2 }) },
   });

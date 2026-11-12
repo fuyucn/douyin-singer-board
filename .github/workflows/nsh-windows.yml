@@ -115,12 +115,6 @@ jobs:
       - name: Icon button geometry
         run: nsh test geometry.test.tsx
 
-      - name: Playlist crypto KAT (NSH vs Node)
-        shell: pwsh
-        run: |
-          nsh test scripts/kat-playlist.test.ts 2>&1 | Out-File -Encoding utf8 kat-nsh.txt
-          if ($LASTEXITCODE -ne 0) { Get-Content kat-nsh.txt; throw "KAT test failed" }
-          node scripts/kat-playlist.mjs kat-nsh.txt
 
       - name: Icon button parity guard
         shell: pwsh

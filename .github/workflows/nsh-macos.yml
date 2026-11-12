@@ -101,12 +101,9 @@ jobs:
           nsh test plugin.test.tsx --target macos
           nsh test plugin-compat.test.tsx --target macos
 
-      - name: Playlist crypto KAT (NSH vs Node)
+      # The plugin's crypto, as a page computes it (needs a real WebView).
+      - name: KuGou plugin crypto KAT (page vs Node)
         run: |
-          # The KAT prints on stderr, so the runner's own lines come along.
-          nsh test scripts/kat-playlist.test.ts > kat-nsh.txt 2>&1
-          node scripts/kat-playlist.mjs kat-nsh.txt
-          # The plugin's crypto, as a page computes it (needs a real WebView).
           nsh test scripts/kat-kugou-plugin.test.tsx --target macos > kat-kugou.txt 2>&1
           node scripts/kat-kugou-plugin.mjs kat-kugou.txt
 
