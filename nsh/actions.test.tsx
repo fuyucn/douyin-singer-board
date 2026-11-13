@@ -99,9 +99,15 @@ test("clear playlist recreates it and updates the target id", async () => {
   await new Promise((r) => setTimeout(r, 1500));
   await app.wait(200);
   await app.press("id:kugou-clear");
-  await app.wait(400);
+  // get_all_list → delete_list → add_list over the bridge outlasts a fixed
+  // wait on a slow runner; poll for the result instead.
+  let cleared = false;
+  for (let i = 0; i < 30 && !cleared; i++) {
+    await app.wait(200);
+    cleared = app.texts().some((t: string) => t.includes("歌单已清理重建"));
+  }
   expect(app.texts()).toContain("id: 42");
-  expect(app.texts().some((t: string) => t.includes("歌单已清理重建"))).toBe(true);
+  expect(cleared).toBe(true);
   const urls = app.requests().map((r: any) => String(r.url ?? r));
   const delAt = urls.findIndex((u: string) => u.includes("/v2/delete_list"));
   const addAt = urls.findIndex((u: string) => u.includes("/cloudlist.service/v5/add_list"));
