@@ -56,7 +56,8 @@ test("board shell, manual request, tabs and plugin settings", async () => {
   expect(app.texts()).toContain("酷狗音乐");
   expect(app.texts()).toContain("网易云音乐");
   expect(app.texts()).toContain("可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。");
-  expect(app.texts()).toContain("未接入 · 启用后歌单与歌曲匹配暂不可用");
+  expect(app.texts()).toContain("网易云音乐");
+  expect(app.texts().some((t: string) => t.includes("登录（Cookie）"))).toBe(true);
   // Turning the platform off hides its login block; turning it back on shows it.
   await app.press("id:plugin-kugou");
   expect(app.texts()).not.toContain("酷狗登录");

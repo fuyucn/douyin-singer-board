@@ -34,7 +34,10 @@
         "gateway.kugou.com",
         "login-user.kugou.com",
         "cloudlist.service.kugou.com",
-        "ws.postman-echo.com"
+        "ws.postman-echo.com",
+        "music.163.com",
+        "*.music.163.com",
+        "*.music.126.net"
       ]
     },
     "statusBar": true,

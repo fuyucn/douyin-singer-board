@@ -1,13 +1,12 @@
-// Netease is listed so the picker shows what is planned, but it has no module
-// of its own yet: `playlist: false` keeps every playlist, sync and matching
-// entry hidden while it is selected.
+// NetEase Cloud Music's entry in the picker. Like KuGou, its API is not
+// compiled in: the board talks to plugins/netease-web over the channel.
 import { registerPlatform } from "../../src/platform/registry";
 
 registerPlatform({
-  id: "netease",
+  id: "netease-web",
   name: "网易云音乐",
   short: "网易云",
-  version: "未接入",
-  note: "启用后歌单与歌曲匹配暂不可用",
-  playlist: false,
+  version: "插件 v0.1.0",
+  note: "登录（Cookie）、歌单、搜索、自动同步",
+  playlist: true,
 });

@@ -118,8 +118,8 @@ test("no platform = listener-only: no manual add, clear mode panel", async () =>
 
   // A listener-only blacklist must not promise Kugou artist matching.
   await app.press("黑名单 (0)");
-  expect(app.texts().some((t: string) => t.includes("歌手名需在启用平台并匹配到酷狗歌曲后生效"))).toBe(true);
-  expect(app.texts().some((t: string) => t.includes("歌手名屏蔽酷狗搜索到的所有歌曲"))).toBe(false);
+  expect(app.texts().some((t: string) => t.includes("歌手名需在启用平台并匹配到歌曲后生效"))).toBe(true);
+  expect(app.texts().some((t: string) => t.includes("歌手名屏蔽平台搜索到的所有歌曲"))).toBe(false);
   // Rule hints must not promise collection-side rate limiting.
   expect(app.texts().some((t: string) => t.includes("仅监听模式不限制重复指令"))).toBe(true);
   expect(app.texts().some((t: string) => t.includes("仅监听模式不启用该限制"))).toBe(true);
@@ -128,14 +128,14 @@ test("no platform = listener-only: no manual add, clear mode panel", async () =>
   expect(app.texts().some((t: string) => t.includes("仅弹幕监听：启用平台并加入歌单后"))).toBe(true);
 });
 
-test("NetEase placeholder stays listener-only (no manual add)", async () => {
+test("an unknown platform id stays listener-only (no manual add)", async () => {
   const app = await openSqliteBoard("./Board.tsx", {
     width: 900, height: 700,
     storage: { "board.config": JSON.stringify({ ...baseConfig, active_plugin: "netease", config_version: 2 }) },
   });
   await app.wait(200);
   expect(app.texts()).toContain("仅弹幕监听");
-  expect(app.texts().some((t: string) => t.includes("网易云音乐未接入"))).toBe(true);
+  expect(app.texts().some((t: string) => t.includes("未启用平台插件"))).toBe(true);
   expect(app.texts()).not.toContain("手动点歌");
   expect(app.shows("id:song-add-0")).toBe(false);
 });

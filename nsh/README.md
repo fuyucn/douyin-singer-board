@@ -64,6 +64,13 @@ run, installable again after 移除) and **启用 selects it as the platform**;
 there is one platform at a time. Every row has 安装 / 启用·停用 / 移除
 (安装 only while it is missing).
 
+网易云音乐 is the second platform (`plugins/netease-web/`): search, playlists,
+add/resolve/clear all go through the same bridge, using the weapi protocol
+(AES twice + raw RSA) computed inside the plugin. Its login is the `MUSIC_U`
+cookie — browsers hide `Set-Cookie` from `fetch`, so a scanned QR cannot hand
+the cookie over; paste the cookie in 设置 → 插件 once and the app sends it on
+every request (also after a restart, since it is stored as the session).
+
 A plugin that did not ship with the app is installed by putting its folder
 in `${dataDir}/plugins/<id>/` and pressing 重新扫描; `plugins/demo/` in this
 repository is the example to copy (it is not installed by the app).

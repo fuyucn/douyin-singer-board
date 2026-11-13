@@ -23,6 +23,7 @@ import { createSqliteStore } from "./src/sqliteStore";
 // of the built-in platforms.
 import { PluginChannel } from "./src/plugin/bridge";
 import { KUGOU_WEB_FILES, KUGOU_WEB_MANIFEST } from "./src/plugin/kugouPlugin";
+import { NETEASE_WEB_FILES, NETEASE_WEB_MANIFEST } from "./src/plugin/neteasePlugin";
 import { PluginView } from "./src/plugin/PluginView";
 import { installPlugin, listPlugins, pluginsDir, removePlugin } from "./src/plugin/store";
 import type { InstalledPlugin } from "./src/plugin/types";
@@ -65,6 +66,11 @@ const APP_VERSION = "0.43.1";
 
 // "0.1.1" is newer than "0.1.0"; missing parts count as 0. Used to decide
 // whether the plugin copy in the data directory predates the bundled one.
+const BUNDLED_PLUGINS = [
+  { manifest: KUGOU_WEB_MANIFEST, files: KUGOU_WEB_FILES },
+  { manifest: NETEASE_WEB_MANIFEST, files: NETEASE_WEB_FILES },
+];
+
 const versionParts = (v: string) => String(v || "0").split(/[.+-]/).map((x) => Number.parseInt(x, 10) || 0);
 const versionNewer = (a: string, b: string) => {
   const pa = versionParts(a), pb = versionParts(b);
@@ -242,7 +248,7 @@ function Board() {
       // "no platform selected" — the user may leave every platform off.
       const rawActive = saved.active_plugin === "kugou" ? "kugou-web" : saved.active_plugin;
       const active = legacy
-        ? (rawActive === "netease" || rawActive === "" ? rawActive : "kugou-web")
+        ? (rawActive === "netease" ? "netease-web" : rawActive === "" ? "" : "kugou-web")
         : (typeof rawActive === "string"
             // "" and any registered id are kept as they are, and so is an id
             // whose platform is not here (a removed plugin): the registry
@@ -287,9 +293,14 @@ function Board() {
     storage.setItem("board.log_visible", on ? "1" : "0").catch(storageError);
   };
 
+  // Each platform keeps its own login. KuGou keeps `kugou.session` because the
+  // SQLite schema has a dedicated table for it; newer platforms use the same
+  // per-plugin key as their other data.
+  const sessionKey = (id = config().active_plugin) =>
+    id === "kugou-web" ? "kugou.session" : `plugin.${id}.session`;
   const saveSession = (sess: KugouSession) => {
     kugou.set(sess);
-    storage.setItem("kugou.session", JSON.stringify(sess)).catch(storageError);
+    storage.setItem(sessionKey(), JSON.stringify(sess)).catch(storageError);
   };
 
   const loadLists = async (sess: KugouSession | null = kugou()) => {
@@ -306,9 +317,9 @@ function Board() {
     } catch (e: any) {
       const auth = isAuthFailure({ status: 0 }, String(e?.message ?? e));
       kgState.set(auth ? "expired" : "error");
-      kgMsg.set(auth ? "酷狗登录已失效，请重新扫码" : "歌单加载失败: " + String(e?.message ?? e));
-      showFlash(auth ? "酷狗登录已失效" : "歌单加载失败");
-      log(auth ? "酷狗登录已失效" : "酷狗歌单加载失败: " + String(e?.message ?? e));
+      kgMsg.set(auth ? `${platformName()}登录已失效，请重新登录` : "歌单加载失败: " + String(e?.message ?? e));
+      showFlash(auth ? `${platformName()}登录已失效` : "歌单加载失败");
+      log(auth ? `${platformName()}登录已失效` : `${platformName()}歌单加载失败: ` + String(e?.message ?? e));
     }
   };
 
@@ -317,7 +328,7 @@ function Board() {
   // get_all_list (which could otherwise raise a stale-token warning).
   function restoreSession() {
     if (!pluginEnabled()) return;
-    storage.getItem("kugou.session")
+    storage.getItem(sessionKey())
       .then((raw) => {
         if (!raw || !pluginEnabled()) return;
         try {
@@ -345,7 +356,7 @@ function Board() {
         };
         saveSession(sess);
         qr.set(null);
-        log(`酷狗登录成功: ${r.nickname ?? r.userid}`);
+        log(`${platformName()}登录成功: ${r.nickname ?? r.userid}`);
         loadLists(sess);
         return;
       }
@@ -383,9 +394,9 @@ function Board() {
     lists.set([]);
     kgState.set("idle");
     kgMsg.set("");
-    storage.removeItem("kugou.session").catch(storageError);
-    log("酷狗已退出登录");
-    showFlash("酷狗已退出登录");
+    storage.removeItem(sessionKey()).catch(storageError);
+    log(`${platformName()}已退出登录`);
+    showFlash(`${platformName()}已退出登录`);
   };
 
   let client: any = null;
@@ -426,7 +437,7 @@ function Board() {
   const waitReady = async (ms: number) => {
     const deadline = Date.now() + ms;
     while (true) {
-      const plugin = plugins().find((p) => p.manifest.id === KUGOU_PLUGIN_ID);
+      const plugin = plugins().find((p) => p.manifest.id === config().active_plugin);
       if (plugin) {
         const channel = channelFor(plugin);
         if (channel.ready) return channel;
@@ -480,9 +491,11 @@ function Board() {
 
   // --- the KuGou plugin: the same API, run through the channel ------------
   const kwCall = async (method: string, params: any = {}): Promise<any> => {
-    const plugin = plugins().find((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
+    const id = config().active_plugin;
+    if (!id) throw new Error("未选择平台");
+    const plugin = plugins().find((p) => p.manifest.id === id);
     if (!plugin) throw new Error("插件未安装");
-    if (!isPluginRunning(KUGOU_WEB_MANIFEST.id)) throw new Error("插件未启用");
+    if (!isPluginRunning(id)) throw new Error("插件未启用");
     return await channelFor(plugin).invoke(method, params, 15000);
   };
 
@@ -500,6 +513,39 @@ function Board() {
     } catch (e: any) {
       log("酷狗插件安装失败: " + String(e?.message ?? e));
       showFlash("酷狗插件安装失败: " + String(e?.message ?? e));
+    }
+  };
+
+  const neteaseInstalled = () => plugins().some((p) => p.manifest.id === NETEASE_WEB_MANIFEST.id);
+  const installNeteasePlugin = async () => {
+    try {
+      await installPlugin(dataDir(), NETEASE_WEB_MANIFEST, NETEASE_WEB_FILES);
+      await storage.setItem(`plugin.${NETEASE_WEB_MANIFEST.id}.removed`, "0").catch(() => {});
+      await refreshPlugins();
+      showFlash("网易云插件已安装");
+      log("网易云插件已安装");
+    } catch (e: any) {
+      showFlash("网易云插件安装失败: " + String(e?.message ?? e));
+      log("网易云插件安装失败: " + String(e?.message ?? e));
+    }
+  };
+  // NetEase Cloud Music is logged in with the MUSIC_U cookie: browsers hide
+  // Set-Cookie from fetch, so a scan cannot hand the cookie over, while a
+  // pasted cookie header works on every launch.
+  const neCookie = signal("");
+  const neteaseLogin = async () => {
+    const cookie = neCookie().trim();
+    if (!cookie) { showFlash("请粘贴包含 MUSIC_U 的 Cookie"); return; }
+    try {
+      const r: any = await kwCall("loginCookie", { token: cookie });
+      saveSession({ token: r.token, userid: String(r.userid), dfid: "-", nickname: r.nickname });
+      neCookie.set("");
+      showFlash(`已登录网易云：${r.nickname ?? r.userid}`);
+      log(`网易云登录成功: ${r.nickname ?? r.userid}`);
+      loadLists();
+    } catch (e: any) {
+      showFlash("网易云登录失败: " + String(e?.message ?? e));
+      log("网易云登录失败: " + String(e?.message ?? e));
     }
   };
 
@@ -607,7 +653,7 @@ function Board() {
     }
     // A login restored at startup only happens when a platform was already
     // selected; enabling one later must not ask the user to scan again.
-    if (next && !kugou()) restoreSession();
+    if (next && config().active_plugin === id && !kugou()) restoreSession();
   };
 
   const uninstallPlugin = async (id: string) => {
@@ -651,21 +697,27 @@ function Board() {
     | undefined;
   effect(() => {
     refreshPlugins(true).then(async () => {
-      // KuGou ships as a plugin; install it once unless the user removed it,
-      // and refresh a copy an older app left in the data directory: plugins
-      // live outside the bundle, so an app update alone does not replace them.
-      const removed = await storage.getItem(`plugin.${KUGOU_WEB_MANIFEST.id}.removed`);
-      const found = (await listPlugins(dataDir())).find((p) => p.manifest.id === KUGOU_WEB_MANIFEST.id);
-      const upgrade = found && versionNewer(KUGOU_WEB_MANIFEST.version, found.manifest.version);
-      if ((!found && removed !== "1") || upgrade) {
-        try {
-          await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
-          if (upgrade) log(`酷狗插件已更新 ${found!.manifest.version} → ${KUGOU_WEB_MANIFEST.version}`);
-        } catch (e: any) {
-          log("酷狗插件安装失败: " + String(e?.message ?? e));
+      // Bundled platforms ship as plugin folders; install each once unless
+      // the user removed it, and refresh a copy an older app left in the data
+      // directory: plugins live outside the bundle, so an app update alone
+      // does not replace them.
+      let changed = false;
+      for (const bundled of BUNDLED_PLUGINS) {
+        const id = bundled.manifest.id;
+        const removed = await storage.getItem(`plugin.${id}.removed`);
+        const found = (await listPlugins(dataDir())).find((p) => p.manifest.id === id);
+        const upgrade = found && versionNewer(bundled.manifest.version, found.manifest.version);
+        if ((!found && removed !== "1") || upgrade) {
+          try {
+            await installPlugin(dataDir(), bundled.manifest, bundled.files);
+            if (upgrade) log(`${bundled.manifest.name} 已更新 ${found!.manifest.version} → ${bundled.manifest.version}`);
+            changed = true;
+          } catch (e: any) {
+            log(`${bundled.manifest.name} 安装失败: ` + String(e?.message ?? e));
+          }
         }
       }
-      if ((!found && removed !== "1") || upgrade) await refreshPlugins(true);
+      if (changed) await refreshPlugins(true);
       // The session may have been read before the plugin existed; once it is
       // on disk and mounted, restore it — a saved login must not ask again.
       // An already-restored session still needs its playlist load retried: that
@@ -712,7 +764,11 @@ function Board() {
     searchQueue.length = 0;
     startedSearches.clear();
     patch({ active_plugin: next, kugou_enabled: next === "kugou-web", auto_sync: false });
-    if (next && !kugou()) restoreSession();
+    kugou.set(null);
+    lists.set([]);
+    kgState.set("idle");
+    kgMsg.set("");
+    if (next) restoreSession();
     showFlash(next ? `已启用${platform(next)!.name}` : "已停用所有平台插件");
   };
   const singers = () => config().blacklist_singers ?? [];
@@ -764,9 +820,9 @@ function Board() {
       search({ keyword: name, pagesize: 5 })
         .then((tracks) => {
           const t = tracks[0];
-          const entry: SearchState = t
-            ? { status: "found", track: { name: t.name, artist: t.artist, hash: t.hash, albumId: t.albumId, mixSongId: t.mixSongId, duration: t.duration } }
-            : { status: "not_found" };
+          // Keep every field the platform returned: KuGou writes `hash`,
+          // NetEase writes `key`, and a rebuilt object lost the second one.
+          const entry: SearchState = t ? { status: "found", track: { ...t } } : { status: "not_found" };
           kgCache.update((c) => ({ ...c, [name]: entry }));
           if (t && blockedReason({ name: t.name, artist: t.artist })) log(`黑名单跳过: ${name}`);
         })
@@ -779,7 +835,7 @@ function Board() {
           if (attempt <= 3) {
             setTimeout(() => { searchQueue.push(name); runSearchQueue(); }, 2000 * attempt);
           } else {
-            log(`酷狗搜索放弃: ${name}`);
+            log(`${platformName()}搜索放弃: ${name}`);
           }
         })
         .finally(() => { searchesInFlight -= 1; runSearchQueue(); });
@@ -823,7 +879,7 @@ function Board() {
 
   const performSync = async (
     song: DanmuInfo,
-    track: { name: string; artist: string; hash: string; albumId?: string; mixSongId?: string; duration?: number },
+    track: { name: string; artist: string; hash?: string; key?: string; albumId?: string; mixSongId?: string; duration?: number },
     key: string,
     gen: number,
     manual = false,
@@ -836,18 +892,18 @@ function Board() {
       if (res.status === 1) {
         // Record success even for an old generation: the write already
         // happened upstream, so the new worker must never replay it.
-        ledger.synced(key, track.hash);
+        ledger.synced(key, track.hash ?? track.key ?? "");
         // The write already happened upstream, so the row must move even if
         // config/session changed while it was in flight. Otherwise ledger
         // says "synced" forever, the worker never retries, and a manual press
         // only says "正在加入": the row is stuck in the queue for good.
         if (ledger.phase(key) === "synced") moveToPlayed(song);
         if (gen !== syncGen) {
-          log(`${manual ? "手动加入" : "酷狗自动加入"} (切换前): ${track.name}`);
+          log(`${manual ? "手动加入" : `${platformName()}自动加入`} (切换前): ${track.name}`);
           return true;
         }
         syncFailures = 0;
-        log(`${manual ? "手动加入歌单" : "酷狗自动加入"}: ${track.name}`);
+        log(`${manual ? "手动加入歌单" : `${platformName()}自动加入`}: ${track.name}`);
         return true;
       }
       if (gen !== syncGen) {
@@ -857,12 +913,12 @@ function Board() {
       const auth = isAuthFailure(res);
       syncFailures += 1;
       ledger.failed(key, String(res.msg ?? res.status), auth ? 3600 : nextDelay(syncFailures) / 1000);
-      log(`酷狗加入失败: ${track.name} (${res.status})`);
+      log(`${platformName()}加入失败: ${track.name} (${res.status})`);
       if (manual) showFlash(`加入失败：${String(res.msg ?? res.status)}`);
       if (auth) {
         kgState.set("expired");
-        kgMsg.set("酷狗登录已失效，请重新扫码");
-        log("酷狗登录已失效，自动同步已停止");
+        kgMsg.set(`${platformName()}登录已失效，请重新登录`);
+        log(`${platformName()}登录已失效，自动同步已停止`);
         stopWorker();
       }
       return false;
@@ -873,7 +929,7 @@ function Board() {
       }
       syncFailures += 1;
       ledger.failed(key, String(e?.message ?? e), nextDelay(syncFailures) / 1000);
-      log("酷狗自动同步失败: " + String(e?.message ?? e));
+      log(`${platformName()}自动同步失败: ` + String(e?.message ?? e));
       if (manual) showFlash(`加入失败：${String(e?.message ?? e)}`);
       return false;
     }
@@ -1046,9 +1102,9 @@ function Board() {
         // viewer's comment, which is often not the title Kugou returns.
         : entry?.status === "found"
           ? `${platformName()}: ${entry.track.name && entry.track.name.trim() !== s.song_name.trim() ? `${entry.track.name} · ` : ""}${entry.track.artist || "未知歌手"}`
-        : entry?.status === "pending" ? "酷狗搜索中…"
-        : entry?.status === "not_found" ? "酷狗未找到"
-        : entry?.status === "error" ? "酷狗搜索失败"
+        : entry?.status === "pending" ? `${platformName()}搜索中…`
+        : entry?.status === "not_found" ? `${platformName()}未找到`
+        : entry?.status === "error" ? `${platformName()}搜索失败`
         : searching ? "手动添加"
         // No platform / no login: no Kugou search was made, so do not claim a
         // match is in progress. The footer already says 酷狗未登录.
@@ -1144,7 +1200,7 @@ function Board() {
     // Defensive: the input is unmounted without a Kugou platform, but a stale
     // keyboard submit must not inject a song into a listener-only session.
     if (!pluginEnabled()) {
-      showFlash("仅弹幕监听模式：设置 → 插件 → 启用酷狗音乐后可手动点歌");
+      showFlash("仅弹幕监听模式：设置 → 插件里启用一个平台后可手动点歌");
       return;
     }
     const name = manual().trim();
@@ -1237,7 +1293,7 @@ function Board() {
   const addTrackToPlayed = async (song: DanmuInfo) => {
     const key = song.msg_id;
     if (!pluginEnabled() || !kugou() || !config().target_playlist_id) {
-      showFlash("请先登录酷狗并设置歌单");
+      showFlash(`请先登录${platformName()}并设置歌单`);
       return;
     }
     // A worker already owns this song: give the state an accurate message.
@@ -1271,7 +1327,7 @@ function Board() {
       const t = tracks[0];
       if (!t) {
         ledger.failed(key, "not found", 30);
-        showFlash(`酷狗未找到：${song.song_name}`);
+        showFlash(`${platformName()}未找到：${song.song_name}`);
         return;
       }
       if (blockedReason(t)) {
@@ -1314,10 +1370,10 @@ function Board() {
   // only then enables sync. A failed resolve leaves auto-sync OFF.
   const toggleAutoSync = async () => {
     if (autoSyncBusy || clearingPlaylist) { showFlash("正在处理歌单，请稍候"); return; }
-    if (!pluginEnabled()) { showFlash("酷狗服务未开启"); return; }
+    if (!pluginEnabled()) { showFlash("平台未开启"); return; }
     if (config().auto_sync) { patch({ auto_sync: false }); autoSyncNoNameConfirm = false; return; }
     const sess = kugou();
-    if (!sess) { showFlash("请先扫码登录酷狗"); return; }
+    if (!sess) { showFlash(`请先登录${platformName()}`); return; }
     const name = config().target_playlist_name.trim();
     if (!name && !config().target_playlist_id) {
       if (!autoSyncNoNameConfirm) {
@@ -1372,7 +1428,7 @@ function Board() {
   const clearPlaylist = async () => {
     if (clearingPlaylist || autoSyncBusy) { showFlash("正在处理歌单，请稍候"); return; }
     const sess = kugou();
-    if (!pluginEnabled() || !sess) { showFlash("请先登录酷狗"); return; }
+    if (!pluginEnabled() || !sess) { showFlash(`请先登录${platformName()}`); return; }
     const name = config().target_playlist_name.trim();
     if (!name) { showFlash("请先填歌单名"); return; }
     const oldId = config().target_playlist_id;
@@ -1732,9 +1788,7 @@ function Board() {
               <View class="gap-1 rounded-(--radius) border border-line bg-secondary px-3 py-2">
                 <Text class="text-[13px] font-medium leading-5 text-foreground">仅弹幕监听</Text>
                 <Text class="text-[11px] leading-4 text-muted-foreground">
-                  {config().active_plugin === "netease"
-                    ? "网易云音乐未接入：点歌指令只进「点歌列表」。"
-                    : "点歌指令只进「点歌列表」；启用酷狗音乐后才有歌单与手动点歌。"}
+                  点歌指令只进「点歌列表」；在设置 → 插件里启用一个平台后才有歌单与手动点歌。
                 </Text>
                 <Text class="text-[11px] text-faint">点「开始」连接直播间即可收集指令。</Text>
               </View>
@@ -1978,7 +2032,7 @@ function Board() {
                 }>
                   <View class="flex-1 items-center justify-center gap-2 py-16">
                     <Text class="text-sm text-faint">黑名单为空</Text>
-                    <Text class="text-xs text-faint">{pluginEnabled() ? "歌曲名精确屏蔽；歌手名屏蔽酷狗搜索到的所有歌曲" : "歌曲名精确屏蔽；歌手名需在启用平台并匹配到酷狗歌曲后生效"}</Text>
+                    <Text class="text-xs text-faint">{pluginEnabled() ? "歌曲名精确屏蔽；歌手名屏蔽平台搜索到的所有歌曲" : "歌曲名精确屏蔽；歌手名需在启用平台并匹配到歌曲后生效"}</Text>
                   </View>
                 </If>
               </View>
@@ -2039,8 +2093,7 @@ function Board() {
               <Text class="text-[11px] text-success">✓</Text>
             </If>
             <Text class="text-[11px] text-faint">{
-              pluginEnabled() ? (kugou() ? "酷狗服务就绪" : "酷狗未登录")
-              : config().active_plugin === "netease" ? "网易云音乐未接入"
+              pluginEnabled() ? (kugou() ? `${platformName()}服务就绪` : `${platformName()}未登录`)
               : "未启用平台插件"
             }</Text>
           </View>
@@ -2117,7 +2170,7 @@ function Board() {
                     <Text class="text-[12px] text-muted-foreground">直播间 ID：{config().room_id || "—"}</Text>
                     <Text class="text-[12px] text-muted-foreground">版本：v{APP_VERSION}</Text>
                   </View>
-                  <Text class="text-[11px] text-faint">直播间配置与点歌规则始终在左侧（弹幕监听）；歌单名、清理、自动同步与手动点歌仅在启用酷狗音乐后出现；平台选择与登录在插件页。</Text>
+                  <Text class="text-[11px] text-faint">直播间配置与点歌规则始终在左侧（弹幕监听）；歌单名、清理、自动同步与手动点歌仅在启用平台后出现；平台选择与登录在插件页。</Text>
                   <Button testID="go-plugin" onPress={() => settingsTab.set("plugin")} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
                     <Text class="text-[12px] text-foreground">前往插件设置 →</Text>
                   </Button>
@@ -2168,7 +2221,7 @@ function Board() {
                   <Text testID="kw-blocked" class="text-[11px] text-[#c5403c]">{kugouBlocked()}；该插件不加载，文件夹保留。</Text>
                 </If>
 
-                <If when={pluginEnabled()}>
+                <If when={config().active_plugin === "kugou-web"}>
                   <View class="h-px bg-muted" />
                   <Text class="text-[12px] font-semibold text-foreground">酷狗登录</Text>
                   <If when={!kugou()}>
@@ -2210,10 +2263,10 @@ function Board() {
                   <Text class="text-[12px] text-foreground">重新扫描</Text>
                 </Button>
               </View>
-              <If when={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id).length === 0}>
+              <If when={plugins().filter((p: any) => !platform(p.manifest.id)).length === 0}>
                 <Text class="text-[11px] text-faint">还没有其它插件</Text>
               </If>
-              <Each of={plugins().filter((p: any) => p.manifest.id !== KUGOU_WEB_MANIFEST.id)} key={(p: any) => p.manifest.id}>
+              <Each of={plugins().filter((p: any) => !platform(p.manifest.id))} key={(p: any) => p.manifest.id}>
                 {(item: any) => (
                   <View class="gap-1.5 rounded-[6px] border border-line px-3 py-2">
                     <View class="flex-row items-center gap-2">
@@ -2254,9 +2307,58 @@ function Board() {
                 )}
               </Each>
 
-              <View class="gap-1 rounded-[6px] border border-line px-3 py-2">
-                <Text class="text-[13px] text-foreground">网易云音乐</Text>
-                <Text class="text-[11px] text-faint">未接入 · 启用后歌单与歌曲匹配暂不可用</Text>
+              <View class={`gap-2 rounded-[6px] border px-3 py-2 ${config().active_plugin === "netease-web" ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
+                <View class="flex-row items-center gap-2">
+                  <View class={`h-3 w-3 rounded-full border ${config().active_plugin === "netease-web" ? "border-primary bg-primary" : "border-line-strong"}`} />
+                  <View class="flex-1">
+                    <Text class="text-[13px] text-foreground">网易云音乐</Text>
+                    <Text class="text-[11px] text-faint">{NETEASE_WEB_MANIFEST.version} · {NETEASE_WEB_MANIFEST.note}</Text>
+                  </View>
+                  <If when={!neteaseInstalled()}>
+                    <Button testID="ne-install" onPress={installNeteasePlugin} class="items-center justify-center rounded-[6px] bg-primary px-3 py-1 active:opacity-80">
+                      <Text class="text-[11px] text-primary-foreground">安装</Text>
+                    </Button>
+                  </If>
+                  <If when={neteaseInstalled()}>
+                    <Button testID="plugin-netease" onPress={() => selectPlugin("netease-web")} class={`items-center justify-center rounded-[6px] px-3 py-1 ${config().active_plugin === "netease-web" ? "bg-primary" : "border border-line-strong active:bg-background"}`}>
+                      <Text class={`text-[12px] ${config().active_plugin === "netease-web" ? "text-primary-foreground" : "text-foreground"}`}>
+                        {config().active_plugin === "netease-web" ? "停用" : "启用"}
+                      </Text>
+                    </Button>
+                    <Button testID="ne-remove" onPress={() => uninstallPlugin(NETEASE_WEB_MANIFEST.id)} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                      <Text class="text-[11px] text-foreground">移除</Text>
+                    </Button>
+                  </If>
+                </View>
+
+                <If when={config().active_plugin === "netease-web"}>
+                  <View class="h-px bg-muted" />
+                  <Text class="text-[12px] font-semibold text-foreground">网易云登录</Text>
+                  <If when={!kugou()}>
+                    <View class="gap-2">
+                      <Input style={inputStyle()}
+                        testID="ne-cookie"
+                        value={neCookie()}
+                        onChange={({ value }: any) => neCookie.set(value)}
+                        placeholder="粘贴包含 MUSIC_U 的 Cookie"
+                        class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
+                      />
+                      <Button testID="ne-login" onPress={neteaseLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                        <Text class="text-[12px] text-primary-foreground">登录</Text>
+                      </Button>
+                      <Text class="text-[11px] text-faint">浏览器登录 music.163.com 后，从开发者工具复制 Cookie（含 MUSIC_U）粘贴到这里。</Text>
+                    </View>
+                  </If>
+                  <If when={kugou()}>
+                    <View class="flex-row items-center gap-2">
+                      <Text class="text-[12px] text-muted-foreground">已登录：{kugou()!.nickname ?? kugou()!.userid}</Text>
+                      <View class="flex-1" />
+                      <Button onPress={logout} class="items-center justify-center rounded-[6px] border border-line-strong px-2 py-1 active:bg-background">
+                        <Text class="text-[11px] text-foreground">退出登录</Text>
+                      </Button>
+                    </View>
+                  </If>
+                </If>
               </View>
                 </View>
               </If>

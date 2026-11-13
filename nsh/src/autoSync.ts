@@ -19,7 +19,10 @@ const ABANDONED_AFTER_SECONDS = 120;
 export interface TrackLike {
   name: string;
   artist: string;
-  hash: string;
+  /** KuGou identifies by file hash; NetEase by song id in `key`. */
+  hash?: string;
+  key?: string;
+  ref?: unknown;
   albumId?: string;
   mixSongId?: string;
   duration?: number;
