@@ -9,6 +9,10 @@ var IV = "0102030405060708";
 var PUB_EXP = "010001";
 var PUB_MOD = "00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7";
 var SECRET_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+var EAPI = "https://interfacepc.music.163.com";
+var EAPI_KEY = "e82ckenh8dichen8";
+var EAPI_UA = "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)";
+var DEVICE_ID = "nsh-" + Math.floor(Math.random() * 1e12).toString(36);
 
 function utf8(text) { return new TextEncoder().encode(String(text)); }
 
@@ -266,12 +270,107 @@ async function loginCookie(input) {
   return { token: cookie, userid: who.userid, nickname: who.nickname, dfid: "-" };
 }
 
-async function loginQrKey() {
-  var json = await app.call("http.json", {
-    url: BASE + "/api/login/qrcode/unikey?type=1",
-    method: "GET",
-    headers: { "User-Agent": UA, "Referer": BASE + "/" },
+
+// --- MD5 (for the eapi digest; a page has no crypto) ----------------------
+function md5(text) {
+  var bytes = utf8(text);
+  var len = bytes.length;
+  var padded = new Uint8Array(((len + 8) >> 6) * 64 + 64);
+  padded.set(bytes, 0);
+  padded[len] = 0x80;
+  var view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, (len * 8) >>> 0, true);
+  view.setUint32(padded.length - 4, Math.floor((len * 8) / 4294967296) >>> 0, true);
+  var S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  var K = new Int32Array(64);
+  for (var i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+  var a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476;
+  for (var off = 0; off < padded.length; off += 64) {
+    var M = new Int32Array(16);
+    for (var j = 0; j < 16; j++) M[j] = view.getInt32(off + j * 4, true);
+    var a = a0, b = b0, c = c0, d = d0;
+    for (var t = 0; t < 64; t++) {
+      var f, g;
+      if (t < 16) { f = (b & c) | (~b & d); g = t; }
+      else if (t < 32) { f = (d & b) | (~d & c); g = (5 * t + 1) & 15; }
+      else if (t < 48) { f = b ^ c ^ d; g = (3 * t + 5) & 15; }
+      else { f = c ^ (b | ~d); g = (7 * t) & 15; }
+      var sum = (a + f + K[t] + M[g]) | 0;
+      var shift = S[(t >> 4) * 4 + (t & 3)];
+      var next = (b + (((sum << shift) | (sum >>> (32 - shift)) | 0))) | 0;
+      a = d; d = c; c = b; b = next;
+    }
+    a0 = (a0 + a) | 0; b0 = (b0 + b) | 0; c0 = (c0 + c) | 0; d0 = (d0 + d) | 0;
+  }
+  function word(value) {
+    var out = "";
+    for (var i = 0; i < 4; i++) {
+      var byte = (value >>> (i * 8)) & 0xff;
+      out += (byte < 16 ? "0" : "") + byte.toString(16);
+    }
+    return out;
+  }
+  return word(a0) + word(b0) + word(c0) + word(d0);
+}
+
+// AES-128-ECB, hex out (eapi's payload format).
+function aesEcbHex(text, key) {
+  var w = expandKey(utf8(key));
+  var plain = utf8(text);
+  var pad = 16 - (plain.length % 16);
+  var data = new Uint8Array(plain.length + pad);
+  data.set(plain, 0);
+  for (var i = 0; i < pad; i++) data[plain.length + i] = pad;
+  var out = "";
+  for (var off = 0; off < data.length; off += 16) {
+    var block = data.subarray(off, off + 16);
+    var enc = encryptBlock(block, w);
+    out += bytesToHex(enc);
+  }
+  return out.toUpperCase();
+}
+
+// eapi wraps the JSON with a path-separated digest and AES-ECB. The cookie
+// carries the PC client's identity; a type=3 QR is what the OS client uses,
+// which is why the legacy type=1 QR answers 8821.
+async function eapiCall(apiPath, data, withDeviceCookie) {
+  var now = Date.now();
+  var header = {
+    osver: "Microsoft-Windows-10-Professional-build-19045-64bit",
+    deviceId: DEVICE_ID,
+    os: "pc",
+    appver: "3.1.17.204416",
+    versioncode: "140",
+    mobilename: "",
+    buildver: String(Math.floor(now / 1000)),
+    resolution: "1920x1080",
+    channel: "netease",
+    requestId: now + "_" + String(Math.floor(Math.random() * 1000)).padStart(4, "0"),
+    __csrf: "",
+  };
+  var text = JSON.stringify(Object.assign({}, data, { header: header, e_r: false }));
+  var digest = md5("nobody" + apiPath + "use" + text + "md5forencrypt");
+  var params = aesEcbHex(apiPath + "-36cd479b6b5-" + text + "-36cd479b6b5-" + digest, EAPI_KEY);
+  var headers = {
+    "User-Agent": EAPI_UA,
+    "Referer": BASE + "/",
+    "Content-Type": "application/x-www-form-urlencoded",
+  };
+  if (withDeviceCookie) {
+    headers.Cookie = Object.keys(header).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(header[k]);
+    }).join("; ");
+  }
+  return await app.call("http.json", {
+    url: EAPI + apiPath.replace(/^\/api\//, "/eapi/"),
+    method: "POST",
+    headers: headers,
+    body: "params=" + params,
   });
+}
+
+async function loginQrKey() {
+  var json = await eapiCall("/api/login/qrcode/unikey", { type: 3 }, true);
   var key = String((json && json.unikey) || "");
   if (!key) throw new Error("二维码生成失败");
   var target = "https://music.163.com/login?codekey=" + key + "&type=1";
@@ -283,13 +382,7 @@ async function loginQrKey() {
 }
 
 async function loginQrCheck(input) {
-  var json = await app.call("http.json", {
-    // Cache-buster: the poll repeats the same URL and a cached 801 would hide
-    // the transition to 802/803.
-    url: BASE + "/api/login/qrcode/client/login?key=" + encodeURIComponent(input.key) + "&type=1&_t=" + Date.now(),
-    method: "GET",
-    headers: { "User-Agent": UA, "Referer": BASE + "/", "Cache-Control": "no-cache" },
-  });
+  var json = await eapiCall("/api/login/qrcode/client/login", { key: input.key, type: 3 }, true);
   var code = Number((json && json.code) || 0);
 
   var message = String((json && json.message) || "");

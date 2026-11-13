@@ -38,7 +38,9 @@
         "music.163.com",
         "*.music.163.com",
         "*.music.126.net",
-        "api.qrserver.com"
+        "api.qrserver.com",
+        "interfacepc.music.163.com",
+        "interface.music.163.com"
       ]
     },
     "statusBar": true,
