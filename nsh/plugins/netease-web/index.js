@@ -245,7 +245,12 @@ async function call(path, data, cookie) {
 // A session is the cookie header itself (MUSIC_U=...; ...); cookies live in the
 // app's jar too, but passing the header makes a restored session independent
 // of what the jar kept between launches.
-function cookieOf(input) { return String((input && input.token) || ""); }
+function cookieOf(input) {
+  var token = String((input && input.token) || "");
+  // `jar:` means "the app's cookie jar holds MUSIC_U after a scan"; only a
+  // pasted MUSIC_U is sent as a header.
+  return /^MUSIC_U=/.test(token) ? token : "";
+}
 
 async function account(cookie) {
   var json = await call("/weapi/w/nuser/account/get", {}, cookie);
@@ -259,6 +264,42 @@ async function loginCookie(input) {
   if (!cookie || !/MUSIC_U=/.test(cookie)) throw new Error("Cookie 里没有 MUSIC_U");
   var who = await account(cookie);
   return { token: cookie, userid: who.userid, nickname: who.nickname, dfid: "-" };
+}
+
+async function loginQrKey() {
+  var json = await app.call("http.json", {
+    url: BASE + "/api/login/qrcode/unikey?type=1",
+    method: "GET",
+    headers: { "User-Agent": UA, "Referer": BASE + "/" },
+  });
+  var key = String((json && json.unikey) || "");
+  if (!key) throw new Error("二维码生成失败");
+  var target = "https://music.163.com/login?codekey=" + key;
+  return {
+    key: key,
+    // The app needs an image; NetEase only returns the key.
+    image: "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(target),
+  };
+}
+
+async function loginQrCheck(input) {
+  var json = await app.call("http.json", {
+    url: BASE + "/api/login/qrcode/client/login?key=" + encodeURIComponent(input.key) + "&type=1",
+    method: "GET",
+    headers: { "User-Agent": UA, "Referer": BASE + "/" },
+  });
+  var code = Number((json && json.code) || 0);
+  if (code === 803) {
+    try {
+      var who = await account("");
+      return { status: 4, token: "jar:", userid: who.userid, nickname: who.nickname };
+    } catch (e) {
+      // The cookie may still be settling; report success and let playlists
+      // show whether it is usable.
+      return { status: 4, token: "jar:", userid: "0", nickname: "网易云用户" };
+    }
+  }
+  return { status: code === 802 ? 2 : code === 800 ? 0 : 1 };
 }
 
 async function search(input) {
@@ -342,6 +383,8 @@ async function clearPlaylist(input) {
 
 plugin.define({
   search: search,
+  loginQrKey: loginQrKey,
+  loginQrCheck: loginQrCheck,
   loginCookie: loginCookie,
   playlists: playlists,
   addTrack: addTrack,

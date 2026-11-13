@@ -2336,17 +2336,26 @@ function Board() {
                   <Text class="text-[12px] font-semibold text-foreground">网易云登录</Text>
                   <If when={!kugou()}>
                     <View class="gap-2">
+                      <Button testID="ne-qr" onPress={startLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
+                        <Text class="text-[12px] text-primary-foreground">生成登录二维码 / 刷新</Text>
+                      </Button>
+                      <If when={qr()}>
+                        <Image src={qr()!.image} class="h-[180px] w-[180px] rounded-[6px] border border-line" />
+                      </If>
+                      <Text class="text-[12px] text-muted-foreground">状态：{kgLabel()}</Text>
+                      <Text class="text-[11px] text-faint">{kgMsg()}</Text>
+                      <View class="h-px bg-muted" />
                       <Input style={inputStyle()}
                         testID="ne-cookie"
                         value={neCookie()}
                         onChange={({ value }: any) => neCookie.set(value)}
-                        placeholder="粘贴包含 MUSIC_U 的 Cookie"
+                        placeholder="或粘贴包含 MUSIC_U 的 Cookie"
                         class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                       />
-                      <Button testID="ne-login" onPress={neteaseLogin} class="items-center justify-center self-start rounded-[6px] bg-primary px-3 py-2 active:opacity-80">
-                        <Text class="text-[12px] text-primary-foreground">登录</Text>
+                      <Button testID="ne-login" onPress={neteaseLogin} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
+                        <Text class="text-[12px] text-foreground">用 Cookie 登录</Text>
                       </Button>
-                      <Text class="text-[11px] text-faint">浏览器登录 music.163.com 后，从开发者工具复制 Cookie（含 MUSIC_U）粘贴到这里。</Text>
+                      <Text class="text-[11px] text-faint">扫码依赖系统的 Cookie 容器，重启后若未保持登录，可用 Cookie 登录一次。</Text>
                     </View>
                   </If>
                   <If when={kugou()}>

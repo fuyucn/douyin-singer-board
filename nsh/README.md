@@ -66,10 +66,12 @@ there is one platform at a time. Every row has 安装 / 启用·停用 / 移除
 
 网易云音乐 is the second platform (`plugins/netease-web/`): search, playlists,
 add/resolve/clear all go through the same bridge, using the weapi protocol
-(AES twice + raw RSA) computed inside the plugin. Its login is the `MUSIC_U`
-cookie — browsers hide `Set-Cookie` from `fetch`, so a scanned QR cannot hand
-the cookie over; paste the cookie in 设置 → 插件 once and the app sends it on
-every request (also after a restart, since it is stored as the session).
+(AES twice + raw RSA) computed inside the plugin. Login scans a QR (the
+plugin asks NetEase for a key and draws it with `api.qrserver.com`; after the
+scan the app's cookie jar holds `MUSIC_U`, which every later request uses).
+`fetch` hides `Set-Cookie`, so that cookie cannot be read back and stored: if a
+restart loses it, 设置 → 插件 accepts a pasted `MUSIC_U` cookie, which is kept
+as the session and sent explicitly on every request.
 
 A plugin that did not ship with the app is installed by putting its folder
 in `${dataDir}/plugins/<id>/` and pressing 重新扫描; `plugins/demo/` in this

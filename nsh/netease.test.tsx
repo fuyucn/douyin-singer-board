@@ -64,7 +64,7 @@ test("netease: cookie login from the plugin tab", async () => {
   await app.wait(600);
   await app.press("id:settings-tab-plugin");
   await app.wait(600);
-  await app.type("粘贴包含 MUSIC_U 的 Cookie", "MUSIC_U=TESTCOOKIE; os=pc");
+  await app.type("或粘贴包含 MUSIC_U 的 Cookie", "MUSIC_U=TESTCOOKIE; os=pc");
   await app.press("id:ne-login");
   await app.wait(1200);
   expect(app.texts().some((t: string) => t.includes("已登录：测试用户"))).toBe(true);
@@ -72,4 +72,32 @@ test("netease: cookie login from the plugin tab", async () => {
   const kugouCard = app.texts();
   expect(kugouCard.some((t: string) => t === "酷狗登录")).toBe(false);
 
+});
+
+test("netease: QR login through the plugin tab", async () => {
+  const app = await openSqliteBoard("./Board.tsx", {
+    width: 1000, height: 800,
+    storage: { "board.config": JSON.stringify({
+      room_id: "", sing_prefix: "[song]", fans_level: 0, sing_cd: 0,
+      cooldown_seconds: 1800, max_songs_per_user: 3, target_playlist_name: "测试4",
+      target_playlist_id: 0, blacklist: [], blacklist_singers: [], auto_sync: false,
+      active_plugin: "netease-web", kugou_enabled: false, config_version: 2,
+    }) },
+    network: {
+      "GET https://music.163.com/api/login/qrcode/unikey*": { body: { code: 200, unikey: "QRKEY" } },
+      "GET https://music.163.com/api/login/qrcode/client/login*": { body: { code: 803 } },
+      "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
+    },
+  });
+  await new Promise((r) => setTimeout(r, 2500));
+  await app.press("id:settings");
+  await app.wait(800);
+  if (!app.shows("id:settings-tab-plugin")) await app.press("id:settings");
+  await app.wait(600);
+  await app.press("id:settings-tab-plugin");
+  await app.wait(600);
+  await app.press("id:ne-qr");
+  await app.wait(2500);
+  expect(app.texts().some((t: string) => t.includes("已登录：测试用户"))).toBe(true);
 });

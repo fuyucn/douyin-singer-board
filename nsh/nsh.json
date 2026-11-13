@@ -37,7 +37,8 @@
         "ws.postman-echo.com",
         "music.163.com",
         "*.music.163.com",
-        "*.music.126.net"
+        "*.music.126.net",
+        "api.qrserver.com"
       ]
     },
     "statusBar": true,
