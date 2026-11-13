@@ -154,7 +154,7 @@ jobs:
       - name: Smoke portable exe
         shell: pwsh
         run: |
-          Start-Process "dist\SUSUSongBoard-Portable-0.43.0-preview.7.exe"
+          Start-Process "dist\SUSUSongBoard-Portable-0.43.1.exe"
           Start-Sleep -Seconds 10
           $app = Get-Process SUSUSongBoard -ErrorAction SilentlyContinue
           if (-not $app) { throw "portable exe did not start the app" }
@@ -167,6 +167,6 @@ jobs:
           name: SUSUSongBoard-windows
           path: |
             nsh/dist/SUSUSongBoard.zip
-            nsh/dist/SUSUSongBoard-Setup-0.43.0-preview.7.exe
-            nsh/dist/SUSUSongBoard-Portable-0.43.0-preview.7.exe
+            nsh/dist/SUSUSongBoard-Setup-0.43.1.exe
+            nsh/dist/SUSUSongBoard-Portable-0.43.1.exe
           if-no-files-found: error

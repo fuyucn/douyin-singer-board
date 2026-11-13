@@ -31,7 +31,7 @@ test("settings tabs switch between general, plugin and about", async () => {
   expect(app.texts()).toContain("插件");
   await app.press("id:settings-tab-about");
   expect(app.texts()).toContain("检查更新");
-  expect(app.texts()).toContain("v0.43.0-preview.7");
+  expect(app.texts()).toContain("v0.43.1");
   await app.press("id:settings-close");
   expect(app.texts()).toContain("手动点歌");
 });
