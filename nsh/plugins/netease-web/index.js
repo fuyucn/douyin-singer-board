@@ -284,9 +284,11 @@ async function loginQrKey() {
 
 async function loginQrCheck(input) {
   var json = await app.call("http.json", {
-    url: BASE + "/api/login/qrcode/client/login?key=" + encodeURIComponent(input.key) + "&type=1",
+    // Cache-buster: the poll repeats the same URL and a cached 801 would hide
+    // the transition to 802/803.
+    url: BASE + "/api/login/qrcode/client/login?key=" + encodeURIComponent(input.key) + "&type=1&_t=" + Date.now(),
     method: "GET",
-    headers: { "User-Agent": UA, "Referer": BASE + "/" },
+    headers: { "User-Agent": UA, "Referer": BASE + "/", "Cache-Control": "no-cache" },
   });
   var code = Number((json && json.code) || 0);
   if (code === 803) {

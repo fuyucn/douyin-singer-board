@@ -342,11 +342,16 @@ function Board() {
       .catch(storageError);
   }
 
+  let lastQrStatus = -1;
   const pollQr = async (key: string, gen: number) => {
     if (gen !== loginGen || !pluginEnabled()) return;
     try {
       const r = await qrCheck(key);
       if (gen !== loginGen || !pluginEnabled()) return;
+      if (r.status !== lastQrStatus) {
+        lastQrStatus = r.status;
+        log(`扫码状态: ${r.status === 4 ? "成功" : r.status === 2 ? "已扫码，等待确认" : r.status === 0 ? "二维码过期" : "等待扫码"}`);
+      }
       if (r.status === 4 && r.token && r.userid) {
         const sess: KugouSession = {
           token: r.token,
@@ -372,6 +377,7 @@ function Board() {
 
   const startLogin = async () => {
     const gen = (loginGen += 1);
+    lastQrStatus = -1;
     kgState.set("loading");
     kgMsg.set("");
     qr.set(null);
