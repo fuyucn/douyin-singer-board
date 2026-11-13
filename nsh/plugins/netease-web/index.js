@@ -257,9 +257,7 @@ function cookieOf(input) {
 }
 
 async function account(cookie) {
-  var json = cookie
-    ? await call("/weapi/w/nuser/account/get", {}, cookie)
-    : await eapiCall("/api/nuser/account/get", {}, false);
+  var json = await call("/weapi/w/nuser/account/get", {}, cookie);
   var profile = (json && json.profile) || (json && json.data && json.data.profile) || null;
   if (!profile) throw new Error("登录状态无效：请重新粘贴 MUSIC_U");
   return { userid: String(profile.userId), nickname: String(profile.nickname || profile.userId) };
@@ -332,6 +330,52 @@ function aesEcbHex(text, key) {
   return out.toUpperCase();
 }
 
+// One eapi POST that also returns the response headers (Set-Cookie), for the
+// login check. The normal path uses the app's fetch.
+async function eapiRaw(apiPath, data) {
+  var now = Date.now();
+  var header = {
+    osver: "Microsoft-Windows-10-Professional-build-19045-64bit",
+    deviceId: DEVICE_ID, os: "pc", appver: "3.1.17.204416", versioncode: "140",
+    mobilename: "", buildver: String(Math.floor(now / 1000)), resolution: "1920x1080",
+    channel: "netease", requestId: now + "_" + String(Math.floor(Math.random() * 1000)).padStart(4, "0"),
+    __csrf: "",
+  };
+  var text = JSON.stringify(Object.assign({}, data, { header: header, e_r: false }));
+  var digest = md5("nobody" + apiPath + "use" + text + "md5forencrypt");
+  var params = aesEcbHex(apiPath + "-36cd479b6b5-" + text + "-36cd479b6b5-" + digest, EAPI_KEY);
+  var device = Object.keys(header).map(function (k) {
+    return encodeURIComponent(k) + "=" + encodeURIComponent(header[k]);
+  }).join("; ");
+  var raw = await app.call("http.raw", {
+    url: EAPI + apiPath.replace(/^\/api\//, "/eapi/"),
+    method: "POST",
+    headers: {
+      "User-Agent": EAPI_UA, "Referer": BASE + "/",
+      "Content-Type": "application/x-www-form-urlencoded", "Cookie": device,
+    },
+    body: "params=" + params,
+  });
+  var body;
+  try { body = JSON.parse(raw.body); } catch (e) { body = {}; }
+  return { body: body, setCookie: String(raw.setCookie || "") };
+}
+
+function cookiesFrom(setCookie) {
+  var wanted = ["MUSIC_U", "__csrf", "NMTID"];
+  var out = [];
+  for (var i = 0; i < wanted.length; i++) {
+    var m = setCookie.match(new RegExp(wanted[i] + "=([^;,\\s]+)"));
+    if (m) out.push(wanted[i] + "=" + m[1]);
+  }
+  return out.join("; ");
+}
+
+function csrfOf(token) {
+  var m = String(token || "").match(/(?:^|;\s*)__csrf=([^;\s]+)/);
+  return m ? m[1] : "";
+}
+
 // eapi wraps the JSON with a path-separated digest and AES-ECB. The cookie
 // carries the PC client's identity; a type=3 QR is what the OS client uses,
 // which is why the legacy type=1 QR answers 8821.
@@ -367,12 +411,13 @@ async function eapiCall(apiPath, data, withDeviceCookie, cookieToken) {
     // Cookie header here would replace it.
     headers.Cookie = cookieToken && /MUSIC_U=/.test(cookieToken) ? cookieToken + "; " + device : device;
   }
-  return await app.call("http.json", {
+  var request = {
     url: EAPI + apiPath.replace(/^\/api\//, "/eapi/"),
     method: "POST",
     headers: headers,
     body: "params=" + params,
-  });
+  };
+  return await app.call("http.json", request);
 }
 
 async function loginQrKey() {
@@ -388,19 +433,16 @@ async function loginQrKey() {
 }
 
 async function loginQrCheck(input) {
-  var json = await eapiCall("/api/login/qrcode/client/login", { key: input.key, type: 3 }, true);
+  var raw = await eapiRaw("/api/login/qrcode/client/login", { key: input.key, type: 3 });
+  var json = raw.body;
   var code = Number((json && json.code) || 0);
 
   var message = String((json && json.message) || "");
   if (code === 803) {
-    var who;
-    try {
-      who = await account("");
-    } catch (e) {
-      throw new Error("扫码成功但读取账号失败（Cookie 未保存），请改用 Cookie 登录");
-    }
-    if (!who) throw new Error("扫码成功但读取账号失败（Cookie 未保存），请改用 Cookie 登录");
-    return { status: 4, token: "jar:", userid: who.userid, nickname: who.nickname };
+    var token = cookiesFrom(raw.setCookie);
+    if (!/MUSIC_U=/.test(token)) throw new Error("扫码成功但服务端未返回 MUSIC_U，请改用 Cookie 登录");
+    var who = await account(token);
+    return { status: 4, token: token, userid: who.userid, nickname: who.nickname };
   }
   // NetEase has retired web QR login for this client: after the scan it
   // answers 8821 "请切换其他登录方式或升级新版本再试". Treat it as a final
@@ -432,9 +474,7 @@ async function search(input) {
 
 async function playlists(input) {
   var cookie = cookieOf(input);
-  var json = cookie
-    ? await call("/weapi/user/playlist", { uid: Number(input.userid), limit: 100, offset: 0, includeVideo: true }, cookie)
-    : await eapiCall("/api/user/playlist", { uid: Number(input.userid), limit: 200, offset: 0 }, false);
+  var json = await call("/weapi/user/playlist", { uid: Number(input.userid), limit: 200, offset: 0, includeVideo: true }, cookie);
   var list = (json && json.playlist) || [];
   return list.map(function (p) {
     return { name: String(p.name || ""), listid: Number(p.id || 0), count: Number(p.trackCount || 0) };
@@ -443,9 +483,7 @@ async function playlists(input) {
 
 async function createPlaylist(input, name) {
   var cookie = cookieOf(input);
-  var json = cookie
-    ? await call("/weapi/playlist/create", { name: name }, cookie)
-    : await eapiCall("/api/playlist/create", { name: name }, false);
+  var json = await call("/weapi/playlist/create", { name: name, csrf_token: csrfOf(cookie) }, cookie);
   var id = json && json.id ? Number(json.id) : Number(json && json.playlist && json.playlist.id);
   if (!id) throw new Error("playlist/create failed: " + JSON.stringify(json));
   return id;
@@ -456,9 +494,9 @@ async function addTrack(input) {
   var id = Number(track.key || 0);
   if (!id) return { status: 0, msg: "no song id: keys=" + Object.keys(track).join(",") + " key=" + String(track.key) };
   var cookie = cookieOf(input);
-  var json = cookie
-    ? await call("/weapi/playlist/manipulate/tracks", { op: "add", pid: String(input.listid), trackIds: "[" + id + "]" }, cookie)
-    : await eapiCall("/api/playlist/manipulate/tracks", { op: "add", pid: String(input.listid), imme: true, trackIds: "[" + id + "]" }, false);
+  var json = await call("/weapi/playlist/manipulate/tracks", {
+    op: "add", pid: String(input.listid), trackIds: "[" + id + "]", csrf_token: csrfOf(cookie),
+  }, cookie);
   var ok = Number(json && (json.code || json.status)) === 200;
   return { status: ok ? 1 : 0, msg: ok ? null : String((json && (json.message || json.msg)) || "add failed") };
 }
@@ -490,9 +528,7 @@ async function clearPlaylist(input) {
   }
   for (var j = 0; j < sameName.length; j++) {
     var cookie = cookieOf(input);
-    var json = cookie
-      ? await call("/weapi/playlist/delete", { pid: String(sameName[j]) }, cookie)
-      : await eapiCall("/api/playlist/delete", { pid: String(sameName[j]) }, false);
+    var json = await call("/weapi/playlist/delete", { pid: String(sameName[j]), csrf_token: csrfOf(cookie) }, cookie);
     if (Number(json && json.code) !== 200) throw new Error("歌单删除失败: " + JSON.stringify(json));
   }
   return { listid: await createPlaylist(input, name), deleted: true, deletedId: sameName[0], deletedIds: sameName };

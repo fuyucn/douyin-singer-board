@@ -1,6 +1,8 @@
 //! Per-engine SQLite storage for the NSH application.
+mod net;
 mod store;
 
+use net::Net;
 use nsh_core::prelude::*;
 use store::Store;
 
@@ -41,4 +43,5 @@ impl SqliteStorage {
 #[native_module("app/sqlite")]
 fn native(registry: &mut Registry) {
     registry.class::<SqliteStorage>();
+    registry.module::<Net>();
 }

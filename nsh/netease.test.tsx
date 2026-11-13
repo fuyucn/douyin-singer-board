@@ -77,6 +77,10 @@ test("netease: cookie login from the plugin tab", async () => {
 test("netease: QR login through the plugin tab", async () => {
   const app = await openSqliteBoard("./Board.tsx", {
     width: 1000, height: 800,
+    host: { params: { httpRawSeed: {
+      "https://interfacepc.music.163.com/eapi/login/qrcode/client/login":
+        { body: JSON.stringify({ code: 803 }), setCookie: "MUSIC_U=TESTCOOKIE; __csrf=TESTCSRF; NMTID=x" },
+    } } },
     storage: { "board.config": JSON.stringify({
       room_id: "", sing_prefix: "[song]", fans_level: 0, sing_cd: 0,
       cooldown_seconds: 1800, max_songs_per_user: 3, target_playlist_name: "测试4",
@@ -85,8 +89,7 @@ test("netease: QR login through the plugin tab", async () => {
     }) },
     network: {
       "POST https://interfacepc.music.163.com/eapi/login/qrcode/unikey*": { body: { code: 200, unikey: "QRKEY" } },
-      "POST https://interfacepc.music.163.com/eapi/login/qrcode/client/login*": { body: { code: 803 } },
-      "POST https://interfacepc.music.163.com/eapi/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
+      "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
       "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
     },
@@ -101,4 +104,42 @@ test("netease: QR login through the plugin tab", async () => {
   await app.press("id:ne-qr");
   await app.wait(2500);
   expect(app.texts().some((t: string) => t.includes("已登录：测试用户"))).toBe(true);
+});
+
+test("netease: create a playlist with the captured cookie session", async () => {
+  const app = await openSqliteBoard("./Board.tsx", {
+    width: 1000, height: 800,
+    storage: {
+      "board.config": JSON.stringify({
+        room_id: "", sing_prefix: "[song]", fans_level: 0, sing_cd: 0,
+        cooldown_seconds: 1800, max_songs_per_user: 3, target_playlist_name: "新歌单",
+        target_playlist_id: 0, blacklist: [], blacklist_singers: [], auto_sync: false,
+        active_plugin: "netease-web", kugou_enabled: false, config_version: 2,
+      }),
+      "plugin.netease-web.session": JSON.stringify({
+        token: "MUSIC_U=TESTCOOKIE; __csrf=TESTCSRF", userid: "123", dfid: "-", nickname: "测试用户",
+      }),
+    },
+    network: {
+      "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
+      "POST https://music.163.com/weapi/playlist/create*": { body: { code: 200, id: 41, playlist: { id: 41 } } },
+    },
+  });
+  await app.wait(1200);
+  if (app.shows("id:firstrun-close")) { await app.press("id:firstrun-close"); await app.wait(300); }
+  let ready = false;
+  for (let i = 0; i < 25 && !ready; i++) {
+    await app.wait(200);
+    ready = app.texts().some((t: string) => t.includes("网易云服务就绪"));
+  }
+  expect(ready).toBe(true);
+  await app.press("id:kugou-clear");
+  let created = false;
+  for (let i = 0; i < 25 && !created; i++) {
+    await app.wait(200);
+    created = app.texts().some((t: string) => t.includes("新歌单已建") || t.includes("歌单已清理重建"));
+  }
+  expect(created).toBe(true);
+  expect(app.texts()).toContain("id: 41");
 });

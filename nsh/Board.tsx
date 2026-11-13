@@ -18,6 +18,7 @@ import { hasPlaylists, platform, platforms } from "./src/platform/registry";
 import process from "process";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { createSqliteStore } from "./src/sqliteStore";
+import { Net } from "app/sqlite";
 // The plugin channel: a plugin is a folder under ${dataDir}/plugins that the
 // app runs in a hidden web view (see src/plugin/). Nothing here is on the path
 // of the built-in platforms.
@@ -615,6 +616,21 @@ function Board() {
     },
     // A plugin's page cannot read a cross-origin answer (CORS), so its HTTP
     // goes through the app: same capabilities, same hosts, no preflight.
+    // Response headers for a plugin that has to keep a server session:
+    // TSX fetch hides Set-Cookie, Rust fetch returns the whole response.
+    "http.raw": async ({ url, method, headers, body }: any) => {
+      if (typeof url !== "string" || !url.startsWith("https://")) throw new Error("插件只能通过应用请求 https 地址");
+      // Tests cannot intercept Rust's fetch; a fixture may supply the raw
+      // answer (body plus Set-Cookie) in the same shape the native call returns.
+      const seed = host.params.httpRawSeed as Record<string, any> | undefined;
+      if (seed) {
+        for (const prefix of Object.keys(seed)) {
+          if (url.startsWith(prefix)) return { status: 200, ...seed[prefix] };
+        }
+      }
+      const raw = await Net.fetchRaw(method ?? "GET", url, JSON.stringify(headers ?? {}), body ?? "");
+      return JSON.parse(raw);
+    },
     "http.json": async ({ url, method, headers, body, as }: any) => {
       if (typeof url !== "string" || !url.startsWith("https://")) throw new Error("插件只能通过应用请求 https 地址");
       const res = await fetch(url, { method: method ?? "GET", headers: headers ?? undefined, body: body ?? undefined });

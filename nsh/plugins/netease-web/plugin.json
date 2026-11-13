@@ -1,7 +1,7 @@
 {
   "id": "netease-web",
   "name": "网易云音乐（插件版）",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "api": 1,
   "note": "扫码登录、歌单、搜索、自动同步",
   "entry": "index.js",
