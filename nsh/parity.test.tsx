@@ -58,7 +58,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
   await app.press("添加");
   await app.wait(300);
   // Kugou selected: sidebar playlist block and the row's ListPlus are shown.
-  expect(app.texts()).toContain("Kugou 歌单");
+  expect(app.texts()).toContain("酷狗 歌单");
   expect(app.shows("id:song-add-0")).toBe(true);
 
   await app.wait(700);
@@ -70,7 +70,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
   await app.press("关闭");
 
   // Every playlist/song feature follows the platform selection.
-  expect(app.texts()).not.toContain("Kugou 歌单");
+  expect(app.texts()).not.toContain("酷狗 歌单");
   expect(app.texts()).not.toContain("酷狗服务就绪");
   expect(app.texts()).toContain("未启用平台插件");
   expect(app.shows("id:song-add-0")).toBe(false);
@@ -82,7 +82,7 @@ test("platform plugin can be switched off and gates all playlist/song features",
   await app.press("id:plugin-kugou");
   expect(app.texts()).toContain("酷狗登录");
   await app.press("关闭");
-  expect(app.texts()).toContain("Kugou 歌单");
+  expect(app.texts()).toContain("酷狗 歌单");
 });
 
 test("blacklist accepts singer entries", async () => {
@@ -108,7 +108,7 @@ test("no platform = listener-only: no manual add, clear mode panel", async () =>
   expect(texts).toContain("仅弹幕监听");
   expect(texts.some((t: string) => t.includes("点歌指令只进「点歌列表」"))).toBe(true);
   expect(texts).not.toContain("手动点歌");
-  expect(texts).not.toContain("Kugou 歌单");
+  expect(texts).not.toContain("酷狗 歌单");
   expect(app.shows("text:输入歌曲名称...")).toBe(false);
   expect(texts).toContain("未启用平台插件");
   // Listener core is still enabled.
@@ -197,7 +197,7 @@ test("no Kugou session means no search request at all", async () => {
   expect(app.texts()).toContain("酷狗未登录");
   // ListPlus and the platform playlist block are both gated on the session.
   expect(app.shows("id:song-add-0")).toBe(false);
-  expect(app.texts()).not.toContain("Kugou 歌单");
+  expect(app.texts()).not.toContain("酷狗 歌单");
 });
 
 const baseConfig = {

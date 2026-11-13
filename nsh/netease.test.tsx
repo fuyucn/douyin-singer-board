@@ -68,4 +68,8 @@ test("netease: cookie login from the plugin tab", async () => {
   await app.press("id:ne-login");
   await app.wait(1200);
   expect(app.texts().some((t: string) => t.includes("已登录：测试用户"))).toBe(true);
+  // Enabling NetEase must not make the KuGou card look selected/enabled too.
+  const kugouCard = app.texts();
+  expect(kugouCard.some((t: string) => t === "酷狗登录")).toBe(false);
+
 });

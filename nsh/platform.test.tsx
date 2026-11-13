@@ -16,7 +16,7 @@ const cfg = (extra: Record<string, unknown>) =>
   });
 
 const kugouUi = (texts: string[]) =>
-  texts.some((t) => t === "Kugou 歌单" || t === "酷狗未登录" || t === "酷狗服务就绪");
+  texts.some((t) => t === "酷狗 歌单" || t === "酷狗未登录" || t === "酷狗服务就绪");
 
 test("a registered platform other than kugou is kept, with no kugou UI", async () => {
   const app = await openSqliteBoard("./Board.tsx", {

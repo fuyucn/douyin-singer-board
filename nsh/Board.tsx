@@ -1719,7 +1719,7 @@ function Board() {
             <If when={pluginEnabled() && kugou()}>
               <View class="h-px bg-line" />
               <View class="p-4">
-                <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">Kugou 歌单</Text>
+                <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">{platformName()} 歌单</Text>
                 <View class="gap-2">
                   <If when={kugou()}>
                     <View class="gap-2">
@@ -2183,9 +2183,9 @@ function Board() {
               <Text class="text-[11px] text-faint">可选一个平台，也可以都不开；歌单、自动同步与歌曲匹配只随所选平台显示。</Text>
 
               {/* 酷狗音乐：平台插件，选中它才启用平台 */}
-              <View class={`gap-2 rounded-[6px] border px-3 py-2 ${pluginEnabled() ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
+              <View class={`gap-2 rounded-[6px] border px-3 py-2 ${config().active_plugin === "kugou-web" ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
                 <View class="flex-row items-center gap-2">
-                  <View class={`h-3 w-3 rounded-full border ${pluginEnabled() ? "border-primary bg-primary" : "border-line-strong"}`} />
+                  <View class={`h-3 w-3 rounded-full border ${config().active_plugin === "kugou-web" ? "border-primary bg-primary" : "border-line-strong"}`} />
                   <View class="flex-1">
                     <Text class="text-[13px] text-foreground">酷狗音乐</Text>
                     <Text class="text-[11px] text-faint">{kugouMeta().version} · {kugouMeta().note}</Text>
@@ -2199,10 +2199,10 @@ function Board() {
                     <Button
                       testID={platformTestId("kugou-web")}
                       onPress={() => selectPlugin("kugou-web")}
-                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${pluginEnabled() ? "bg-primary" : "border border-line-strong active:bg-background"}`}
+                      class={`items-center justify-center rounded-[6px] px-3 py-1 ${config().active_plugin === "kugou-web" ? "bg-primary" : "border border-line-strong active:bg-background"}`}
                     >
-                      <Text class={`text-[12px] ${pluginEnabled() ? "text-primary-foreground" : "text-foreground"}`}>
-                        {kugouBlocked() ? "不可用" : pluginEnabled() ? "停用" : "启用"}
+                      <Text class={`text-[12px] ${config().active_plugin === "kugou-web" ? "text-primary-foreground" : "text-foreground"}`}>
+                        {kugouBlocked() ? "不可用" : config().active_plugin === "kugou-web" ? "停用" : "启用"}
                       </Text>
                     </Button>
                     <Button
