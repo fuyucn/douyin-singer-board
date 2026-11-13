@@ -31,7 +31,7 @@ const demoSeed = [{
 test("an installed plugin runs hidden and answers the app", async () => {
   const app = await openSqliteBoard("./Board.tsx", {
     width: 1000, height: 800,
-    host: { params: { pluginTestSeed: demoSeed } },
+    host: { params: { pluginTestSeed: demoSeed, pluginDebug: true } },
   });
 
   await app.wait(1200);
@@ -70,7 +70,7 @@ test("an installed plugin runs hidden and answers the app", async () => {
 test("calling a plugin that is not enabled says so instead of failing", async () => {
   const app = await openSqliteBoard("./Board.tsx", {
     width: 1000, height: 800,
-    host: { params: { pluginTestSeed: demoSeed } },
+    host: { params: { pluginTestSeed: demoSeed, pluginDebug: true } },
   });
   await app.wait(1200);
   await app.press("id:settings");

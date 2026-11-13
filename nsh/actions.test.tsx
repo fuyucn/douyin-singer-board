@@ -22,7 +22,7 @@ const searchBody = {
   data: { lists: [{ SongName: "晴天", SingerName: "周杰伦", FileHash: "HASH1", AlbumID: "1", MixSongID: "2", Duration: 200 }] },
 };
 const playlistsBody = { data: { info: [{ name: "测试4", listid: 27, count: 0 }] } };
-const kugouNetwork = {
+const kugouNetwork: Record<string, any> = {
   "POST https://gateway.kugou.com/v7/get_all_list*": { body: playlistsBody },
   "GET https://gateway.kugou.com/v2/search/song*": { body: searchBody },
   "POST https://gateway.kugou.com/cloudlist.service/v6/add_song*": { body: { status: 1 } },

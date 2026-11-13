@@ -67,15 +67,19 @@ there is one platform at a time. Every row has 安装 / 启用·停用 / 移除
 网易云音乐 is the second platform (`plugins/netease-web/`): search, playlists,
 add/resolve/clear all go through the same bridge, using the weapi protocol
 (AES twice + raw RSA) computed inside the plugin. Login scans a QR (the
-plugin asks NetEase for a key and draws it with `api.qrserver.com`; after the
-scan the app's cookie jar holds `MUSIC_U`, which every later request uses).
-`fetch` hides `Set-Cookie`, so that cookie cannot be read back and stored: if a
-restart loses it, 设置 → 插件 accepts a pasted `MUSIC_U` cookie, which is kept
-as the session and sent explicitly on every request.
+plugin asks NetEase for a key and draws it with `api.qrserver.com`). TSX `fetch`
+hides `Set-Cookie`, so the login check goes through the native crate's
+`Net.fetchRaw` (Rust fetch, status + body + headers); on `803` the plugin keeps
+`MUSIC_U`/`__csrf`, every later weapi call sends them, mutations add
+`csrf_token`, and the cookie is stored as the session — a restart stays logged
+in. 设置 → 插件 also accepts a pasted `MUSIC_U` as a fallback.
 
-A plugin that did not ship with the app is installed by putting its folder
-in `${dataDir}/plugins/<id>/` and pressing 重新扫描; `plugins/demo/` in this
-repository is the example to copy (it is not installed by the app).
+设置 → 插件 shows exactly these two cards. A plugin that did not ship with the
+app can still be installed by putting its folder in `${dataDir}/plugins/<id>/`
+at startup, but there is no user-facing list or rescan button: the app is a
+two-platform player, and the generic list (rescan / call a demo method) is
+only rendered for the plugin-channel tests via `host.params.pluginDebug`.
+`plugins/demo/` remains the API example to copy.
 
 What this costs:
 
@@ -85,6 +89,12 @@ What this costs:
 - A plugin's page has a web engine's own network: `app.call("http.json")`
   goes through the app's `fetch` (so `network.hosts` applies); a bare `fetch`
   inside the page does not, and CORS blocks it anyway.
+- `http.raw` (Rust fetch, status/body/Set-Cookie) is handed to
+  plugin pages; it is only for keeping a login session, and any plugin folder
+  can request allowlisted hosts with it.
+- 网易云 draws its QR through `api.qrserver.com`; that host sees the login
+  challenge and the IP. No other third-party host is used.
+
 - `api: 1` is the bridge this app speaks. A plugin asking for a newer bridge
   stays in the list, labelled 不可用 with the reason and its folder kept — an
   update never makes a plugin look deleted — while an older `api` keeps
@@ -101,13 +111,13 @@ What this costs:
 zip the updater replaces it from. The one-file download is an NSIS build of
 that directory, so both come from `installer/`:
 
-- `SUSUSongBoard-Portable-0.43.1.exe` — one file, ~26 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.43.2.exe` — one file, ~26 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly. A
   registry build marker (`PortableBuild`) keeps an updated install from being
   overwritten by an older launcher.
-- `SUSUSongBoard-Setup-0.43.1.exe` — per-user NSIS installer, same directory
+- `SUSUSongBoard-Setup-0.43.2.exe` — per-user NSIS installer, same directory
   (`%LOCALAPPDATA%`, so `nsh/updater` can replace the app without elevation).
-- `SUSUSongBoard-0.43.0-preview.6-windows-x86_64.zip` — raw directory, and the
+- `SUSUSongBoard-0.43.2-windows-x86_64.zip` — raw directory, and the
   archive the updater uses. Not a hand-download.
 
 `nsh-windows.yml` builds and smoke-runs both exes on every push; `NSH Release`
@@ -121,7 +131,7 @@ next to the updater archives.
 
 功能边界按「有没有启用酷狗平台」拆分，不改动原版左栏布局：
 
-| | 仅弹幕监听（无平台 / 网易云占位） | 启用酷狗音乐 |
+| | 仅弹幕监听（无平台） | 启用平台（酷狗或网易云） |
 |---|---|---|
 | 弹幕监听与点歌指令收集 | ✅ 始终工作 | ✅ |
 | 直播间配置 / 点歌规则 / 点歌列表 / 黑名单 | ✅ 字段保留；两个限流字段仅在启用平台并同步时生效，歌手黑名单需平台匹配 | ✅ |
@@ -132,7 +142,7 @@ next to the updater archives.
 
 无平台时，原「手动点歌」位置显示一块带边框的 **仅弹幕监听** 说明面板：
 点歌指令只进「点歌列表」，并提示「设置 → 插件 → 启用酷狗音乐」。
-网易云占位态显示同样的面板，文案改为「尚未接入」。三 tab、直播间配置、
+两个平台都未启用时显示同样的面板。三 tab、直播间配置、
 点歌规则一律保留（用户曾多次要求不要擅自重排原版布局）；规则里两处只与
 歌单相关的副标题，以及黑名单的歌手屏蔽说明，在无平台时都明确写成
 「仅监听模式不启用 / 需启用平台后生效」，避免承诺不存在的限流能力。
@@ -196,7 +206,7 @@ freshness (re-scan if expired), 歌单列表 (re-fetched on login), auto-sync
 
 The manual **导入原版数据** picker is gone: the first launch imports the old
 database itself, so a second path could only duplicate or overwrite it.
-`src/legacyMigration.ts` and `plugins/kugou/sqliteReader.ts` remain for their
+`src/legacyMigration.ts` and `src/legacy/sqliteReader.ts` remain for their
 unit tests only; nothing in `Board.tsx` imports them. The old Python JSON
 exporter is not the main storage backend.
 
@@ -272,12 +282,12 @@ stays reachable through the header settings → 插件 tab.
 `清理` = **先删除同名歌单，再按同名创建新歌单，返回新 listid**，顺序与
 原版 `clearPlaylistByName` 一致（测试断言 `delete_list` 早于 `add_list`）。
 新 id 会写进 `target_playlist_id`，界面右侧的 `id:` 随之更新；截图里是
-29 → 42。NSH 没有 Node sidecar，所以 `plugins/kugou/playlistOps.ts` 直连酷狗：
-`add_list` 走和 `add_song` 相同的 android 签名 JSON，`delete_list` 需要
-`playlistCrypto.ts` 里的 AES-CBC + RSAES-PKCS1-V1_5 协议。
+29 → 42。NSH 没有 Node sidecar，所以歌单协议由插件
+（`plugins/kugou-web/index.js`）自己算：`add_list` 走和 `add_song` 相同的
+android 签名 JSON，`delete_list` 用插件内手写的 AES-CBC + RSAES-PKCS1-V1_5。
 A network stub cannot validate an encrypted body or a binary encrypted
-response, so `scripts/kat-playlist.test.ts` emits deterministic values and
-`scripts/kat-playlist.mjs` recomputes them from **hardcoded reference
+response, so `scripts/kat-kugou-plugin.test.tsx` emits deterministic values and
+`scripts/kat-kugou-plugin.mjs` recomputes them from **hardcoded reference
 constants** with Node's own crypto and SPKI parser (md5 / AES key+iv
 derivation / AES-CBC / RSA modulus+exponent / PKCS#1 v1.5 padding). The NSH
 random-PS branch is checked by exposing EM through a test exponent of 1, and
@@ -360,7 +370,7 @@ tens of rows, so this is accepted for now.
   original's separate **KuGou API 调试面板** (an About dialog sub-entry), not
   from its settings. Playlist management lives in the left panel
   (name / 清理 / 自动同步) only.
-  Token/userid are kept in `Storage`, not in the repo. Icons are drawn as plain
+  Token/userid are kept in SQLite (`kugou_session`), not in the repo. Icons are drawn as plain
   function calls so their SVG colors follow theme changes.
 - Turning 自动同步 ON performs the original's `using exist or create`:
   `resolvePlaylistByName` looks up the editable name in the user's playlists
@@ -391,10 +401,11 @@ tens of rows, so this is accepted for now.
   (they depend on external services), so a green run does not prove those
   passed. Windows-side Chinese font fallback, DPI scaling and full chat-frame
   decoding are still unverified.
-- The left panel shows only the active plugin's summary (Kugou playlist and
-  auto-sync); management is in Settings. Token refresh/user info are still
-  missing. The plugin is compiled in; there is no runtime plugin host yet.
-- Auto-update is not configured yet; the portable wrapper can be replaced by a
-  newer single file, which re-extracts its newer payload.
+- The left panel shows only the active platform's playlist and auto-sync;
+  management is in Settings. Platforms are plugins in
+  `${dataDir}/plugins/<id>/`, installed on first run and upgraded with the app;
+  KuGou and NetEase both run over the WebView bridge.
+- Auto-update uses the GitHub Releases manifest described under Updates; the
+  portable wrapper re-extracts its newer payload on launch.
 
 See `docs/PARITY.md` for the Windows gate and P0–P3 plan.

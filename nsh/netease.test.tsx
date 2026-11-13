@@ -18,7 +18,7 @@ test("netease: login restored, search, add to playlist", async () => {
     storage: { "board.config": cfg, "plugin.netease-web.session": session },
     network: {
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
-      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [{ id: 27, name: "测试4", trackCount: 0 }] } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { code: 200, playlist: [{ id: 27, name: "测试4", trackCount: 0 }] } },
       "POST https://music.163.com/weapi/cloudsearch/pc*": { body: { result: { songs: [{ id: 186016, name: "晴天", ar: [{ name: "周杰伦" }], dt: 269000 }] } } },
       "POST https://music.163.com/weapi/playlist/manipulate/tracks*": { body: { code: 200 } },
     },
@@ -51,7 +51,7 @@ test("netease: cookie login from the plugin tab", async () => {
     }) },
     network: {
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
-      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { code: 200, playlist: [] } },
     },
   });
   await new Promise((r) => setTimeout(r, 2500));
@@ -90,8 +90,7 @@ test("netease: QR login through the plugin tab", async () => {
     network: {
       "POST https://interfacepc.music.163.com/eapi/login/qrcode/unikey*": { body: { code: 200, unikey: "QRKEY" } },
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
-      "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
-      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { code: 200, playlist: [] } },
     },
   });
   await new Promise((r) => setTimeout(r, 2500));
@@ -122,7 +121,7 @@ test("netease: create a playlist with the captured cookie session", async () => 
     },
     network: {
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
-      "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
+      "POST https://music.163.com/weapi/user/playlist*": { body: { code: 200, playlist: [] } },
       "POST https://music.163.com/weapi/playlist/create*": { body: { code: 200, id: 41, playlist: { id: 41 } } },
     },
   });

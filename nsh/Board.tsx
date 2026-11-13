@@ -10,11 +10,11 @@ import { Matcher } from "./src/matcher";
 import { SyncLedger, formatDuration, isAuthFailure, nextDelay, pickNextSync, type SearchState } from "./src/autoSync";
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
 import type { Playlist, Track } from "./src/types";
-// Registering the platforms is what `PLUGINS` and `pluginEnabled()` read: a
-// new platform is one more import here plus its own folder under `plugins/`.
+// Registering the platforms is what `platform()` and `pluginEnabled()` read:
+// a new platform is one import here plus its own folder under `plugins/`.
 import "./src/platform/kugou";
 import "./plugins/netease/platform";
-import { hasPlaylists, platform, platforms } from "./src/platform/registry";
+import { hasPlaylists, platform } from "./src/platform/registry";
 import process from "process";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { createSqliteStore } from "./src/sqliteStore";
@@ -26,7 +26,7 @@ import { PluginChannel } from "./src/plugin/bridge";
 import { KUGOU_WEB_FILES, KUGOU_WEB_MANIFEST } from "./src/plugin/kugouPlugin";
 import { NETEASE_WEB_FILES, NETEASE_WEB_MANIFEST } from "./src/plugin/neteasePlugin";
 import { PluginView } from "./src/plugin/PluginView";
-import { installPlugin, listPlugins, pluginsDir, removePlugin } from "./src/plugin/store";
+import { installPlugin, listPlugins, removePlugin } from "./src/plugin/store";
 import type { InstalledPlugin } from "./src/plugin/types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -63,7 +63,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.1";
+const APP_VERSION = "0.43.2";
 
 // "0.1.1" is newer than "0.1.0"; missing parts count as 0. Used to decide
 // whether the plugin copy in the data directory predates the bundled one.
@@ -83,7 +83,6 @@ const versionNewer = (a: string, b: string) => {
 
 type Tab = "songs" | "played" | "blacklist";
 type PluginId = string;
-const PLUGINS = platforms();
 type KugouSession = { token: string; userid: string; dfid?: string; nickname?: string };
 type PlayedInfo = DanmuInfo & { played_at: number };
 
@@ -248,9 +247,10 @@ function Board() {
       // platform. From v2 on, an explicitly disabled service means
       // "no platform selected" — the user may leave every platform off.
       const rawActive = saved.active_plugin === "kugou" ? "kugou-web" : saved.active_plugin;
+      const mapped = rawActive === "netease" ? "netease-web" : rawActive;
       const active = legacy
-        ? (rawActive === "netease" ? "netease-web" : rawActive === "" ? "" : "kugou-web")
-        : (typeof rawActive === "string"
+        ? (mapped === "" ? "" : mapped === "netease-web" ? mapped : "kugou-web")
+        : (typeof mapped === "string"
             // "" and any registered id are kept as they are, and so is an id
             // whose platform is not here (a removed plugin): the registry
             // decides what applies, so nothing is silently renamed to kugou.
@@ -297,11 +297,17 @@ function Board() {
   // Each platform keeps its own login. KuGou keeps `kugou.session` because the
   // SQLite schema has a dedicated table for it; newer platforms use the same
   // per-plugin key as their other data.
+  const requireDataDir = () => {
+    const dir = dataDir();
+    if (!dir) throw new Error("应用没有数据目录");
+    return dir;
+  };
   const sessionKey = (id = config().active_plugin) =>
     id === "kugou-web" ? "kugou.session" : `plugin.${id}.session`;
-  const saveSession = (sess: KugouSession) => {
+  const saveSession = (sess: KugouSession, id = config().active_plugin) => {
+    if (id !== config().active_plugin) return;
     kugou.set(sess);
-    storage.setItem(sessionKey(), JSON.stringify(sess)).catch(storageError);
+    storage.setItem(sessionKey(id), JSON.stringify(sess)).catch(storageError);
   };
 
   const loadLists = async (sess: KugouSession | null = kugou()) => {
@@ -329,12 +335,14 @@ function Board() {
   // get_all_list (which could otherwise raise a stale-token warning).
   function restoreSession() {
     if (!pluginEnabled()) return;
-    storage.getItem(sessionKey())
+    const startedOn = config().active_plugin;
+    storage.getItem(sessionKey(startedOn))
       .then((raw) => {
         if (!raw || !pluginEnabled()) return;
         try {
           const sess = JSON.parse(raw) as KugouSession;
           if (sess?.token && sess?.userid) {
+            if (startedOn !== config().active_plugin) return;
             kugou.set(sess);
             loadLists(sess);
           }
@@ -442,8 +450,7 @@ function Board() {
   };
 
 
-  // The platform is the plugin: every KuGou call below goes to its page.
-  const KUGOU_PLUGIN_ID = KUGOU_WEB_MANIFEST.id;
+  // The platform is the plugin: every platform call below goes to its page.
 
   // At startup the session restore can ask before the plugin folder has been
   // listed, so "插件未安装" is not final: wait for `plugins()` to include it,
@@ -482,7 +489,7 @@ function Board() {
     return (await kwCall("loginQrKey", {})) as { key: string; image: string };
   }
 
-  async function qrCheck(key: string): Promise<{ status: number; token?: string; userid?: string; nickname?: string }> {
+  async function qrCheck(key: string): Promise<{ status: number; token?: string; userid?: string; nickname?: string; code?: number; message?: string }> {
     await waitReady(4000);
     const r = (await kwCall("loginQrCheck", { key })) as any;
     // Keep the raw code/message: the QR log uses them to say why a scan did
@@ -519,7 +526,7 @@ function Board() {
 
   const installKugouPlugin = async () => {
     try {
-      await installPlugin(dataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
+      await installPlugin(requireDataDir(), KUGOU_WEB_MANIFEST, KUGOU_WEB_FILES);
       // A 移除 earlier left the "do not auto-install" mark behind; an explicit
       // install is the user asking for it back.
       await storage.setItem(`plugin.${KUGOU_WEB_MANIFEST.id}.removed`, "0").catch(() => {});
@@ -535,7 +542,7 @@ function Board() {
   const neteaseInstalled = () => plugins().some((p) => p.manifest.id === NETEASE_WEB_MANIFEST.id);
   const installNeteasePlugin = async () => {
     try {
-      await installPlugin(dataDir(), NETEASE_WEB_MANIFEST, NETEASE_WEB_FILES);
+      await installPlugin(requireDataDir(), NETEASE_WEB_MANIFEST, NETEASE_WEB_FILES);
       await storage.setItem(`plugin.${NETEASE_WEB_MANIFEST.id}.removed`, "0").catch(() => {});
       await refreshPlugins();
       showFlash("网易云插件已安装");
@@ -552,9 +559,14 @@ function Board() {
   const neteaseLogin = async () => {
     const cookie = neCookie().trim();
     if (!cookie) { showFlash("请粘贴包含 MUSIC_U 的 Cookie"); return; }
+    const startedOn = config().active_plugin;
     try {
       const r: any = await kwCall("loginCookie", { token: cookie });
-      saveSession({ token: r.token, userid: String(r.userid), dfid: "-", nickname: r.nickname });
+      if (startedOn !== config().active_plugin) {
+        showFlash("平台已切换，登录结果已丢弃，请重新登录");
+        return;
+      }
+      saveSession({ token: r.token, userid: String(r.userid), dfid: "-", nickname: r.nickname }, startedOn);
       neCookie.set("");
       showFlash(`已登录网易云：${r.nickname ?? r.userid}`);
       log(`网易云登录成功: ${r.nickname ?? r.userid}`);
@@ -659,7 +671,7 @@ function Board() {
   // filesystem (the headless test runner) would only add a scary line.
   const refreshPlugins = async (silent = false) => {
     try {
-      const found = await listPlugins(dataDir());
+      const found = await listPlugins(requireDataDir());
       plugins.set(found);
       const on: Record<string, boolean> = {};
       for (const p of found) on[p.manifest.id] = (await storage.getItem(`plugin.${p.manifest.id}`)) === "1";
@@ -691,7 +703,7 @@ function Board() {
     try {
       if (config().active_plugin === id) patch({ active_plugin: "", auto_sync: false });
       channels.delete(id);
-      await removePlugin(dataDir(), id);
+      await removePlugin(requireDataDir(), id);
       await storage.removeItem(`plugin.${id}`);
       await storage.setItem(`plugin.${id}.removed`, "1").catch(() => {});
       showFlash(`已移除插件：${id}`);
@@ -733,20 +745,24 @@ function Board() {
       // directory: plugins live outside the bundle, so an app update alone
       // does not replace them.
       let changed = false;
+      try {
       for (const bundled of BUNDLED_PLUGINS) {
         const id = bundled.manifest.id;
         const removed = await storage.getItem(`plugin.${id}.removed`);
-        const found = (await listPlugins(dataDir())).find((p) => p.manifest.id === id);
+        const found = (await listPlugins(requireDataDir())).find((p) => p.manifest.id === id);
         const upgrade = found && versionNewer(bundled.manifest.version, found.manifest.version);
         if ((!found && removed !== "1") || upgrade) {
           try {
-            await installPlugin(dataDir(), bundled.manifest, bundled.files);
+            await installPlugin(requireDataDir(), bundled.manifest, bundled.files);
             if (upgrade) log(`${bundled.manifest.name} 已更新 ${found!.manifest.version} → ${bundled.manifest.version}`);
             changed = true;
           } catch (e: any) {
             log(`${bundled.manifest.name} 安装失败: ` + String(e?.message ?? e));
           }
         }
+      }
+      } catch (e: any) {
+        log("插件安装跳过: " + String(e?.message ?? e));
       }
       if (changed) await refreshPlugins(true);
       // The session may have been read before the plugin existed; once it is
@@ -758,7 +774,7 @@ function Board() {
       if (!pluginSeed) return;
       for (const item of pluginSeed) {
         try {
-          await installPlugin(dataDir(), item.manifest, item.files);
+          await installPlugin(requireDataDir(), item.manifest, item.files);
         } catch (e: any) {
           log("测试插件写入失败: " + String(e?.message ?? e));
         }
@@ -794,7 +810,10 @@ function Board() {
     qr.set(null);
     searchQueue.length = 0;
     startedSearches.clear();
-    patch({ active_plugin: next, kugou_enabled: next === "kugou-web", auto_sync: false });
+    // Ids are global per platform: a KuGou listid means nothing (or another
+    // user's playlist) on NetEase, so a switch drops the target and lets the
+    // name resolve again on the new platform.
+    patch({ active_plugin: next, kugou_enabled: next === "kugou-web", auto_sync: false, target_playlist_id: 0 });
     kugou.set(null);
     lists.set([]);
     kgState.set("idle");
@@ -2287,6 +2306,11 @@ function Board() {
                 <Text class="text-[11px] text-faint">未选择平台：仅弹幕监听并收集点歌指令；歌单、自动同步、歌曲匹配与手动点歌均已隐藏。</Text>
               </If>
 
+              {/* Only these two platforms are user-facing. The generic
+                  plugin list (rescan, call hello) stays reachable for the
+                  plugin-channel tests via host.params.pluginDebug; users get
+                  exactly 酷狗 and 网易云. */}
+              <If when={host.params.pluginDebug === true}>
               {/* 其它插件：装与不装都与平台无关 */}
               <Text class="text-[12px] font-semibold text-foreground">其它插件</Text>
               <View class="flex-row items-center gap-2">
@@ -2338,6 +2362,8 @@ function Board() {
                 )}
               </Each>
 
+              </If>
+
               <View class={`gap-2 rounded-[6px] border px-3 py-2 ${config().active_plugin === "netease-web" ? "border-primary bg-accent-soft-bg" : "border-line"}`}>
                 <View class="flex-row items-center gap-2">
                   <View class={`h-3 w-3 rounded-full border ${config().active_plugin === "netease-web" ? "border-primary bg-primary" : "border-line-strong"}`} />
@@ -2386,7 +2412,7 @@ function Board() {
                       <Button testID="ne-login" onPress={neteaseLogin} class="items-center justify-center self-start rounded-[6px] border border-line-strong bg-card px-3 py-1.5 active:bg-muted">
                         <Text class="text-[12px] text-foreground">用 Cookie 登录</Text>
                       </Button>
-                      <Text class="text-[11px] text-faint">扫码依赖系统的 Cookie 容器，重启后若未保持登录，可用 Cookie 登录一次。</Text>
+                      <Text class="text-[11px] text-faint">扫码成功后会话会保存，重启无需重扫；如遇登录失效，可用 Cookie 登录一次。</Text>
                     </View>
                   </If>
                   <If when={kugou()}>
@@ -2488,7 +2514,7 @@ function Board() {
             const value = entry.value as { msg: string; tone: string };
             return (
               <Toast
-                key={entry.id}
+                {...({ key: entry.id } as any)}
                 transitionStatus={entry.status}
                 accessibilityLabel={value.msg}
                 swipeDirection="right"

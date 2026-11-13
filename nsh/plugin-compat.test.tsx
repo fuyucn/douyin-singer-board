@@ -12,6 +12,7 @@ test("a plugin newer than the bridge is listed as incompatible", async () => {
           manifest: { id: "future", name: "未来插件", version: "1.0.0", api: 2, entry: "index.js" },
           files: { "index.js": "plugin.define({ hello: () => ({ ok: true }) });\n" },
         }],
+        pluginDebug: true,
       },
     },
   });

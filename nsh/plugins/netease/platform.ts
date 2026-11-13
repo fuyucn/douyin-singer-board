@@ -6,7 +6,7 @@ registerPlatform({
   id: "netease-web",
   name: "网易云音乐",
   short: "网易云",
-  version: "插件 v0.1.0",
+  version: "插件 v0.1.9",
   note: "扫码登录、歌单、搜索、自动同步",
   playlist: true,
 });

@@ -1,7 +1,8 @@
 // NetEase Cloud Music, as a plugin. Search/playlists go through the weapi
 // protocol: AES-CBC twice (preset key, then a random key) and RSA for the key.
-// Cookies are the session: the app's fetch keeps a cookie jar, so a MUSIC_U
-// pasted once carries every later request; the plugin sends it explicitly too.
+// A session is the Cookie header captured after a QR login (through the native
+// raw fetch, which can see Set-Cookie) or pasted by the user; every request
+// sends it explicitly.
 var UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 var BASE = "https://music.163.com";
 var NONCE = "0CoJUm6Qyw8W8jud";
@@ -251,9 +252,9 @@ async function call(path, data, cookie) {
 // of what the jar kept between launches.
 function cookieOf(input) {
   var token = String((input && input.token) || "");
-  // `jar:` means "the app's cookie jar holds MUSIC_U after a scan"; only a
-  // pasted MUSIC_U is sent as a header.
-  return /^MUSIC_U=/.test(token) ? token : "";
+  // A session is a Cookie header (captured on QR success or pasted); it may
+  // also carry NMTID/__csrf, so it need not start with MUSIC_U.
+  return /MUSIC_U=/.test(token) ? token : "";
 }
 
 async function account(cookie) {
@@ -264,8 +265,8 @@ async function account(cookie) {
 }
 
 async function loginCookie(input) {
-  var cookie = cookieOf(input).trim();
-  if (!cookie || !/MUSIC_U=/.test(cookie)) throw new Error("Cookie 里没有 MUSIC_U");
+  var cookie = cookiesFrom(String(input.token || "").trim());
+  if (!/MUSIC_U=/.test(cookie)) throw new Error("Cookie 里没有 MUSIC_U");
   var who = await account(cookie);
   return { token: cookie, userid: who.userid, nickname: who.nickname, dfid: "-" };
 }
@@ -475,7 +476,10 @@ async function search(input) {
 async function playlists(input) {
   var cookie = cookieOf(input);
   var json = await call("/weapi/user/playlist", { uid: Number(input.userid), limit: 200, offset: 0, includeVideo: true }, cookie);
-  var list = (json && json.playlist) || [];
+  if (!json || Number(json.code) !== 200 || !Array.isArray(json.playlist)) {
+    throw new Error("歌单列表读取失败 code=" + Number(json && json.code) + " " + String((json && (json.message || json.msg)) || ""));
+  }
+  var list = json.playlist;
   return list.map(function (p) {
     return { name: String(p.name || ""), listid: Number(p.id || 0), count: Number(p.trackCount || 0) };
   });
@@ -497,8 +501,11 @@ async function addTrack(input) {
   var json = await call("/weapi/playlist/manipulate/tracks", {
     op: "add", pid: String(input.listid), trackIds: "[" + id + "]", csrf_token: csrfOf(cookie),
   }, cookie);
-  var ok = Number(json && (json.code || json.status)) === 200;
-  return { status: ok ? 1 : 0, msg: ok ? null : String((json && (json.message || json.msg)) || "add failed") };
+  var code = Number(json && (json.code || json.status));
+  var ok = code === 200;
+  var msg = (json && (json.message || json.msg)) || "add failed";
+  if (code === 301 || code === 302 || code === 401 || code === 403) msg = "登录已失效 code=" + code + " " + msg;
+  return { status: ok ? 1 : 0, msg: ok ? null : msg };
 }
 
 async function resolvePlaylist(input) {
@@ -526,12 +533,25 @@ async function clearPlaylist(input) {
   if (!sameName.length) {
     return { listid: await createPlaylist(input, name), deleted: false, warning: "未找到同名旧歌单，未删除旧歌单" };
   }
+  var deleted = [];
   for (var j = 0; j < sameName.length; j++) {
     var cookie = cookieOf(input);
-    var json = await call("/weapi/playlist/delete", { pid: String(sameName[j]), csrf_token: csrfOf(cookie) }, cookie);
-    if (Number(json && json.code) !== 200) throw new Error("歌单删除失败: " + JSON.stringify(json));
+    var json;
+    try {
+      json = await call("/weapi/playlist/delete", { pid: String(sameName[j]), csrf_token: csrfOf(cookie) }, cookie);
+    } catch (e) {
+      var err = new Error("歌单删除请求失败: " + String((e && e.message) || e));
+      if (deleted.length) { err.deletedOld = true; err.deletedId = deleted[0]; err.deletedIds = deleted; }
+      throw err;
+    }
+    if (Number(json && json.code) !== 200) {
+      var err2 = new Error("歌单删除失败 code=" + Number(json && json.code) + " " + String((json && (json.message || json.msg)) || ""));
+      if (deleted.length) { err2.deletedOld = true; err2.deletedId = deleted[0]; err2.deletedIds = deleted; }
+      throw err2;
+    }
+    deleted.push(sameName[j]);
   }
-  return { listid: await createPlaylist(input, name), deleted: true, deletedId: sameName[0], deletedIds: sameName };
+  return { listid: await createPlaylist(input, name), deleted: true, deletedId: sameName[0], deletedIds: deleted };
 }
 
 plugin.define({

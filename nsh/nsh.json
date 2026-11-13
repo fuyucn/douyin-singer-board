@@ -1,8 +1,8 @@
 {
   "name": "SUSUSongBoard",
   "id": "com.sususongboard.app",
-  "version": "0.43.1",
-  "build": 815,
+  "version": "0.43.2",
+  "build": 816,
   "rust": "native",
   "icon": "assets/icon.png",
   "window": {
@@ -37,10 +37,8 @@
         "ws.postman-echo.com",
         "music.163.com",
         "*.music.163.com",
-        "*.music.126.net",
         "api.qrserver.com",
-        "interfacepc.music.163.com",
-        "interface.music.163.com"
+        "interfacepc.music.163.com"
       ]
     },
     "statusBar": true,

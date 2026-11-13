@@ -28,7 +28,7 @@ test("ledger claims once and never re-adds a synced song", () => {
   const l = new SyncLedger(() => 0);
   expect(l.claim("a")).toBe(true);
   expect(l.claim("a")).toBe(false);
-  l.synced("a", track.hash);
+  l.synced("a", track.hash ?? "");
   expect(l.phase("a")).toBe("synced");
   expect(l.claim("a")).toBe(false);
 });
@@ -38,7 +38,7 @@ test("manual takeover stops a late worker result from moving the row", () => {
   expect(l.claim("a")).toBe(true);
   expect(l.claim("a")).toBe(false);
   l.manual("a");
-  l.synced("a", track.hash);
+  l.synced("a", track.hash ?? "");
   expect(l.phase("a")).toBe("manual");
   expect(l.claim("a")).toBe(false);
 });
@@ -59,12 +59,12 @@ test("abortInFlight holds ownership until a late result lands", () => {
   let now = 0;
   const l = new SyncLedger(() => now);
   l.claim("a");
-  l.synced("b", track.hash);
+  l.synced("b", track.hash ?? "");
   l.abortInFlight();
   expect(l.phase("a")).toBe("aborted");
   expect(l.canAttempt("a")).toBe(false);
   expect(l.claim("a")).toBe(false);
-  l.synced("a", track.hash);
+  l.synced("a", track.hash ?? "");
   expect(l.phase("a")).toBe("synced");
   expect(l.claim("a")).toBe(false);
   // A response that never arrives is eventually abandoned and retried.

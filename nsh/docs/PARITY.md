@@ -379,3 +379,15 @@ Port the visual shell from `src/styles.css` and `src/App.tsx`:
   tests need Windows.
 - Kugou `user_detail` / token refresh need RSA/AES; playlist add needs token
   and android signature. Old token can cover read-only tests now.
+
+> 0.43.1 promotes the preview.7 line to a stable release. 0.43.2 adds
+> 网易云音乐 as a second platform plugin (`plugins/netease-web/`): search and
+> playlists over weapi, QR login over eapi `type=3`, and a real session —
+> the login check runs through the native `Net.fetchRaw` (TSX fetch hides
+> `Set-Cookie`), captures `MUSIC_U`/`__csrf`, and stores them, so a restart
+> keeps the login. Mutations send `csrf_token`. Settings → 插件 lists only
+> 酷狗 and 网易云; the generic plugin list (rescan/demo calls) is test-only
+> (`host.params.pluginDebug`). Platform switches zero `target_playlist_id`
+> (ids are global per platform), a failed NetEase playlist read now reports
+> instead of looking like zero playlists, and the KuGou KAT still guards the
+> hand-written crypto.

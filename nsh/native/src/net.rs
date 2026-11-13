@@ -34,7 +34,20 @@ impl Net {
         }
         let response = fetch(request).await.map_err(|e| e.to_string())?;
         let status = response.status();
-        let set_cookie = response.header("set-cookie").map(|v| v.to_string());
+        // Every Set-Cookie line: Windows/Linux yield one per header, macOS
+        // joins them. Join with ", " so the plugin can search all of them.
+        let cookies: Vec<&str> = response
+            .head
+            .headers
+            .iter()
+            .filter(|(name, _)| name.eq_ignore_ascii_case("set-cookie"))
+            .map(|(_, value)| value.as_str())
+            .collect();
+        let set_cookie = if cookies.is_empty() {
+            None
+        } else {
+            Some(cookies.join(", "))
+        };
         let text = response.text();
         Ok(serde_json::json!({
             "status": status,
