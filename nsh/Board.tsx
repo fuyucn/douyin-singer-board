@@ -350,7 +350,8 @@ function Board() {
       if (gen !== loginGen || !pluginEnabled()) return;
       if (r.status !== lastQrStatus) {
         lastQrStatus = r.status;
-        log(`扫码状态: ${r.status === 4 ? "成功" : r.status === 2 ? "已扫码，等待确认" : r.status === 0 ? "二维码过期" : "等待扫码"}`);
+        log(`扫码状态: ${r.status === 4 ? "成功" : r.status === 2 ? "已扫码，等待确认" : r.status === 0 ? "二维码过期" : "等待扫码"}`
+          + (r.code !== undefined ? ` (code=${r.code} ${r.message ?? ""})` : ""));
       }
       if (r.status === 4 && r.token && r.userid) {
         const sess: KugouSession = {
@@ -363,6 +364,12 @@ function Board() {
         qr.set(null);
         log(`${platformName()}登录成功: ${r.nickname ?? r.userid}`);
         loadLists(sess);
+        return;
+      }
+      if (r.status === -1) {
+        kgState.set("error");
+        kgMsg.set("网易云已停用网页扫码登录：" + (r.message ?? "") + "，请用下方 Cookie 登录");
+        log(`网易云扫码被拒绝: ${r.code ?? ""} ${r.message ?? ""}`);
         return;
       }
       if (r.status === 0) { kgState.set("expired"); return; }
@@ -477,7 +484,9 @@ function Board() {
   async function qrCheck(key: string): Promise<{ status: number; token?: string; userid?: string; nickname?: string }> {
     await waitReady(4000);
     const r = (await kwCall("loginQrCheck", { key })) as any;
-    return { status: r.status, token: r.token ?? undefined, userid: r.userid ?? undefined, nickname: r.nickname ?? undefined };
+    // Keep the raw code/message: the QR log uses them to say why a scan did
+    // not move past 等待扫码.
+    return { ...r, token: r.token ?? undefined, userid: r.userid ?? undefined, nickname: r.nickname ?? undefined };
   }
 
   async function addTrack(token: string, userid: string, listid: number, track: Track, dfid = "-"): Promise<{ status: number; msg?: string }> {

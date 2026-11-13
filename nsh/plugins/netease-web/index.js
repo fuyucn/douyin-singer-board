@@ -274,7 +274,7 @@ async function loginQrKey() {
   });
   var key = String((json && json.unikey) || "");
   if (!key) throw new Error("二维码生成失败");
-  var target = "https://music.163.com/login?codekey=" + key;
+  var target = "https://music.163.com/login?codekey=" + key + "&type=1";
   return {
     key: key,
     // The app needs an image; NetEase only returns the key.
@@ -291,6 +291,8 @@ async function loginQrCheck(input) {
     headers: { "User-Agent": UA, "Referer": BASE + "/", "Cache-Control": "no-cache" },
   });
   var code = Number((json && json.code) || 0);
+
+  var message = String((json && json.message) || "");
   if (code === 803) {
     try {
       var who = await account("");
@@ -301,7 +303,13 @@ async function loginQrCheck(input) {
       return { status: 4, token: "jar:", userid: "0", nickname: "网易云用户" };
     }
   }
-  return { status: code === 802 ? 2 : code === 800 ? 0 : 1 };
+  // NetEase has retired web QR login for this client: after the scan it
+  // answers 8821 "请切换其他登录方式或升级新版本再试". Treat it as a final
+  // refusal, not as "still waiting", so the panel can say why.
+  if (code === 8821) {
+    return { status: -1, code: code, message: message };
+  }
+  return { status: code === 802 ? 2 : code === 800 ? 0 : 1, code: code, message: message };
 }
 
 async function search(input) {
