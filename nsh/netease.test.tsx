@@ -86,6 +86,7 @@ test("netease: QR login through the plugin tab", async () => {
     network: {
       "POST https://interfacepc.music.163.com/eapi/login/qrcode/unikey*": { body: { code: 200, unikey: "QRKEY" } },
       "POST https://interfacepc.music.163.com/eapi/login/qrcode/client/login*": { body: { code: 803 } },
+      "POST https://interfacepc.music.163.com/eapi/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
       "POST https://music.163.com/weapi/w/nuser/account/get*": { body: { profile: { userId: 123, nickname: "测试用户" } } },
       "POST https://music.163.com/weapi/user/playlist*": { body: { playlist: [] } },
     },
