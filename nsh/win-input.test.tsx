@@ -8,7 +8,7 @@ import { VALUE } from "./win-input-value";
 // measure - the text inside the blue border, as tall as the mirror's, and
 // a selection fill wide enough to see. The headless targets draw nothing.
 test("the Windows input draws its text and selection inside the field", async () => {
-  if (process.platform !== "win32") return;
+  if (process.platform !== "windows") return;
   const scale = process.env.NSH_TEST_SCALE ?? "1.0";
   const app = await open("./win-input-entry.tsx", { width: 800, height: 600 });
   await app.setColorScheme("light");
