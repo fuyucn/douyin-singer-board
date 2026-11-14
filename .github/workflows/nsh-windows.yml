@@ -115,7 +115,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: text-overlay-windows
-          path: text-overlay.png
+          path: nsh/text-overlay.png
           if-no-files-found: ignore
 
       - name: Auto-sync worker test
