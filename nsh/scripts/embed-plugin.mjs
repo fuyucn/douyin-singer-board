@@ -14,6 +14,9 @@ const manifest = JSON.parse(readFileSync(join(folder, "plugin.json"), "utf8"));
 const files = {};
 for (const entry of readdirSync(folder)) {
   if (entry === "plugin.json" || entry.startsWith(".")) continue;
+  // App-side TypeScript (the platform registration) lives next to the
+  // runtime files but is not part of the installed web-view package.
+  if (entry.endsWith(".ts")) continue;
   files[entry] = readFileSync(join(folder, entry), "utf8");
 }
 // The module the app reads must be in `files`.

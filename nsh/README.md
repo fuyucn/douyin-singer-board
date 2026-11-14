@@ -79,7 +79,7 @@ app can still be installed by putting its folder in `${dataDir}/plugins/<id>/`
 at startup, but there is no user-facing list or rescan button: the app is a
 two-platform player, and the generic list (rescan / call a demo method) is
 only rendered for the plugin-channel tests via `host.params.pluginDebug`.
-`plugins/demo/` remains the API example to copy.
+There is no bundled demo: `plugin.test.tsx` seeds the minimal plugin shape.
 
 What this costs:
 

@@ -1,9 +1,0 @@
-{
-  "id": "demo",
-  "name": "示例插件",
-  "version": "1.0.0",
-  "api": 1,
-  "entry": "index.js",
-  "note": "演示插件通道：log / storage / 方法调用",
-  "methods": ["hello", "search", "fetchDemo"]
-}

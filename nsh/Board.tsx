@@ -11,9 +11,9 @@ import { SyncLedger, formatDuration, isAuthFailure, nextDelay, pickNextSync, typ
 import { DEFAULT_SING_PREFIX, type Config, type DanmuInfo } from "./src/types";
 import type { Playlist, Track } from "./src/types";
 // Registering the platforms is what `platform()` and `pluginEnabled()` read:
-// a new platform is one import here plus its own folder under `plugins/`.
-import "./src/platform/kugou";
-import "./plugins/netease/platform";
+// each bundled plugin registers itself from its own folder under `plugins/`.
+import "./plugins/kugou-web/platform";
+import "./plugins/netease-web/platform";
 import { hasPlaylists, platform } from "./src/platform/registry";
 import process from "process";
 import { mkdir, readFile, writeFile } from "fs/promises";
