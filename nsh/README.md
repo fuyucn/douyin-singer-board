@@ -2,7 +2,7 @@
 
 NSH (Native Shell) rewrite of `douyin-singer-board`. Windows is the primary
 target; macOS is the development target. The NSH app is the shipping
-version (0.43.3); the Tauri app on `main` is not part of this branch.
+version (0.43.4); the Tauri app on `main` is not part of this branch.
 
 ## Run
 
@@ -111,13 +111,13 @@ What this costs:
 zip the updater replaces it from. The one-file download is an NSIS build of
 that directory, so both come from `installer/`:
 
-- `SUSUSongBoard-Portable-0.43.3.exe` — one file, ~26 MB; first run extracts to
+- `SUSUSongBoard-Portable-0.43.4.exe` — one file, ~26 MB; first run extracts to
   `%LOCALAPPDATA%\Programs\SUSUSongBoard`, later runs launch directly. A
   registry build marker (`PortableBuild`) keeps an updated install from being
   overwritten by an older launcher.
-- `SUSUSongBoard-Setup-0.43.3.exe` — per-user NSIS installer, same directory
+- `SUSUSongBoard-Setup-0.43.4.exe` — per-user NSIS installer, same directory
   (`%LOCALAPPDATA%`, so `nsh/updater` can replace the app without elevation).
-- `SUSUSongBoard-0.43.3-windows-x86_64.zip` — raw directory, and the
+- `SUSUSongBoard-0.43.4-windows-x86_64.zip` — raw directory, and the
   archive the updater uses. Not a hand-download.
 
 `nsh-windows.yml` builds and smoke-runs both exes on every push; `NSH Release`

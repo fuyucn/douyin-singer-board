@@ -34,9 +34,10 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 /**
  * Windows text inputs live in a native RichEdit control that can draw its
  * text off the field at display scales above 100% (nsh#1747). Until that is
- * fixed in the runtime, hide its glyphs and show the same value in a Text
- * layer behind a transparent Input: editing, the caret, IME and onChange stay
- * native, and clicks reach the Input. Other platforms render the Input itself.
+ * fixed in the runtime, hide its glyphs and draw the value in a Text layer on
+ * top of the Input. The Input keeps editing, the caret, IME, selection and
+ * onChange; the Text layer keeps the value readable and keeps the native
+ * glyphs from painting over it. Other platforms render the Input itself.
  */
 function BoardField(props: any) {
   const overlay = device.os === "windows" || host.params.textOverlay === true;
@@ -51,6 +52,14 @@ function BoardField(props: any) {
   const hidden = token("background");
   return (
     <View class={wrapper} testID={props.testID}>
+      <Input
+        value={props.value}
+        onChange={props.onChange}
+        onSubmit={props.onSubmit}
+        placeholder={props.placeholder}
+        class={`${cls.replace(/\bh-\d+\b/, "")} h-full w-full`}
+        style={{ ...(props.style || {}), color: hidden, placeholderColor: hidden }}
+      />
       <View style={{ position: "absolute", left: pad, right: pad, top: 0, bottom: 0, justifyContent: "center", pointerEvents: "none" }}>
         <If when={!!props.value}>
           <Text class={`truncate ${small ? "text-xs" : "text-sm"}`} style={{ color: token("foreground") }}>{String(props.value ?? "")}</Text>
@@ -59,14 +68,6 @@ function BoardField(props: any) {
           <Text class={`truncate ${small ? "text-xs" : "text-sm"}`} style={{ color: token("muted-foreground") }}>{props.placeholder || ""}</Text>
         </If>
       </View>
-      <Input
-        value={props.value}
-        onChange={props.onChange}
-        onSubmit={props.onSubmit}
-        placeholder={props.placeholder}
-        class={`${cls.replace(/\bh-\d+\b/, "")} h-full w-full`}
-        style={{ ...(props.style || {}), color: hidden, placeholderColor: hidden, backgroundColor: "transparent" }}
-      />
     </View>
   );
 }
@@ -103,7 +104,7 @@ function parseRoomInfo(html: string): { nickname: string; title: string; status:
   if (!nickname) return null;
   return { nickname, title: text("title"), status: number("status") };
 }
-const APP_VERSION = "0.43.3";
+const APP_VERSION = "0.43.4";
 
 // "0.1.1" is newer than "0.1.0"; missing parts count as 0. Used to decide
 // whether the plugin copy in the data directory predates the bundled one.
