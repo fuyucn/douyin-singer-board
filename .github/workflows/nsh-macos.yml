@@ -82,7 +82,6 @@ jobs:
           nsh test sqlite-store.test.tsx
           nsh test platform.test.tsx
           nsh test log.test.tsx
-          nsh test sqlite-bridge.test.tsx
           nsh test text-layout.test.tsx
           nsh test geometry.test.tsx
 

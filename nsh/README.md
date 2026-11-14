@@ -1,8 +1,8 @@
 # SUSUSongBoard · NSH rewrite
 
 NSH (Native Shell) rewrite of `douyin-singer-board`. Windows is the primary
-target; macOS is the development target. The Tauri app remains the shipping
-version until parity is signed off.
+target; macOS is the development target. The NSH app is the shipping
+version (0.43.2); the Tauri app on `main` is not part of this branch.
 
 ## Run
 
@@ -205,10 +205,9 @@ freshness (re-scan if expired), 歌单列表 (re-fetched on login), auto-sync
 (defaults to off), 队列/已点/日志/history (session data).
 
 The manual **导入原版数据** picker is gone: the first launch imports the old
-database itself, so a second path could only duplicate or overwrite it.
-`src/legacyMigration.ts` and `src/legacy/sqliteReader.ts` remain for their
-unit tests only; nothing in `Board.tsx` imports them. The old Python JSON
-exporter is not the main storage backend.
+database itself, so a second path could only duplicate or overwrite it. The
+native store performs that import; the old Python JSON exporter is not the
+main storage backend.
 
 ## Updates
 
