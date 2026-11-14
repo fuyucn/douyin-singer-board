@@ -9,6 +9,11 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    # The dev host's threads take RUST_MIN_STACK: upstream's CI sets 256 MiB
+    # because the debug build's frames overflow the 2 MiB default (its own
+    # Windows job does the same for every test it runs).
+    env:
+      RUST_MIN_STACK: "268435456"
     defaults:
       run:
         working-directory: nsh
