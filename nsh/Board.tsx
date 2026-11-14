@@ -40,7 +40,8 @@ const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
  * glyphs from painting over it. Other platforms render the Input itself.
  */
 function BoardField(props: any) {
-  const overlay = device.os === "windows" || host.params.textOverlay === true;
+  // TEST BUILD: native Windows inputs; forced only by a test param.
+  const overlay = host.params.textOverlay === true;
   if (!overlay) {
     return <Input value={props.value} onChange={props.onChange} onSubmit={props.onSubmit} placeholder={props.placeholder} class={props.class} style={props.style} testID={props.testID} />;
   }
