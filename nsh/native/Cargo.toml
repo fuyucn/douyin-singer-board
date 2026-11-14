@@ -10,8 +10,8 @@ publish = false
 # The fork of upstream main that carries the Windows input fixes under test
 # (and the NSH_TEST_SCALE knob the runner reproduction uses). Upstream rev
 # a7addd84bb5f4dbfc6979549cc7429517e9bdca9 is where the branch started.
-nsh-core = { git = "https://github.com/fuyucn/nsh", rev = "1fb4f15e" }
-nsh-base = { git = "https://github.com/fuyucn/nsh", rev = "1fb4f15e" }
+nsh-core = { git = "https://github.com/fuyucn/nsh", rev = "e448b8cf" }
+nsh-base = { git = "https://github.com/fuyucn/nsh", rev = "e448b8cf" }
 # Bundled everywhere: one SQLite version on macOS, Windows, Linux and Android,
 # no pkg-config/Homebrew leakage into the shipped binary.
 rusqlite = { version = "0.31", features = ["bundled", "backup"] }
