@@ -31,12 +31,12 @@ jobs:
           Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
           (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install the test runtime (fork main 4290c2f)
+      - name: Install the test runtime (fork main 4e2a7bc)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $rt = "$env:LOCALAPPDATA\nsh\runtime\windows"
-          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-4290c2f"
+          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-4e2a7bc"
           Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
           Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
@@ -53,6 +53,37 @@ jobs:
 
       - name: Install NSIS
         run: choco install nsis -y --no-progress
+
+      # The field's pixels at the machine's own scale (the control) and at a
+      # forced 150% (NSH_TEST_SCALE, the runtime stands in for a monitor the
+      # runner does not have): the text inside the field, as tall as the
+      # mirror's, and a selection fill inside it. scripts/check_win_input.py
+      # measures the screenshots and fails the run on either scale.
+      - name: Input rendering test at the machine's scale
+        run: nsh test win-input.test.tsx --target windows
+
+      - name: Input rendering test at a forced 150%
+        shell: pwsh
+        run: |
+          $env:NSH_TEST_SCALE = "1.5"
+          nsh test win-input.test.tsx --target windows
+
+      - name: Check the input's pixels
+        shell: pwsh
+        run: |
+          python -m pip install --quiet pillow
+          python scripts/check_win_input.py --scale 1.0
+          python scripts/check_win_input.py --scale 1.5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-input-screenshots
+          path: |
+            nsh/win-input-1.0-value.png
+            nsh/win-input-1.0-selected.png
+            nsh/win-input-1.5-value.png
+            nsh/win-input-1.5-selected.png
+          if-no-files-found: error
 
       - name: Package
         shell: pwsh
