@@ -2,6 +2,12 @@ name: NSH Windows runtime test
 
 on:
   workflow_dispatch:
+    inputs:
+      render_test:
+        description: Run the 150% input pixel test
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -62,6 +68,7 @@ jobs:
       # The runtime forces 150% to match the user's display scale; check the
       # text inside the field and its selection fill before packaging.
       - name: Input rendering test at a forced 150%
+        if: ${{ inputs.render_test }}
         shell: pwsh
         env:
           NSH_TEST_SCALE: "1.5"
@@ -74,6 +81,7 @@ jobs:
           Move-Item win-input-faces.png win-input-1.5-faces.png
 
       - uses: actions/upload-artifact@v4
+        if: ${{ inputs.render_test }}
         with:
           name: win-input-screenshots
           path: |
@@ -83,6 +91,7 @@ jobs:
           if-no-files-found: error
 
       - name: Check the input's pixels
+        if: ${{ inputs.render_test }}
         shell: pwsh
         run: |
           python -m pip install --quiet pillow
@@ -120,12 +129,34 @@ jobs:
           } while (-not $app.HasExited -and ($app.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($app.MainWindowHandle)) -and (Get-Date) -lt $deadline)
           if ($app.HasExited) { throw "Packaged app exited with code $($app.ExitCode)" }
           if ($app.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($app.MainWindowHandle)) {
+            $diagnostic = @(
+              "App ID: $appId"
+              "Process ID: $($app.Id)"
+              "Main window handle: $($app.MainWindowHandle)"
+              "Main window title: $($app.MainWindowTitle)"
+              "Window visible: $([WindowCheck]::IsWindowVisible($app.MainWindowHandle))"
+            )
+            $logPath = Join-Path $env:APPDATA "$appId\logs\app.log"
+            if (Test-Path $logPath) {
+              $errors = @(Select-String -Path $logPath -Pattern 'ERROR|WARN|panic' | Select-Object -Last 50 | ForEach-Object Line)
+              if ($errors.Count) { $diagnostic += $errors } else { $diagnostic += "No ERROR, WARN, or panic log entries" }
+            } else {
+              $diagnostic += "No app log: $logPath"
+            }
+            $diagnostic | Set-Content dist\SUSUSongBoard\startup-diagnostics.txt
             Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
             throw "Packaged app stayed alive without a visible main window"
           }
           Stop-Process -Id $app.Id -Force
           & "C:\Program Files (x86)\NSIS\makensis.exe" "/DRUNTIME_TEST_ID=$testId" installer\portable.nsi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: runtime-startup-diagnostics
+          path: nsh/dist/SUSUSongBoard/startup-diagnostics.txt
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         with:
