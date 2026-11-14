@@ -6,16 +6,8 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Node / pnpm
-node_modules/
-.pnpm-store/
-
 # Build outputs
 dist/
-sidecar/build/
-src-tauri/target/
-src-tauri/binaries/
-src-tauri/gen/schemas/
 
 # Rust
 **/*.rs.bk
@@ -23,14 +15,6 @@ src-tauri/gen/schemas/
 # Backup files
 *.bak
 _sqlite-main-snapshot-*/
-
-# kugou-api (nested repo / submodule)
-kugou-api/
-
-# Alma / Orka tooling
-.alma-snapshots/
-.orka/
-TASK_BOARD.md
 
 # Editors
 .idea/
@@ -42,7 +26,7 @@ TASK_BOARD.md
 
 # Local config
 config.json
-.orka/
-TASK_BOARD.md
-.alma-snapshots
 tmp/
+.orka/
+.alma-snapshots/
+TASK_BOARD.md

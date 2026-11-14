@@ -49,7 +49,7 @@ the Tauri app config dir, e.g. `~/Library/Application Support/<identifier>/`).
 
 ## NSH app (branch `nsh`)
 
-`AGENTS.md` is authoritative when this file and the code disagree. Since the native rewrite the repo also ships an NSH app on the `nsh` branch:
+`AGENTS.md` is authoritative when this file and the code disagree. This branch (`nsh`) contains the NSH app only; the Tauri app is on `main`/`feat/susu`:
 
 - `nsh/Board.tsx` is the entry; `nsh/native` is the Rust crate behind the `app/sqlite` module.
 - Build and test from `nsh/`: `nsh build Board.tsx`, `nsh test <file>.test.tsx`, `nsh test <file>.test.tsx --target macos`, `nsh package Board.tsx --target macos -o dist`. Cargo discovers `nsh/.cargo/config.toml` from the working directory, so the repo root builds differently.
