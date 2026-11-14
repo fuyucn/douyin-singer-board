@@ -15,7 +15,7 @@ function Harness() {
       <View class="flex-col gap-6 p-10">
         <Text class="text-sm text-[#191d24]" testID="mirror">{VALUE}</Text>
         <View class="h-9 w-[420px] rounded border border-[#2563eb] bg-white" testID="field-wrap">
-          <Input class="h-full w-full text-sm" testID="field" value={value()} onChange={value.set} />
+          <Input class="h-full w-full text-sm" testID="field" value={value()} onChange={({ value: v }) => value.set(v)} />
         </View>
         <Text class="text-sm text-[#191d24]" testID="title">标题字样 Sample 123</Text>
       </View>
