@@ -36,12 +36,12 @@ jobs:
           Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
           (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install the test runtime (fork main c9575535)
+      - name: Install the test runtime (fork main 263b1b3e)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $rt = "$env:LOCALAPPDATA\nsh\runtime\windows"
-          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-c9575535"
+          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-263b1b3e"
           Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
           Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
