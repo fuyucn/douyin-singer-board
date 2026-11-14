@@ -41,6 +41,19 @@ jobs:
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
           Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
 
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            nsh/native/target
+          key: ssb-runtime-test-${{ hashFiles('nsh/native/Cargo.lock') }}
+          restore-keys: ssb-runtime-test-
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
       - name: Package
         shell: pwsh
         run: |
