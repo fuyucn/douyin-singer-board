@@ -121,6 +121,7 @@ jobs:
             [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
           }
           "@
+          $env:RUST_LOG = "debug"
           $app = Start-Process -FilePath "$PWD\dist\SUSUSongBoard\SUSUSongBoard.exe" -PassThru
           $deadline = (Get-Date).AddSeconds(20)
           do {
@@ -138,8 +139,7 @@ jobs:
             )
             $logPath = Join-Path $env:APPDATA "$appId\logs\app.log"
             if (Test-Path $logPath) {
-              $errors = @(Select-String -Path $logPath -Pattern 'ERROR|WARN|panic' | Select-Object -Last 50 | ForEach-Object Line)
-              if ($errors.Count) { $diagnostic += $errors } else { $diagnostic += "No ERROR, WARN, or panic log entries" }
+              $diagnostic += Get-Content $logPath -Tail 200
             } else {
               $diagnostic += "No app log: $logPath"
             }
