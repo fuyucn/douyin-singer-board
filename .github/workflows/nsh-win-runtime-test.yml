@@ -57,23 +57,25 @@ jobs:
       # The field's pixels at the machine's own scale (the control) and at a
       # forced 150% (NSH_TEST_SCALE, the runtime stands in for a monitor the
       # runner does not have): the text inside the field, as tall as the
-      # mirror's, and a selection fill inside it. scripts/check_win_input.py
-      # measures the screenshots and fails the run on either scale.
+      # mirror's, and a selection fill wide enough to see. The test names its
+      # screenshots plainly; each step renames them by its scale, and
+      # scripts/check_win_input.py measures both runs and fails the run on
+      # either.
       - name: Input rendering test at the machine's scale
-        run: nsh test win-input.test.tsx --target windows
+        shell: pwsh
+        run: |
+          nsh test win-input.test.tsx --target windows
+          Move-Item win-input-value.png win-input-1.0-value.png
+          Move-Item win-input-selected.png win-input-1.0-selected.png
 
       - name: Input rendering test at a forced 150%
         shell: pwsh
+        env:
+          NSH_TEST_SCALE: "1.5"
         run: |
-          $env:NSH_TEST_SCALE = "1.5"
           nsh test win-input.test.tsx --target windows
-
-      - name: Check the input's pixels
-        shell: pwsh
-        run: |
-          python -m pip install --quiet pillow
-          python scripts/check_win_input.py --scale 1.0
-          python scripts/check_win_input.py --scale 1.5
+          Move-Item win-input-value.png win-input-1.5-value.png
+          Move-Item win-input-selected.png win-input-1.5-selected.png
 
       - uses: actions/upload-artifact@v4
         with:
@@ -84,6 +86,13 @@ jobs:
             nsh/win-input-1.5-value.png
             nsh/win-input-1.5-selected.png
           if-no-files-found: error
+
+      - name: Check the input's pixels
+        shell: pwsh
+        run: |
+          python -m pip install --quiet pillow
+          python scripts/check_win_input.py --scale 1.0
+          python scripts/check_win_input.py --scale 1.5
 
       - name: Package
         shell: pwsh

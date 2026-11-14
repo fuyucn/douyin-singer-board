@@ -9,15 +9,14 @@ import { VALUE } from "./win-input-value";
 // a selection fill wide enough to see. The headless targets draw nothing.
 test("the Windows input draws its text and selection inside the field", async () => {
   if (process.platform !== "windows") return;
-  const scale = process.env.NSH_TEST_SCALE ?? "1.0";
   const app = await open("./win-input-entry.tsx", { width: 800, height: 600 });
   await app.setColorScheme("light");
   await app.type("id:field", VALUE);
   expect(app.value("id:field")).toBe(VALUE);
   await new Promise((r) => setTimeout(r, 300));
-  await app.screenshot(`win-input-${scale}-value.png`);
+  await app.screenshot("win-input-value.png");
   await app.keyboard.press("mod+a");
   await new Promise((r) => setTimeout(r, 300));
-  await app.screenshot(`win-input-${scale}-selected.png`);
+  await app.screenshot("win-input-selected.png");
   app.dispose();
 });

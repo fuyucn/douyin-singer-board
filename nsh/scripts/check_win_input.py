@@ -112,12 +112,19 @@ def main():
     mirror_band = (0, field[1] - gap - round(30 * s) - 4, value.width, field[1] - gap + 4)
     title_band = (0, field[3] + gap - 4, value.width, field[3] + gap + round(30 * s) + 4)
 
-    mirror = ink_bbox(value, mirror_band)
+    mirror = ink_bbox(value, (0, 0, value.width, mirror_band[1]))
+    title = ink_bbox(value, (0, title_band[3], value.width, value.height))
     if mirror is None or mirror[4] < 200:
-        failures.append(f"the mirror text is missing ({mirror and mirror[4]} ink px)")
-    title = ink_bbox(value, title_band)
+        failures.append(
+            f"the mirror text is missing ({mirror and mirror[4]} ink px); "
+            f"all ink on the page: {ink_bbox(value, (0, 0, value.width, value.height))}"
+        )
     if title is None or title[4] < 200:
         failures.append(f"the title text is missing ({title and title[4]} ink px)")
+    if mirror is None:
+        mirror = (0, 0, 0, 0, 0)
+    if title is None:
+        title = (0, 0, 0, 0, 0)
 
     inset = round(3 * s)
     inner = (field[0] + inset, field[1] + inset, field[2] - inset, field[3] - inset)
