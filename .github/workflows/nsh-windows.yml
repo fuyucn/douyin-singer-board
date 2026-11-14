@@ -97,6 +97,7 @@ jobs:
           nsh test parity.test.tsx --target windows
           nsh test actions.test.tsx --target windows
           nsh test kugou-ui.test.tsx --target windows
+          nsh test text-overlay.test.tsx --target windows
 
       # The plugin channel runs a third-party page in a hidden WebView, so this
       # is also the check that the Windows image has a WebView engine.
@@ -108,6 +109,14 @@ jobs:
           nsh test scripts/kat-kugou-plugin.test.tsx --target windows > kat-kugou.txt 2>&1
           if ($LASTEXITCODE -ne 0) { Get-Content kat-kugou.txt; throw "plugin KAT failed" }
           node scripts/kat-kugou-plugin.mjs kat-kugou.txt
+
+      - name: Text overlay screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: text-overlay-windows
+          path: text-overlay.png
+          if-no-files-found: ignore
 
       - name: Auto-sync worker test
         run: nsh test sync-worker.test.tsx --target windows

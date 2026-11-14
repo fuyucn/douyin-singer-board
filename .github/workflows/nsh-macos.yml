@@ -98,6 +98,7 @@ jobs:
           nsh test plugin.test.tsx --target macos
           nsh test plugin-compat.test.tsx --target macos
           nsh test netease.test.tsx --target macos
+          nsh test text-overlay.test.tsx --target macos
 
       # The plugin's crypto, as a page computes it (needs a real WebView).
       - name: KuGou plugin crypto KAT (page vs Node)

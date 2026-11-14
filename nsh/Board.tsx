@@ -1,4 +1,4 @@
-import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Overlay, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
+import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Overlay, platform as device, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
 import { Icon, IconButton, PALETTE } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
@@ -30,6 +30,46 @@ import { installPlugin, listPlugins, removePlugin } from "./src/plugin/store";
 import type { InstalledPlugin } from "./src/plugin/types";
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+
+/**
+ * Windows text inputs live in a native RichEdit control that can draw its
+ * text off the field at display scales above 100% (nsh#1747). Until that is
+ * fixed in the runtime, hide its glyphs and show the same value in a Text
+ * layer behind a transparent Input: editing, the caret, IME and onChange stay
+ * native, and clicks reach the Input. Other platforms render the Input itself.
+ */
+function BoardField(props: any) {
+  const overlay = device.os === "windows" || host.params.textOverlay === true;
+  if (!overlay) {
+    return <Input value={props.value} onChange={props.onChange} onSubmit={props.onSubmit} placeholder={props.placeholder} class={props.class} style={props.style} testID={props.testID} />;
+  }
+  const cls = String(props.class ?? "");
+  const small = cls.includes("text-xs");
+  const pad = cls.includes("px-0") ? 0 : 11;
+  const height = cls.match(/h-\d+/)?.[0] ?? "h-8";
+  const wrapper = cls.includes("flex-1") ? `relative ${height} min-w-0 flex-1` : `relative ${height} w-full`;
+  const hidden = token("background");
+  return (
+    <View class={wrapper} testID={props.testID}>
+      <View style={{ position: "absolute", left: pad, right: pad, top: 0, bottom: 0, justifyContent: "center", pointerEvents: "none" }}>
+        <If when={!!props.value}>
+          <Text class={`truncate ${small ? "text-xs" : "text-sm"}`} style={{ color: token("foreground") }}>{String(props.value ?? "")}</Text>
+        </If>
+        <If when={!props.value}>
+          <Text class={`truncate ${small ? "text-xs" : "text-sm"}`} style={{ color: token("muted-foreground") }}>{props.placeholder || ""}</Text>
+        </If>
+      </View>
+      <Input
+        value={props.value}
+        onChange={props.onChange}
+        onSubmit={props.onSubmit}
+        placeholder={props.placeholder}
+        class={`${cls.replace(/\bh-\d+\b/, "")} h-full w-full`}
+        style={{ ...(props.style || {}), color: hidden, placeholderColor: hidden, backgroundColor: "transparent" }}
+      />
+    </View>
+  );
+}
 
 /** Next.js streams the room page as escaped JSON: `nickname\":\"…`.
  *  Reading it by index keeps the backslashes out of RegExp sources, where
@@ -1673,8 +1713,9 @@ function Board() {
                       </View>
                     </If>
                   </View>
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={config().room_id}
+                    testID="room-id"
                     onChange={({ value }) => patch({ room_id: value })}
                     onSubmit={start}
                     placeholder="221321076494"
@@ -1712,8 +1753,9 @@ function Board() {
                       {Icon({ scheme: colorScheme(), name: "info", class: "h-3 w-3", color: "faint" })}
                     </View>
                   </View>
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={config().sing_prefix}
+                    testID="sing-prefix"
                     onChange={({ value }) => patch({ sing_prefix: value })}
                     placeholder="[song]"
                     class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
@@ -1730,16 +1772,18 @@ function Board() {
                 <View class="flex-row gap-3">
                   <View class="flex-1 gap-1.5">
                     <Text class="text-xs text-muted-foreground">最低粉丝团等级</Text>
-                    <Input style={inputStyle()}
+                    <BoardField style={inputStyle()}
                       value={String(config().fans_level)}
+                    testID="fans-level"
                       onChange={({ value }) => patch({ fans_level: num(value) })}
                       class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                     />
                   </View>
                   <View class="flex-1 gap-1.5">
                     <Text class="text-xs text-muted-foreground">点歌冷却 (秒)</Text>
-                    <Input style={inputStyle()}
+                    <BoardField style={inputStyle()}
                       value={String(config().sing_cd)}
+                    testID="sing-cd"
                       onChange={({ value }) => patch({ sing_cd: num(value) })}
                       class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                     />
@@ -1747,8 +1791,9 @@ function Board() {
                 </View>
                 <View class="gap-1.5">
                   <Text class="text-xs text-muted-foreground">重复点歌冷却 (秒)</Text>
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={String(config().cooldown_seconds)}
+                    testID="cooldown-seconds"
                     onChange={({ value }) => patch({ cooldown_seconds: num(value) })}
                     class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                   />
@@ -1756,8 +1801,9 @@ function Board() {
                 </View>
                 <View class="gap-1.5">
                   <Text class="text-xs text-muted-foreground">单人单场点歌上限</Text>
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={String(config().max_songs_per_user)}
+                    testID="max-songs"
                     onChange={({ value }) => patch({ max_songs_per_user: num(value) })}
                     class="h-8 rounded-(--radius) border border-input bg-background px-2.5 text-sm"
                   />
@@ -1777,8 +1823,9 @@ function Board() {
                         <Text class="text-xs text-muted-foreground">歌单名称</Text>
                         <Text class="font-mono text-xs text-faint">id: {config().target_playlist_id || "—"}</Text>
                       </View>
-                      <Input style={inputStyle()}
+                      <BoardField style={inputStyle()}
                         value={config().target_playlist_name}
+                    testID="playlist-name"
                         onChange={({ value }) => {
                           const old = config().target_playlist_name.trim();
                           patch({ target_playlist_name: value });
@@ -1847,8 +1894,9 @@ function Board() {
               <View class="p-4 pt-6">
                 <Text class="mb-3 text-[13px] font-medium leading-5 text-foreground">手动点歌</Text>
                 <View class="flex-row gap-2">
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={manual()}
+                    testID="manual-song"
                     onChange={({ value }) => manual.set(value)}
                     onSubmit={addManual}
                     placeholder="输入歌曲名称..."
@@ -1971,8 +2019,9 @@ function Board() {
                 <View class="shrink-0 border-b border-line px-3 py-1.5">
                   <View class="h-7 flex-row items-center gap-2 rounded-(--radius) border border-input bg-background px-2">
                     {Icon({ scheme: colorScheme(), name: "search", class: "h-3.5 w-3.5", color: "faint" })}
-                    <Input style={inputStyle()}
+                    <BoardField style={inputStyle()}
                       value={playedQuery()}
+                    testID="played-query"
                       onChange={({ value }) => playedQuery.set(value)}
                       placeholder="搜索歌曲名或用户…"
                       class="h-6 min-w-0 flex-1 border-0 bg-transparent px-0 text-xs"
@@ -2038,8 +2087,9 @@ function Board() {
                       <Text class={`text-[11px] ${blackType() === "singer" ? "text-primary-foreground" : "text-foreground"}`}>歌手</Text>
                     </Button>
                   </View>
-                  <Input style={inputStyle()}
+                  <BoardField style={inputStyle()}
                     value={blackInput()}
+                    testID="black-input"
                     onChange={({ value }) => blackInput.set(value)}
                     onSubmit={addBlack}
                     placeholder={blackType() === "song" ? "输入歌曲名…" : "输入歌手名…"}
@@ -2402,7 +2452,7 @@ function Board() {
                       <Text class="text-[12px] text-muted-foreground">状态：{kgLabel()}</Text>
                       <Text class="text-[11px] text-faint">{kgMsg()}</Text>
                       <View class="h-px bg-muted" />
-                      <Input style={inputStyle()}
+                      <BoardField style={inputStyle()}
                         testID="ne-cookie"
                         value={neCookie()}
                         onChange={({ value }: any) => neCookie.set(value)}
