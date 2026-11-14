@@ -30,3 +30,4 @@ tmp/
 .orka/
 .alma-snapshots/
 TASK_BOARD.md
+nsh/scripts/__pycache__/
