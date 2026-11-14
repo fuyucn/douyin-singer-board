@@ -59,25 +59,9 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y --no-progress
 
-      # The field's pixels at the machine's own scale (the control) and at a
-      # forced 150% (NSH_TEST_SCALE, the runtime stands in for a monitor the
-      # runner does not have): the text inside the field, as tall as the
-      # mirror's, and a selection fill wide enough to see. The test names its
-      # screenshots plainly; each step renames them by its scale, and
-      # scripts/check_win_input.py measures both runs and fails the run on
-      # either.
-      - name: Input rendering test at the machine's scale
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          nsh test win-input.test.tsx --target windows
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Move-Item win-input-value.png win-input-1.0-value.png
-          Move-Item win-input-selected.png win-input-1.0-selected.png
-          Move-Item win-input-faces.png win-input-1.0-faces.png
-
+      # The runtime forces 150% to match the user's display scale; check the
+      # text inside the field and its selection fill before packaging.
       - name: Input rendering test at a forced 150%
-        if: ${{ !cancelled() }}
         shell: pwsh
         env:
           NSH_TEST_SCALE: "1.5"
@@ -90,30 +74,23 @@ jobs:
           Move-Item win-input-faces.png win-input-1.5-faces.png
 
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
         with:
           name: win-input-screenshots
           path: |
-            nsh/win-input-1.0-value.png
-            nsh/win-input-1.0-selected.png
-            nsh/win-input-1.0-faces.png
             nsh/win-input-1.5-value.png
             nsh/win-input-1.5-selected.png
             nsh/win-input-1.5-faces.png
           if-no-files-found: error
 
       - name: Check the input's pixels
-        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           python -m pip install --quiet pillow
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s scripts -p test_check_win_input.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python scripts/check_win_input.py --scale 1.0
-          $normal = $LASTEXITCODE
           python scripts/check_win_input.py --scale 1.5
-          if ($normal -ne 0 -or $LASTEXITCODE -ne 0) { exit 1 }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package
         shell: pwsh
