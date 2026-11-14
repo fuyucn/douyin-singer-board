@@ -74,8 +74,9 @@ jobs:
         shell: pwsh
         run: |
           nsh test win-input.test.tsx --target windows
-          Move-Item win-input-value.png win-input-1.0-value.png
-          Move-Item win-input-selected.png win-input-1.0-selected.png
+          Move-Item win-input-value.png win-input-1.0-value.png -ErrorAction SilentlyContinue
+          Move-Item win-input-selected.png win-input-1.0-selected.png -ErrorAction SilentlyContinue
+          Move-Item win-input-faces.png win-input-1.0-faces.png -ErrorAction SilentlyContinue
 
       - name: Input rendering test at a forced 150%
         continue-on-error: true
@@ -84,8 +85,9 @@ jobs:
           NSH_TEST_SCALE: "1.5"
         run: |
           nsh test win-input.test.tsx --target windows
-          Move-Item win-input-value.png win-input-1.5-value.png
-          Move-Item win-input-selected.png win-input-1.5-selected.png
+          Move-Item win-input-value.png win-input-1.5-value.png -ErrorAction SilentlyContinue
+          Move-Item win-input-selected.png win-input-1.5-selected.png -ErrorAction SilentlyContinue
+          Move-Item win-input-faces.png win-input-1.5-faces.png -ErrorAction SilentlyContinue
 
       - uses: actions/upload-artifact@v4
         with:
@@ -93,8 +95,10 @@ jobs:
           path: |
             nsh/win-input-1.0-value.png
             nsh/win-input-1.0-selected.png
+            nsh/win-input-1.0-faces.png
             nsh/win-input-1.5-value.png
             nsh/win-input-1.5-selected.png
+            nsh/win-input-1.5-faces.png
           if-no-files-found: error
 
       - name: Check the input's pixels

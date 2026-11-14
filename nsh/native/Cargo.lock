@@ -974,7 +974,7 @@ dependencies = [
 [[package]]
 name = "nsh-base"
 version = "0.5.0"
-source = "git+https://github.com/fuyucn/nsh?rev=1fb4f15e#1fb4f15e704dd2aa3729cb0865e3fd68ca4705c0"
+source = "git+https://github.com/fuyucn/nsh?rev=85bfa1fd#85bfa1fdb1bc2fe0cc24290e732f2b4e88f4bac8"
 dependencies = [
  "chrono",
  "html5ever",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "nsh-core"
 version = "0.5.0"
-source = "git+https://github.com/fuyucn/nsh?rev=1fb4f15e#1fb4f15e704dd2aa3729cb0865e3fd68ca4705c0"
+source = "git+https://github.com/fuyucn/nsh?rev=85bfa1fd#85bfa1fdb1bc2fe0cc24290e732f2b4e88f4bac8"
 dependencies = [
  "cap-std",
  "crc32fast",
@@ -1027,7 +1027,7 @@ dependencies = [
 [[package]]
 name = "nsh-macros"
 version = "0.5.0"
-source = "git+https://github.com/fuyucn/nsh?rev=1fb4f15e#1fb4f15e704dd2aa3729cb0865e3fd68ca4705c0"
+source = "git+https://github.com/fuyucn/nsh?rev=85bfa1fd#85bfa1fdb1bc2fe0cc24290e732f2b4e88f4bac8"
 dependencies = [
  "imagesize",
  "proc-macro2",
