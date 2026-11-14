@@ -16,7 +16,6 @@ test("the Windows input draws its text and selection inside the field", async ()
   expect(app.value("id:field")).toBe(VALUE);
   await new Promise((r) => setTimeout(r, 300));
   await app.screenshot(`win-input-${scale}-value.png`);
-  await app.press("id:field");
   await app.keyboard.press("mod+a");
   await new Promise((r) => setTimeout(r, 300));
   await app.screenshot(`win-input-${scale}-selected.png`);
