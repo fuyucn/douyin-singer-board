@@ -7,8 +7,8 @@ Unicode true
 !include "LogicLib.nsh"
 
 !define APP_NAME "SUSUSongBoard"
-!define APP_VERSION "0.43.2"
-!define APP_BUILD "816"
+!define APP_VERSION "0.43.3"
+!define APP_BUILD "817"
 !define APP_EXE "SUSUSongBoard.exe"
 
 Name "${APP_NAME} Portable"
@@ -19,7 +19,7 @@ SilentInstall silent
 SetCompressor /SOLID lzma
 Icon "..\assets\icon.ico"
 
-VIProductVersion "0.43.2.816"
+VIProductVersion "0.43.3.817"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "FileDescription" "${APP_NAME} portable launcher"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"

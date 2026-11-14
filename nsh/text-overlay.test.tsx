@@ -1,5 +1,4 @@
 import { expect, test } from "nsh/test";
-import process from "process";
 import { openSqliteBoard } from "./sqlite-test-options";
 
 const config = JSON.stringify({
@@ -41,6 +40,4 @@ test("the Windows text overlay shows values and accepts typing", async () => {
   await app.press("id:black-add");
   expect(app.texts()).toContain("黑名单 (1)");
 
-  // A real Windows renderer leaves this behind for the CI artifact.
-  if (process.platform === "win32") await app.screenshot("text-overlay.png");
 });
