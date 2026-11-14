@@ -110,10 +110,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $testId = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           $appId = "com.sususongboard.runtime-test.$testId"
-          nsh package Board.tsx --target windows -o dist --name SUSUSongBoard --id $appId
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "263b1b3e" } |
-            ConvertTo-Json | Set-Content dist\SUSUSongBoard\runtime-test.json
           Add-Type -TypeDefinition @"
           using System;
           using System.Runtime.InteropServices;
@@ -122,6 +118,28 @@ jobs:
           }
           "@
           $env:RUST_LOG = "debug"
+          $smokeId = "$appId.smoke"
+          nsh package startup-smoke-entry.tsx --target windows -o smoke-dist --name StartupSmoke --id $smokeId
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $smoke = Start-Process -FilePath "$PWD\smoke-dist\StartupSmoke\StartupSmoke.exe" -PassThru
+          $smokeDeadline = (Get-Date).AddSeconds(20)
+          do {
+            Start-Sleep -Milliseconds 500
+            $smoke.Refresh()
+          } while (-not $smoke.HasExited -and ($smoke.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($smoke.MainWindowHandle)) -and (Get-Date) -lt $smokeDeadline)
+          if ($smoke.HasExited -or $smoke.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($smoke.MainWindowHandle)) {
+            $smokeLog = Join-Path $env:APPDATA "$smokeId\logs\app.log"
+            $smokeDiagnostic = @("Smoke app ID: $smokeId", "Process ID: $($smoke.Id)", "Main window handle: $($smoke.MainWindowHandle)")
+            if (Test-Path $smokeLog) { $smokeDiagnostic += Get-Content $smokeLog -Tail 200 } else { $smokeDiagnostic += "No app log: $smokeLog" }
+            $smokeDiagnostic | Set-Content smoke-dist\StartupSmoke\startup-diagnostics.txt
+            Stop-Process -Id $smoke.Id -Force -ErrorAction SilentlyContinue
+            throw "Minimal packaged NSH app did not show a visible window"
+          }
+          Stop-Process -Id $smoke.Id -Force
+          nsh package Board.tsx --target windows -o dist --name SUSUSongBoard --id $appId
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "263b1b3e" } |
+            ConvertTo-Json | Set-Content dist\SUSUSongBoard\runtime-test.json
           $app = Start-Process -FilePath "$PWD\dist\SUSUSongBoard\SUSUSongBoard.exe" -PassThru
           $deadline = (Get-Date).AddSeconds(20)
           do {
@@ -155,7 +173,9 @@ jobs:
         if: failure()
         with:
           name: runtime-startup-diagnostics
-          path: nsh/dist/SUSUSongBoard/startup-diagnostics.txt
+          path: |
+            nsh/dist/SUSUSongBoard/startup-diagnostics.txt
+            nsh/smoke-dist/StartupSmoke/startup-diagnostics.txt
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
