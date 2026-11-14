@@ -1,0 +1,57 @@
+name: NSH Windows runtime test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: nsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install NSH nightly
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tmp = "$env:TEMP\nsh-unpack"
+          $zip = "$env:TEMP\nsh-windows-x86_64.zip"
+          gh release download nightly --repo longbridge/nsh --pattern "nsh-windows-x86_64.zip" --dir $env:TEMP --clobber
+          Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
+          $dest = "$env:LOCALAPPDATA\nsh"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
+          (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Install the test runtime (fork main 4290c2f)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $rt = "$env:LOCALAPPDATA\nsh\runtime\windows"
+          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-4290c2f"
+          Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
+          Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
+          Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          nsh --version
+          nsh build Board.tsx
+          nsh package Board.tsx --target windows -o dist --name SUSUSongBoard
+          & "C:\Program Files (x86)\NSIS\makensis.exe" installer\portable.nsi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SUSUSongBoard-runtime-test
+          path: nsh/dist/SUSUSongBoard-Portable-0.43.4.exe
+          if-no-files-found: error
