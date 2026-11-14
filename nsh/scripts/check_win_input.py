@@ -49,28 +49,56 @@ def ink_bbox(img, rect):
 
 
 def find_field(img):
-    """The blue border's bounds, grown to the whole border rectangle."""
+    """The field's border rectangle, found by its blue edges.
+
+    A border edge is a RUN of blue pixels (the border's 420-point top and
+    bottom), which ClearType's colored glyph fringes never are: the mirror
+    and the title also sit near blue after subpixel antialiasing, but their
+    runs are a few pixels long.
+    """
+
+    def blue(px):
+        r, g, b = px[0], px[1], px[2]
+        return b - r > 80 and b > 170 and g > 60 and g < 230
+
     px = img.load()
-    xs, ys = [], []
-    for y in range(0, img.height, 2):
-        for x in range(0, img.width, 2):
-            if near(px[x, y], BORDER, 60):
-                xs.append(x)
-                ys.append(y)
-    if len(xs) < 40:
-        raise SystemExit(f"FAIL: the field's blue border is not on screen ({len(xs)} px)")
-    return (min(xs), min(ys), max(xs) + 2, max(ys) + 2)
+    edge_rows = []
+    for y in range(img.height):
+        run = best = 0
+        run_start = best_start = 0
+        for x in range(img.width):
+            if blue(px[x, y]):
+                if run == 0:
+                    run_start = x
+                run += 1
+                if run > best:
+                    best, best_start = run, run_start
+            else:
+                run = 0
+        # The top and bottom edges are the widest runs on their rows.
+        if best > (img.width // 4):
+            edge_rows.append((y, best_start, best_start + best))
+    if len(edge_rows) < 2 or edge_rows[-1][0] - edge_rows[0][0] < 8:
+        raise SystemExit("FAIL: the field's blue border is not on screen")
+    top, left, right = edge_rows[0]
+    bottom = edge_rows[-1][0]
+    return (left, top, right, bottom)
 
 
 def count_ink_outside(img, field, avoid, grow):
-    """Dark pixels within `grow` of the field, outside it, minus `avoid`."""
+    """Dark pixels within `grow` of the field, outside it, minus `avoid`.
+
+    A band of 3 points around the field is skipped: the border's own
+    antialiasing bleeds that far, and nothing that escaped a field's box
+    stops within it.
+    """
     left, top, right, bottom = field
     outer = (left - grow, top - grow, right + grow, bottom + grow)
     px = img.load()
     count = 0
     for y in range(max(outer[1], 0), min(outer[3], img.height)):
         for x in range(max(outer[0], 0), min(outer[2], img.width)):
-            inside = left <= x < right and top <= y < bottom
+            inside = left - 3 <= x < right + 3 and top - 3 <= y < bottom + 3
             if inside:
                 continue
             if any(a[0] <= x < a[2] and a[1] <= y < a[3] for a in avoid):
@@ -112,8 +140,8 @@ def main():
     mirror_band = (0, field[1] - gap - round(30 * s) - 4, value.width, field[1] - gap + 4)
     title_band = (0, field[3] + gap - 4, value.width, field[3] + gap + round(30 * s) + 4)
 
-    mirror = ink_bbox(value, (0, 0, value.width, mirror_band[1]))
-    title = ink_bbox(value, (0, title_band[3], value.width, value.height))
+    mirror = ink_bbox(value, (0, 0, value.width, mirror_band[3]))
+    title = ink_bbox(value, (0, title_band[1], value.width, value.height))
     if mirror is None or mirror[4] < 200:
         failures.append(
             f"the mirror text is missing ({mirror and mirror[4]} ink px); "
@@ -135,7 +163,7 @@ def main():
     if leaked > 20:
         failures.append(f"{leaked} ink px drew outside the field (text escaped its box)")
 
-    if text and mirror:
+    if text and mirror and mirror[3] > mirror[1]:
         ratio = (text[3] - text[1]) / (mirror[3] - mirror[1])
         if not 0.7 <= ratio <= 1.45:
             failures.append(
