@@ -66,30 +66,31 @@ jobs:
       # screenshots plainly; each step renames them by its scale, and
       # scripts/check_win_input.py measures both runs and fails the run on
       # either.
-      # The dev host still cannot start on the runner (an upstream main
-      # regression, being bisected), so these run for their screenshots when
-      # the host connects and stay non-blocking until it does.
       - name: Input rendering test at the machine's scale
-        continue-on-error: true
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           nsh test win-input.test.tsx --target windows
-          Move-Item win-input-value.png win-input-1.0-value.png -ErrorAction SilentlyContinue
-          Move-Item win-input-selected.png win-input-1.0-selected.png -ErrorAction SilentlyContinue
-          Move-Item win-input-faces.png win-input-1.0-faces.png -ErrorAction SilentlyContinue
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item win-input-value.png win-input-1.0-value.png
+          Move-Item win-input-selected.png win-input-1.0-selected.png
+          Move-Item win-input-faces.png win-input-1.0-faces.png
 
       - name: Input rendering test at a forced 150%
-        continue-on-error: true
+        if: ${{ !cancelled() }}
         shell: pwsh
         env:
           NSH_TEST_SCALE: "1.5"
         run: |
+          $ErrorActionPreference = "Stop"
           nsh test win-input.test.tsx --target windows
-          Move-Item win-input-value.png win-input-1.5-value.png -ErrorAction SilentlyContinue
-          Move-Item win-input-selected.png win-input-1.5-selected.png -ErrorAction SilentlyContinue
-          Move-Item win-input-faces.png win-input-1.5-faces.png -ErrorAction SilentlyContinue
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item win-input-value.png win-input-1.5-value.png
+          Move-Item win-input-selected.png win-input-1.5-selected.png
+          Move-Item win-input-faces.png win-input-1.5-faces.png
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: win-input-screenshots
           path: |
@@ -102,12 +103,17 @@ jobs:
           if-no-files-found: error
 
       - name: Check the input's pixels
-        continue-on-error: true
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           python -m pip install --quiet pillow
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts -p test_check_win_input.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python scripts/check_win_input.py --scale 1.0
+          $normal = $LASTEXITCODE
           python scripts/check_win_input.py --scale 1.5
+          if ($normal -ne 0 -or $LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Package
         shell: pwsh
@@ -115,8 +121,14 @@ jobs:
           $ErrorActionPreference = "Stop"
           nsh --version
           nsh build Board.tsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           nsh package Board.tsx --target windows -o dist --name SUSUSongBoard
-          & "C:\Program Files (x86)\NSIS\makensis.exe" installer\portable.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testId = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          @{ testId = $testId; appCommit = $env:GITHUB_SHA; runtimeCommit = "263b1b3e" } |
+            ConvertTo-Json | Set-Content dist\SUSUSongBoard\runtime-test.json
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DRUNTIME_TEST_ID=$testId" installer\portable.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@v4
         with:

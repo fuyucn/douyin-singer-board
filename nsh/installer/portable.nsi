@@ -11,9 +11,15 @@ Unicode true
 !define APP_BUILD "818"
 !define APP_EXE "SUSUSongBoard.exe"
 
+!ifdef RUNTIME_TEST_ID
+!define INSTALL_NAME "${APP_NAME}-RuntimeTest-${RUNTIME_TEST_ID}"
+!else
+!define INSTALL_NAME "${APP_NAME}"
+!endif
+
 Name "${APP_NAME} Portable"
 OutFile "..\dist\${APP_NAME}-Portable-${APP_VERSION}.exe"
-InstallDir "$LOCALAPPDATA\Programs\${APP_NAME}"
+InstallDir "$LOCALAPPDATA\Programs\${INSTALL_NAME}"
 RequestExecutionLevel user
 SilentInstall silent
 SetCompressor /SOLID lzma
@@ -26,14 +32,14 @@ VIAddVersionKey "FileVersion" "${APP_VERSION}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
 
 Section "Run"
-  ReadRegStr $1 HKCU "Software\${APP_NAME}" "PortableBuild"
+  ReadRegStr $1 HKCU "Software\${INSTALL_NAME}" "PortableBuild"
   IfFileExists "$INSTDIR\${APP_EXE}" 0 extract
   StrCmp $1 "${APP_BUILD}" run
   IntCmp $1 ${APP_BUILD} run extract run
 extract:
   SetOutPath "$INSTDIR"
   File /r "..\dist\${APP_NAME}\*.*"
-  WriteRegStr HKCU "Software\${APP_NAME}" "PortableBuild" "${APP_BUILD}"
+  WriteRegStr HKCU "Software\${INSTALL_NAME}" "PortableBuild" "${APP_BUILD}"
 run:
   Exec "$INSTDIR\${APP_EXE}"
 SectionEnd

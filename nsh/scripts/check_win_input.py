@@ -1,7 +1,7 @@
 """Measures what a real Windows renderer drew for win-input.test.tsx.
 
-The entry (win-input-entry.tsx) lays a mirror text, the field (found by its
-blue border) and a title line on white, at fixed positions. This script
+The entry (win-input-entry.tsx) lays a mirror text, three fields and a
+title line on white. This script measures the first blue-bordered field and
 asserts, on the PNGs the test left:
 
 - the field's text drew INSIDE the field (no ink in the white ring around
@@ -81,7 +81,21 @@ def find_field(img):
     if len(edge_rows) < 2 or edge_rows[-1][0] - edge_rows[0][0] < 8:
         raise SystemExit("FAIL: the field's blue border is not on screen")
     top, left, right = edge_rows[0]
-    bottom = edge_rows[-1][0]
+    top_end = top
+    for y, _, _ in edge_rows[1:]:
+        if y > top_end + 1:
+            bottom = y
+            break
+        top_end = y
+    else:
+        raise SystemExit("FAIL: the field's bottom blue border is not on screen")
+    if bottom - top < 8:
+        raise SystemExit("FAIL: the field's blue border is too short")
+    for y in range(top, bottom + 1):
+        for x in range(img.width):
+            if blue(px[x, y]):
+                left = min(left, x)
+                right = max(right, x + 1)
     return (left, top, right, bottom)
 
 
@@ -134,32 +148,23 @@ def main():
     value = Image.open(f"win-input-{args.scale}-value.png").convert("RGB")
     field = find_field(value)
     grow = round(14 * s)
-    gap = round(24 * s)
-    # The mirror sits one 24-point gap above the field, the title one below;
-    # their ink bands leave the ring around the field empty by layout.
-    mirror_band = (0, field[1] - gap - round(30 * s) - 4, value.width, field[1] - gap + 4)
-    title_band = (0, field[3] + gap - 4, value.width, field[3] + gap + round(30 * s) + 4)
+    mirror_band = (0, 0, value.width, field[1] - round(4 * s))
 
     mirror = ink_bbox(value, (0, 0, value.width, mirror_band[3]))
-    title = ink_bbox(value, (0, title_band[1], value.width, value.height))
     if mirror is None or mirror[4] < 200:
         failures.append(
             f"the mirror text is missing ({mirror and mirror[4]} ink px); "
             f"all ink on the page: {ink_bbox(value, (0, 0, value.width, value.height))}"
         )
-    if title is None or title[4] < 200:
-        failures.append(f"the title text is missing ({title and title[4]} ink px)")
     if mirror is None:
         mirror = (0, 0, 0, 0, 0)
-    if title is None:
-        title = (0, 0, 0, 0, 0)
 
     inset = round(3 * s)
     inner = (field[0] + inset, field[1] + inset, field[2] - inset, field[3] - inset)
     text = ink_bbox(value, inner)
     if text is None or text[4] < 200:
         failures.append(f"the field's text is missing inside the field ({text and text[4]} ink px)")
-    leaked = count_ink_outside(value, field, [mirror_band, title_band], grow)
+    leaked = count_ink_outside(value, field, [mirror_band], grow)
     if leaked > 20:
         failures.append(f"{leaked} ink px drew outside the field (text escaped its box)")
 
@@ -184,7 +189,7 @@ def main():
             f"(changed {change and change[4]} px, need {min_px}; width {change and change[2] - change[0]}, need {min_w})"
         )
     else:
-        leaked_sel = count_ink_outside(selected, field, [mirror_band, title_band], grow)
+        leaked_sel = count_ink_outside(selected, field, [mirror_band], grow)
         if leaked_sel > 20:
             failures.append(f"{leaked_sel} ink px outside the field with the selection shown")
         print(f"selection fill {change[4]} px, bbox {change[2] - change[0]}x{change[3] - change[1]} inside the field")

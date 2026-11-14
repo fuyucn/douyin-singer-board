@@ -1,4 +1,4 @@
-import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Overlay, platform as device, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
+import { Clipboard, colorScheme, createMotion, effect, host, Image, mount, openUrl, Overlay, Scroll, setColorScheme, signal, Text, token, View } from "nsh";
 import { Icon, IconButton, PALETTE } from "./ui";
 import icon from "./assets/icon.png";
 import logo from "./assets/logo.png";
@@ -32,16 +32,12 @@ import type { InstalledPlugin } from "./src/plugin/types";
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
 
 /**
- * Windows text inputs live in a native RichEdit control that can draw its
- * text off the field at display scales above 100% (nsh#1747). Until that is
- * fixed in the runtime, hide its glyphs and draw the value in a Text layer on
- * top of the Input. The Input keeps editing, the caret, IME, selection and
- * onChange; the Text layer keeps the value readable and keeps the native
- * glyphs from painting over it. Other platforms render the Input itself.
+ * Windows RichEdit inputs can fail to render their value. Keep the native
+ * control for editing and draw the controlled value in a Text layer above it.
+ * Other platforms render the Input itself.
  */
 function BoardField(props: any) {
-  // TEST BUILD: native Windows inputs; forced only by a test param.
-  const overlay = host.params.textOverlay === true;
+  const overlay = host.params.textOverlay === true || process.platform === "windows";
   if (!overlay) {
     return <Input value={props.value} onChange={props.onChange} onSubmit={props.onSubmit} placeholder={props.placeholder} class={props.class} style={props.style} testID={props.testID} />;
   }
