@@ -99,11 +99,31 @@ jobs:
           nsh --version
           nsh build Board.tsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          nsh package Board.tsx --target windows -o dist --name SUSUSongBoard
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $testId = "$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
-          @{ testId = $testId; appCommit = $env:GITHUB_SHA; runtimeCommit = "263b1b3e" } |
+          $appId = "com.sususongboard.runtime-test.$testId"
+          nsh package Board.tsx --target windows -o dist --name SUSUSongBoard --id $appId
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "263b1b3e" } |
             ConvertTo-Json | Set-Content dist\SUSUSongBoard\runtime-test.json
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.Runtime.InteropServices;
+          public static class WindowCheck {
+            [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
+          }
+          "@
+          $app = Start-Process -FilePath "$PWD\dist\SUSUSongBoard\SUSUSongBoard.exe" -PassThru
+          $deadline = (Get-Date).AddSeconds(20)
+          do {
+            Start-Sleep -Milliseconds 500
+            $app.Refresh()
+          } while (-not $app.HasExited -and ($app.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($app.MainWindowHandle)) -and (Get-Date) -lt $deadline)
+          if ($app.HasExited) { throw "Packaged app exited with code $($app.ExitCode)" }
+          if ($app.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($app.MainWindowHandle)) {
+            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+            throw "Packaged app stayed alive without a visible main window"
+          }
+          Stop-Process -Id $app.Id -Force
           & "C:\Program Files (x86)\NSIS\makensis.exe" "/DRUNTIME_TEST_ID=$testId" installer\portable.nsi
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
