@@ -17,6 +17,7 @@
     }
   },
   "capabilities": {
+    "application": true,
     "fs": {
       "read": [
         "${dataDir}",

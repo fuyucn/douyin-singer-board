@@ -2598,4 +2598,6 @@ function Board() {
     </View>
   );
 }
+if (process.env.RUST_LOG === "debug") console.info("SUSUSongBoard: entry module loaded");
 mount(Board);
+if (process.env.RUST_LOG === "debug") console.info("SUSUSongBoard: root mounted");
