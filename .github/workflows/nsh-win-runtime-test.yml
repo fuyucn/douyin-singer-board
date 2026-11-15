@@ -120,6 +120,7 @@ jobs:
           $env:RUST_LOG = "debug"
           $tracePath = Join-Path $env:TEMP "nsh-windows-startup-trace.log"
           if (Test-Path $tracePath) { Clear-Content $tracePath }
+          $env:NSH_RUNTIME = Join-Path $env:LOCALAPPDATA "nsh\runtime"
           $smokeId = "$appId.smoke"
           nsh package startup-smoke --target windows -o smoke-dist --name StartupSmoke --id $smokeId
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -140,6 +141,7 @@ jobs:
           }
           Stop-Process -Id $smoke.Id -Force
           if (Test-Path $tracePath) { Clear-Content $tracePath }
+          $env:NSH_RUNTIME = Join-Path $env:LOCALAPPDATA "nsh\runtime"
           nsh package Board.tsx --target windows -o dist --name SUSUSongBoard --id $appId
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "197818d3" } |
