@@ -1,6 +1,12 @@
 name: NSH Windows input-only test
 
 on:
+  push:
+    branches:
+      - test/native-inputs
+    paths:
+      - .github/workflows/nsh-input-smoke.yml
+      - nsh/input-smoke/**
   workflow_dispatch:
 
 permissions:
