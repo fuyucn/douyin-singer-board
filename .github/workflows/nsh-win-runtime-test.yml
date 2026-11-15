@@ -42,12 +42,12 @@ jobs:
           Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
           (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install the diagnostic runtime (fork main d8a63b61)
+      - name: Install the startup fix runtime (fork main 3531e8cf)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $rt = "$env:LOCALAPPDATA\nsh\runtime\windows"
-          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-startup-d8a63b61"
+          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-startup-3531e8cf"
           Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
           Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
@@ -144,7 +144,7 @@ jobs:
           $env:NSH_RUNTIME = Join-Path $env:LOCALAPPDATA "nsh\runtime"
           nsh package Board.tsx --target windows -o dist --name SUSUSongBoard --id $appId
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "197818d3" } |
+          @{ testId = $testId; appId = $appId; appCommit = $env:GITHUB_SHA; runtimeCommit = "3531e8cf" } |
             ConvertTo-Json | Set-Content dist\SUSUSongBoard\runtime-test.json
           $app = Start-Process -FilePath "$PWD\dist\SUSUSongBoard\SUSUSongBoard.exe" -PassThru
           $deadline = (Get-Date).AddSeconds(20)
