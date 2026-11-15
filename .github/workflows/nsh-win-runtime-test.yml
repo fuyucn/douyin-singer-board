@@ -118,6 +118,7 @@ jobs:
           }
           "@
           $env:RUST_LOG = "debug"
+          $env:NSH_STARTUP_TRACE = "1"
           $tracePath = Join-Path $env:TEMP "nsh-windows-startup-trace.log"
           if (Test-Path $tracePath) { Clear-Content $tracePath }
           $env:NSH_RUNTIME = Join-Path $env:LOCALAPPDATA "nsh\runtime"
