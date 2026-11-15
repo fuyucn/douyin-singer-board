@@ -1,0 +1,14 @@
+{
+  "name": "NSHInputSmoke",
+  "id": "com.sususongboard.nsh-input-smoke",
+  "version": "1.0.0",
+  "build": 1,
+  "window": {
+    "title": "NSH Windows Input Test",
+    "defaultSize": { "width": 640, "height": 240 },
+    "minSize": { "width": 480, "height": 180 }
+  },
+  "capabilities": {
+    "application": true
+  }
+}
