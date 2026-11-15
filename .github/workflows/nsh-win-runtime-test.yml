@@ -121,7 +121,7 @@ jobs:
           $tracePath = Join-Path $env:TEMP "nsh-windows-startup-trace.log"
           if (Test-Path $tracePath) { Clear-Content $tracePath }
           $smokeId = "$appId.smoke"
-          nsh package startup-smoke-entry.tsx --target windows -o smoke-dist --name StartupSmoke --id $smokeId
+          nsh package startup-smoke --target windows -o smoke-dist --name StartupSmoke --id $smokeId
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $smoke = Start-Process -FilePath "$PWD\smoke-dist\StartupSmoke\StartupSmoke.exe" -PassThru
           $smokeDeadline = (Get-Date).AddSeconds(20)

@@ -1,0 +1,13 @@
+{
+  "name": "NSHStartupSmoke",
+  "id": "com.sususongboard.startup-smoke",
+  "version": "1.0.0",
+  "build": 1,
+  "window": {
+    "title": "NSH Startup Smoke",
+    "defaultSize": { "width": 480, "height": 280 }
+  },
+  "capabilities": {
+    "application": true
+  }
+}
