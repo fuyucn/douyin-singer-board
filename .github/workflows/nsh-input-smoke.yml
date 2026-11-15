@@ -61,12 +61,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: NSH-input-smoke-screenshots
           path: |
             nsh/win-input-1.0-value.png
             nsh/win-input-1.0-selected.png
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Package and verify the input-only app
         shell: pwsh

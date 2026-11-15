@@ -8,7 +8,7 @@ function InputSmoke() {
     <View class="flex-1 items-center justify-center bg-white" style={{ padding: 32 }}>
       <Input
         autoFocus
-        class="h-10 w-[480px] rounded border border-[#64748b] bg-white px-3 text-base text-[#111827]"
+        class="h-10 w-[480px] rounded border border-[#2563eb] bg-white px-3 text-base text-[#111827]"
         placeholder="Type here to test Windows input"
         style={{ selectionColor: "#2563eb" }}
         testID="field"
