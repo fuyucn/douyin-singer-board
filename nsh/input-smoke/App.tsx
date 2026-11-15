@@ -11,6 +11,7 @@ function InputSmoke() {
         class="h-10 w-[480px] rounded border border-[#64748b] bg-white px-3 text-base text-[#111827]"
         placeholder="Type here to test Windows input"
         style={{ selectionColor: "#2563eb" }}
+        testID="field"
         value={value()}
         onChange={({ value: nextValue }) => value.set(nextValue)}
       />

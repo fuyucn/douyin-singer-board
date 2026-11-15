@@ -38,6 +38,21 @@ class InputPixelTests(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()):
                     check_win_input.main()
 
+    def test_single_field_accepts_visible_text_and_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            value = Image.new("RGB", (640, 240), "white")
+            draw = ImageDraw.Draw(value)
+            draw.rounded_rectangle((80, 100, 560, 140), 4, outline=check_win_input.BORDER, width=2)
+            draw.rectangle((96, 112, 280, 126), fill="black")
+            value.save(folder / "win-input-1.0-value.png")
+            selected = value.copy()
+            ImageDraw.Draw(selected).rectangle((96, 108, 280, 132), fill="blue")
+            selected.save(folder / "win-input-1.0-selected.png")
+            with contextlib.chdir(folder), patch.object(sys, "argv", ["check_win_input", "--single"]):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    check_win_input.main()
+
     def test_first_of_three_fields_has_its_own_bounds(self):
         with tempfile.TemporaryDirectory() as directory:
             value = self.screenshots(Path(directory))

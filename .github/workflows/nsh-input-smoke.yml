@@ -45,6 +45,29 @@ jobs:
           Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
 
+      - name: Verify actual input text and selection pixels
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --quiet pillow
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s scripts -p test_check_win_input.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          nsh test input-smoke.test.tsx --target windows
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Move-Item win-input-value.png win-input-1.0-value.png
+          Move-Item win-input-selected.png win-input-1.0-selected.png
+          python scripts/check_win_input.py --scale 1.0 --single
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NSH-input-smoke-screenshots
+          path: |
+            nsh/win-input-1.0-value.png
+            nsh/win-input-1.0-selected.png
+          if-no-files-found: error
+
       - name: Package and verify the input-only app
         shell: pwsh
         run: |

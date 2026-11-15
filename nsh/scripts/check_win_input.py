@@ -141,6 +141,7 @@ def diff_bbox(was, now, rect, step):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scale", type=float, default=1.0)
+    ap.add_argument("--single", action="store_true", help="check a single input without mirror text")
     args = ap.parse_args()
     s = args.scale
     failures = []
@@ -149,22 +150,21 @@ def main():
     field = find_field(value)
     grow = round(14 * s)
     mirror_band = (0, 0, value.width, field[1] - round(4 * s))
-
-    mirror = ink_bbox(value, (0, 0, value.width, mirror_band[3]))
-    if mirror is None or mirror[4] < 200:
-        failures.append(
-            f"the mirror text is missing ({mirror and mirror[4]} ink px); "
-            f"all ink on the page: {ink_bbox(value, (0, 0, value.width, value.height))}"
-        )
-    if mirror is None:
-        mirror = (0, 0, 0, 0, 0)
+    mirror = None
+    if not args.single:
+        mirror = ink_bbox(value, (0, 0, value.width, mirror_band[3]))
+        if mirror is None or mirror[4] < 200:
+            failures.append(
+                f"the mirror text is missing ({mirror and mirror[4]} ink px); "
+                f"all ink on the page: {ink_bbox(value, (0, 0, value.width, value.height))}"
+            )
 
     inset = round(3 * s)
     inner = (field[0] + inset, field[1] + inset, field[2] - inset, field[3] - inset)
     text = ink_bbox(value, inner)
     if text is None or text[4] < 200:
         failures.append(f"the field's text is missing inside the field ({text and text[4]} ink px)")
-    leaked = count_ink_outside(value, field, [mirror_band], grow)
+    leaked = count_ink_outside(value, field, [] if args.single else [mirror_band], grow)
     if leaked > 20:
         failures.append(f"{leaked} ink px drew outside the field (text escaped its box)")
 
@@ -189,7 +189,7 @@ def main():
             f"(changed {change and change[4]} px, need {min_px}; width {change and change[2] - change[0]}, need {min_w})"
         )
     else:
-        leaked_sel = count_ink_outside(selected, field, [mirror_band], grow)
+        leaked_sel = count_ink_outside(selected, field, [] if args.single else [mirror_band], grow)
         if leaked_sel > 20:
             failures.append(f"{leaked_sel} ink px outside the field with the selection shown")
         print(f"selection fill {change[4]} px, bbox {change[2] - change[0]}x{change[3] - change[1]} inside the field")
