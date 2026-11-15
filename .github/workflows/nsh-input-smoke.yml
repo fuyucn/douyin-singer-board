@@ -75,6 +75,22 @@ jobs:
           Stop-Process -Id $app.Id -Force
           @{ testId = $testId; appId = $appId; runtimeCommit = "3af9c133" } |
             ConvertTo-Json | Set-Content dist\NSHInputSmoke\runtime-test.json
+          $installer = Start-Process -FilePath "$PWD\dist\NSHInputSmoke-setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -Wait -PassThru
+          if ($installer.ExitCode -ne 0) { throw "NSH installer exited with code $($installer.ExitCode)" }
+          $installedExe = Join-Path $env:LOCALAPPDATA "Programs\NSHInputSmoke\NSHInputSmoke.exe"
+          if (-not (Test-Path $installedExe)) { throw "Installer did not create $installedExe" }
+          $installed = Start-Process -FilePath $installedExe -PassThru
+          $deadline = (Get-Date).AddSeconds(20)
+          do {
+            Start-Sleep -Milliseconds 500
+            $installed.Refresh()
+          } while (-not $installed.HasExited -and ($installed.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($installed.MainWindowHandle)) -and (Get-Date) -lt $deadline)
+          if ($installed.HasExited) { throw "Installed app exited with code $($installed.ExitCode)" }
+          if ($installed.MainWindowHandle -eq [IntPtr]::Zero -or -not [WindowCheck]::IsWindowVisible($installed.MainWindowHandle)) {
+            Stop-Process -Id $installed.Id -Force -ErrorAction SilentlyContinue
+            throw "Installed app did not create a visible main window"
+          }
+          Stop-Process -Id $installed.Id -Force
       - uses: actions/upload-artifact@v4
         with:
           name: NSH-Windows-Input-Test
