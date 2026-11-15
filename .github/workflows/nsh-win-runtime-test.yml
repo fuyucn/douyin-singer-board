@@ -42,12 +42,12 @@ jobs:
           Copy-Item -Path (Join-Path (Join-Path $tmp "nsh") "*") -Destination $dest -Recurse -Force
           (Join-Path $dest "bin") | Out-File -FilePath $env:GITHUB_PATH -Append
 
-      - name: Install the diagnostic runtime (fork main 197818d3)
+      - name: Install the diagnostic runtime (fork main 062b7c5c)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $rt = "$env:LOCALAPPDATA\nsh\runtime\windows"
-          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-startup-197818d3"
+          $base = "https://github.com/fuyucn/nsh/releases/download/test-runtime-startup-062b7c5c"
           Invoke-WebRequest "$base/nsh-windows-app.exe" -OutFile "$rt\nsh-windows-app.exe"
           Invoke-WebRequest "$base/nsh-windows-host.exe" -OutFile "$rt\nsh-windows-host.exe"
           Get-Item "$rt\nsh-windows-app.exe" | Select-Object Length
