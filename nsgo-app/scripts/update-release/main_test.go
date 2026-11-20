@@ -67,6 +67,24 @@ func TestStableReleaseFeed(t *testing.T) {
 	}
 }
 
+func TestStableUpdateTestFeedIsIsolated(t *testing.T) {
+	const origin = "https://github.com/example/project/releases/download/nsgo-stable-test/"
+	const expected = githubProxy + origin
+	for _, input := range []string{origin, expected} {
+		if feed, err := releaseFeed(input, "stable-test"); err != nil || feed != expected {
+			t.Errorf("releaseFeed(%q, stable-test) = %q, %v; want %q", input, feed, err, expected)
+		}
+	}
+	if _, err := releaseFeed("https://github.com/example/project/releases/download/nsgo-stable/", "stable-test"); err == nil {
+		t.Fatal("stable test updater accepted the production stable feed")
+	}
+	config := map[string]any{"id": "com.sususongboard.nsgo", "name": "SUSUSongBoard"}
+	configureUpdateTestIdentity(config, "stable-test")
+	if config["id"] != "com.sususongboard.nsgo.updatetest" || config["name"] != "SUSUSongBoard Update Test" {
+		t.Fatalf("update test shares its app identity: %#v", config)
+	}
+}
+
 func TestBuildReleaseRejectsWrongChannelVersion(t *testing.T) {
 	for channel, version := range map[string]string{"preview": "0.43.0", "stable": "0.43.0-preview.1"} {
 		t.Run(channel, func(t *testing.T) {

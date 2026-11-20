@@ -22,10 +22,11 @@ import (
 )
 
 var channelVersions = map[string]*regexp.Regexp{
-	"preview": regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+-preview\.[1-9][0-9]*$`),
-	"stable":  regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`),
+	"preview":     regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+-preview\.[1-9][0-9]*$`),
+	"stable":      regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`),
+	"stable-test": regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`),
 }
-var githubReleasePath = regexp.MustCompile(`^/[A-Za-z0-9-]+/([A-Za-z0-9._-]+)/releases/download/(nsgo-preview|nsgo-stable)/?$`)
+var githubReleasePath = regexp.MustCompile(`^/[A-Za-z0-9-]+/([A-Za-z0-9._-]+)/releases/download/(nsgo-preview|nsgo-stable|nsgo-stable-test)/?$`)
 
 const githubProxy = "https://gh-proxy.com/"
 
@@ -49,7 +50,7 @@ func buildRelease(channel, target string, build int, output string) error {
 	}
 	versionPattern, ok := channelVersions[channel]
 	if !ok {
-		return errors.New("update channel must be preview or stable")
+		return errors.New("update channel must be preview, stable, or stable-test")
 	}
 	data, err := os.ReadFile("nsgo.yaml")
 	if err != nil {
@@ -63,6 +64,7 @@ func buildRelease(channel, target string, build int, output string) error {
 	if !versionPattern.MatchString(version) {
 		return fmt.Errorf("nsgo.yaml version %q does not match the %s update channel", version, channel)
 	}
+	configureUpdateTestIdentity(config, channel)
 	feed, err := releaseFeed(os.Getenv("SONGBOARD_UPDATE_FEED"), channel)
 	if err != nil {
 		return err
@@ -161,6 +163,13 @@ func buildRelease(channel, target string, build int, output string) error {
 	return nil
 }
 
+func configureUpdateTestIdentity(config map[string]any, channel string) {
+	if channel == "stable-test" {
+		config["id"] = "com.sususongboard.nsgo.updatetest"
+		config["name"] = "SUSUSongBoard Update Test"
+	}
+}
+
 func releaseFeed(value, channel string) (string, error) {
 	origin, proxied := strings.CutPrefix(value, githubProxy)
 	parsed, err := url.Parse(origin)
@@ -171,6 +180,9 @@ func releaseFeed(value, channel string) (string, error) {
 	host := strings.TrimSuffix(strings.ToLower(parsed.Hostname()), ".")
 	if proxied || host == "github.com" || host == "gh-proxy.com" {
 		tag := "nsgo-" + channel
+		if channel == "stable-test" {
+			tag = "nsgo-stable-test"
+		}
 		parts := githubReleasePath.FindStringSubmatch(parsed.Path)
 		if parsed.Host != "github.com" || parsed.RawPath != "" || parts == nil || parts[1] == "." || parts[1] == ".." || parts[2] != tag {
 			return "", fmt.Errorf("GitHub update feed must point to https://github.com/OWNER/REPO/releases/download/%s/ with at most one GH Proxy prefix", tag)

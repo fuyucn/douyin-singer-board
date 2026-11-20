@@ -92,35 +92,24 @@ jobs:
         run: go tool nsgo check ./...
       - name: Build Windows app without an installer
         run: go tool nsgo build -target windows_x64 -installers=false
-      - name: Package and verify the portable app
+      - name: Package and verify the portable executable
         shell: pwsh
         run: |
           $packageDir = Join-Path $PWD ("dist/SUSUSongBoard-{0}-windows_x64" -f $env:NSGO_VERSION)
           $exe = Join-Path $packageDir 'SUSUSongBoard.exe'
           if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Missing portable app executable: $exe" }
           $releaseDir = Join-Path $PWD 'dist/releases'
-          $zip = Join-Path $releaseDir ("sususongboard-{0}-windows-x64-portable.zip" -f $env:NSGO_VERSION)
+          $portable = Join-Path $releaseDir ("sususongboard-{0}-windows-x64.exe" -f $env:NSGO_VERSION)
           New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          [System.IO.Compression.ZipFile]::CreateFromDirectory($packageDir, $zip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
-          try {
-            $entry = $archive.Entries | Where-Object { $_.FullName -eq 'SUSUSongBoard.exe' }
-            if ($null -eq $entry) { throw 'The portable ZIP does not contain the application executable.' }
-            $archiveNames = $archive.Entries | ForEach-Object { $_.FullName }
-            $sourceFiles = Get-ChildItem -LiteralPath $packageDir -File -Recurse | ForEach-Object { $_.FullName.Substring($packageDir.Length + 1).Replace('\', '/') }
-            foreach ($file in $sourceFiles) {
-              if ($file -notin $archiveNames) { throw "The portable ZIP is missing $file" }
-            }
-          } finally {
-            $archive.Dispose()
-          }
-          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $(Split-Path $zip -Leaf)" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+          Copy-Item -LiteralPath $exe -Destination $portable
+          $productVersion = (Get-Item -LiteralPath $portable).VersionInfo.ProductVersion
+          if (!$productVersion.StartsWith($env:NSGO_VERSION)) { throw "Unexpected executable version: $productVersion" }
+          $hash = (Get-FileHash -LiteralPath $portable -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $(Split-Path $portable -Leaf)" | Set-Content -LiteralPath "$portable.sha256" -Encoding ascii
       - uses: actions/upload-artifact@v4
         with:
           name: SUSUSongBoard-windows-x64-portable
           if-no-files-found: error
           path: |
-            nsgo-app/dist/releases/sususongboard-${{ env.NSGO_VERSION }}-windows-x64-portable.zip
-            nsgo-app/dist/releases/sususongboard-${{ env.NSGO_VERSION }}-windows-x64-portable.zip.sha256
+            nsgo-app/dist/releases/sususongboard-${{ env.NSGO_VERSION }}-windows-x64.exe
+            nsgo-app/dist/releases/sususongboard-${{ env.NSGO_VERSION }}-windows-x64.exe.sha256
