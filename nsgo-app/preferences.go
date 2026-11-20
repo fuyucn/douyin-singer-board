@@ -141,7 +141,7 @@ func selectBoardDatabase(directory, selection string) (path string, create, pinn
 		path = store.DatabasePath(directory)
 		if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
 			legacy := store.DatabasePath(filepath.Join(filepath.Dir(directory), "com.sususongboard.app"))
-			if _, err := os.Lstat(legacy); errors.Is(err, os.ErrNotExist) {
+			if _, err := os.Lstat(legacy); manifest.ID == "com.sususongboard.nsgo.updatetest" || errors.Is(err, os.ErrNotExist) {
 				create = true
 			} else {
 				path = legacy

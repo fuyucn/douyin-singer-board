@@ -20,6 +20,7 @@ var manifest = func() appManifest {
 }()
 
 type appManifest struct {
+	ID      string
 	Version string
 	Updates struct {
 		Channel string

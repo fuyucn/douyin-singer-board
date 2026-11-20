@@ -1,12 +1,42 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
+	"github.com/sususongboard/nsgo-app/store"
 )
+
+func TestUpdateTestIdentityDoesNotAdoptExistingData(t *testing.T) {
+	t.Setenv("SUSUSONGBOARD_DB", "")
+	t.Setenv("SUSUSONGBOARD_TEST_DB", "")
+	previous := manifest.ID
+	manifest.ID = "com.sususongboard.nsgo.updatetest"
+	t.Cleanup(func() { manifest.ID = previous })
+	root := t.TempDir()
+	directory := filepath.Join(root, manifest.ID)
+	legacy := filepath.Join(root, "com.sususongboard.app")
+	for _, path := range []string{directory, legacy} {
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(store.DatabasePath(legacy), []byte("do not adopt"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path, create, pinned, err := selectBoardDatabase(directory, filepath.Join(directory, databaseSelectionFilename))
+	resolved, resolveErr := filepath.EvalSymlinks(directory)
+	if err != nil || resolveErr != nil || !create || pinned || filepath.Dir(path) != resolved {
+		t.Fatalf("test app selected legacy data: %q, create=%t, pinned=%t, err=%v", path, create, pinned, err)
+	}
+	if credentialServiceFor(manifest.ID) == credentialServiceFor(previous) {
+		t.Fatal("update test shares the regular credential service")
+	}
+}
 
 func TestUpdateCheckInAbout(t *testing.T) {
 	for _, enabled := range []bool{false, true} {

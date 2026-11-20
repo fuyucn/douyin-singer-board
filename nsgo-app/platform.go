@@ -21,7 +21,14 @@ import (
 	"rsc.io/qr"
 )
 
-const credentialService = "com.sususongboard.nsgo.music"
+var credentialService = credentialServiceFor(manifest.ID)
+
+func credentialServiceFor(appID string) string {
+	if appID == "com.sususongboard.nsgo.updatetest" {
+		return appID + ".music"
+	}
+	return "com.sususongboard.nsgo.music"
+}
 
 type session struct {
 	Token    string `json:"token"`
