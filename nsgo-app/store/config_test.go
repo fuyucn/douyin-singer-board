@@ -2,9 +2,9 @@ package store
 
 import (
 	"database/sql"
-	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -35,7 +35,7 @@ func TestLoadConfigReadsExistingSQLiteWithoutWriting(t *testing.T) {
 	if got.RoomID != "123456789" || got.SingPrefix != "点歌[space][song]" || got.FansLevel != 4 || got.SingCooldown != 60 || got.TargetPlaylistID != 42 || !got.KugouEnabled {
 		t.Fatalf("unexpected config: %#v", got)
 	}
-	readOnly, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: path}).String()+"?mode=ro")
+	readOnly, err := sql.Open("sqlite", sqliteURI(path, runtime.GOOS)+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestWriteConfigMakesVerifiedSnapshotAndRoundTripsBlacklist(t *testing.T) {
 	if after.RoomID != "987654321" || after.SingPrefix != "[song]" || len(after.BlacklistSongs) != 1 || after.BlacklistSongs[0] != "new block" || len(after.BlacklistSingers) != 1 || after.BlacklistMeta["song:new block"] != 456 {
 		t.Fatalf("written config failed to round-trip: %#v", after)
 	}
-	check, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: path}).String()+"?mode=ro")
+	check, err := sql.Open("sqlite", sqliteURI(path, runtime.GOOS)+"?mode=ro")
 	if err != nil {
 		t.Fatal(err)
 	}

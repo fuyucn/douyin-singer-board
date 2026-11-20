@@ -59,11 +59,9 @@ func signXMSStub(stub string) (string, error) {
 			return object
 		})
 		signer.runtime.Set("Buffer", signer.runtime.Get("Uint8Array"))
-		source := strings.Replace(signingSource,
-			"import { createHash } from \"crypto\";\nimport { Buffer } from \"buffer\";", "", 1)
-		source = strings.Replace(source, "export function get_sign(md5)", "globalThis.__getSign = function get_sign(md5)", 1)
-		if source == signingSource || strings.Contains(source, "export function get_sign(md5)") {
-			signer.err = fmt.Errorf("could not prepare the embedded Douyin signer")
+		source, err := prepareSigningSource(signingSource)
+		if err != nil {
+			signer.err = err
 		} else if _, err := signer.runtime.RunString(source); err != nil {
 			signer.err = fmt.Errorf("initialize embedded Douyin signer: %w", err)
 		} else if function, ok := goja.AssertFunction(signer.runtime.Get("__getSign")); !ok {
@@ -84,4 +82,16 @@ func signXMSStub(stub string) (string, error) {
 		return "", fmt.Errorf("embedded Douyin signer returned an invalid signature")
 	}
 	return signature, nil
+}
+
+func prepareSigningSource(source string) (string, error) {
+	source = strings.ReplaceAll(source, "\r\n", "\n")
+	source = strings.ReplaceAll(source, "\r", "\n")
+	source = strings.Replace(source,
+		"import { createHash } from \"crypto\";\nimport { Buffer } from \"buffer\";", "", 1)
+	source = strings.Replace(source, "export function get_sign(md5)", "globalThis.__getSign = function get_sign(md5)", 1)
+	if strings.Contains(source, "import { createHash } from \"crypto\";") || strings.Contains(source, "export function get_sign(md5)") {
+		return "", fmt.Errorf("could not prepare the embedded Douyin signer")
+	}
+	return source, nil
 }

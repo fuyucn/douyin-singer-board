@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -65,6 +66,19 @@ func TestSignedWebsocketURLIncludesSignerOutput(t *testing.T) {
 	}
 	if parsed.Scheme != "wss" || parsed.Host != "example.com" || parsed.Query().Get("signature") == "" || parsed.Query().Get("signature") == "00000000" {
 		t.Fatalf("invalid signed websocket URL: %s", value)
+	}
+}
+
+func TestPrepareSigningSourceNormalizesWindowsLineEndings(t *testing.T) {
+	source, err := prepareSigningSource("import { createHash } from \"crypto\";\r\nimport { Buffer } from \"buffer\";\r\nexport function get_sign(md5) { return md5; }\r\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(source, "\r") || strings.Contains(source, "import { createHash }") || strings.Contains(source, "export function get_sign(md5)") {
+		t.Fatalf("source was not normalized for Goja: %q", source)
+	}
+	if !strings.Contains(source, "globalThis.__getSign = function get_sign(md5)") {
+		t.Fatalf("signer export was not adapted: %q", source)
 	}
 }
 
