@@ -1,48 +1,22 @@
-# SUSUSongBoard · NSH rewrite
+# SUSUSongBoard
 
-NSH (Native Shell) rewrite of `douyin-singer-board`. Windows is the primary
-target; macOS is the development target. The Tauri app remains the shipping
-version until parity is signed off.
+SongBoard is a native NSGo desktop app for collecting Douyin live song requests and syncing them to KuGou or NetEase Cloud Music playlists. `nsgo-app/` is the only maintained implementation and the source of new packages built from this repository.
 
-## Run
+## Develop and build
 
-```sh
-nsh run Board.tsx --target macos
-nsh test board.test.tsx
-nsh test src/matcher.test.ts
-```
+From the repository root:
 
-## Build
+~~~sh
+cd nsgo-app
+go tool nsgo dev
+go test ./... -skip '^TestLiveDouyinConnection$'
+go tool nsgo check
+go tool nsgo build -target macos_arm64
+go tool nsgo build -target windows_x64 -installers=false
+~~~
 
-```sh
-nsh package Board.tsx --target macos -o dist --name SUSUSongBoard
-```
+- [Application guide](nsgo-app/README.md): workbench, platform login, data and tests.
+- [Signed updates](nsgo-app/UPDATES.md): Mac and Windows installers, GH Proxy and the preview feed.
+- [Migration contract](nsgo-app/PARITY.md): UI and behavior references, versioning and remaining acceptance gates.
 
-Windows builds must run on Windows (Explorer icon embedding and runtime tests):
-
-```powershell
-$env:NSH_VERSION = "nightly"
-irm https://nsh.dev/install.ps1 | iex
-nsh package Board.tsx --target windows -o dist --name SUSUSongBoard
-```
-
-For inspection only, a Windows zip can be cross-packaged on macOS with a
-Windows nightly runtime:
-
-```sh
-NSH_RUNTIME=/path/to/nsh-windows/runtime nsh package Board.tsx \
-  --target windows -o dist --name SUSUSongBoard
-```
-
-The exe then keeps the default Explorer icon.
-
-## Current state
-
-- P0 shell: header, room/settings panel, song table, log panel, manual add,
-  simulated request.
-- Matcher: `[space]` / `[song]` templates, fans level, per-user cooldown,
-  cancel, blacklist.
-- Listener: Douyin WSS (nightly required for the `Cookie` handshake header).
-- Kugou adapter remains under `plugins/kugou/`; not wired into the board UI yet.
-
-See `docs/PARITY.md` for the Windows gate and P0–P3 plan.
+The retired implementations are no longer built from this repository. Existing installations, data and releases are not removed by the source migration. NSGo reads and writes settings in SQLite. When adopting an existing database, it backs up the database before adding its own settings table and leaves the legacy tables intact.

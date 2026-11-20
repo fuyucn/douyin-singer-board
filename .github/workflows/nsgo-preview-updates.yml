@@ -1,0 +1,60 @@
+name: SongBoard signed preview updates
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: Numeric build number greater than every previously published preview
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+jobs:
+  signed-packages:
+    name: Signed ${{ matrix.target }} preview
+    runs-on: ${{ matrix.runner }}
+    environment: nsgo-preview-signing
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: macos_arm64
+          - runner: windows-latest
+            target: windows_x64
+    defaults:
+      run:
+        shell: bash
+        working-directory: nsgo-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: nsgo-app/go.mod
+          cache-dependency-path: nsgo-app/go.sum
+      - name: Verify runner architecture
+        if: runner.os == 'macOS'
+        run: test "$(uname -m)" = arm64
+      - name: Install NSIS on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run offline tests
+        run: go test ./... -skip '^TestLiveDouyinConnection$'
+      - name: Build and verify signed installer and appcast
+        env:
+          NSGO_UPDATES_KEY: ${{ secrets.NSGO_UPDATES_KEY }}
+          SONGBOARD_UPDATE_PUBLIC_KEY: ${{ vars.SONGBOARD_UPDATE_PUBLIC_KEY }}
+          SONGBOARD_UPDATE_FEED: ${{ vars.SONGBOARD_UPDATE_FEED }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          UPDATE_TARGET: ${{ matrix.target }}
+        run: go run ./scripts/update-release -target "$UPDATE_TARGET" -build-number "$BUILD_NUMBER" -output dist/signed-preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-preview-${{ matrix.target }}
+          path: nsgo-app/dist/signed-preview/*
+          if-no-files-found: error
