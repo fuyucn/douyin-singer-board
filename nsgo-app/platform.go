@@ -580,7 +580,7 @@ func (board *boardState) songAllowed(song queue.Song, candidate track) bool {
 			return false
 		}
 	}
-	return song.Manual || limit == 0 || count < limit
+	return song.Manual || isAnonymousUserID(song.UserID) || limit == 0 || count < limit
 }
 
 func (board *boardState) syncSong(song queue.Song, candidate track, automatic bool) {

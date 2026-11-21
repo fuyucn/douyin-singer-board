@@ -19,6 +19,10 @@ func chatUserID(message queue.ChatMessage) string {
 	return "anon:" + name
 }
 
+func isAnonymousUserID(userID string) bool {
+	return userID == "anonymous" || strings.HasPrefix(userID, "anon:")
+}
+
 func (board *boardState) handleChat(message queue.ChatMessage) {
 	message.UserID = chatUserID(message)
 	result := board.matcher.Match(message)
@@ -54,7 +58,7 @@ func (board *boardState) admitSong(song queue.Song) bool {
 		board.logRequestRejection(song.Nickname, song.RawMessage, "已在待点或已点列表中")
 		return false
 	}
-	if !song.Manual && board.settings.Rules.Limit > 0 && count >= board.settings.Rules.Limit {
+	if !song.Manual && !isAnonymousUserID(song.UserID) && board.settings.Rules.Limit > 0 && count >= board.settings.Rules.Limit {
 		board.matcher.RemoveByID(song.ID)
 		board.notify("已达每人单场点歌上限")
 		board.logRequestRejection(song.Nickname, song.RawMessage, fmt.Sprintf("已达每人单场点歌上限（%d/%d）", count, board.settings.Rules.Limit))

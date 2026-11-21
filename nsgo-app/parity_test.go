@@ -253,9 +253,9 @@ func TestChatUserIDFallback(t *testing.T) {
 	}
 }
 
-func TestAnonymousViewersDoNotShareQuota(t *testing.T) {
+func TestAnonymousViewersIgnoreUserQuota(t *testing.T) {
 	fixtureDatabase(t)
-	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 3}})
+	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 1}})
 	var board *boardState
 	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
 		board = newBoard(scope, platformServices{})
@@ -267,6 +267,7 @@ func TestAnonymousViewersDoNotShareQuota(t *testing.T) {
 		{"a1", "Alice", "Alice song"},
 		{"b1", "Bob", "Bob song"},
 		{"c1", "Carol", "Carol song"},
+		{"a2", "Alice", "Alice second song"},
 	}
 	app.Post(func() {
 		for _, request := range requests {
@@ -274,19 +275,12 @@ func TestAnonymousViewersDoNotShareQuota(t *testing.T) {
 		}
 		board.publish()
 	})
-	app.WaitUntil(time.Second, func() bool { return len(app.Query("text:0/3")) == 3 })
-	app.Post(func() {
-		for _, song := range board.matcher.Queue() {
-			if song.UserID == "anon:Alice" {
-				board.accepted = []playedSong{{Song: song, At: time.Now()}}
-				break
-			}
-		}
-		board.publish()
-	})
-	app.WaitFor("text:1/3", time.Second)
-	if got := len(app.Query("text:0/3")); got != 2 {
-		t.Fatalf("%d anonymous viewers still showed 0/3, want 2", got)
+	app.WaitUntil(time.Second, func() bool { return app.Find("id:queue-count").Text == "队列 4" })
+	if got := len(app.Query("text:0/1")) + len(app.Query("text:1/1")); got != 0 {
+		t.Fatalf("anonymous rows showed %d quota badges, want none", got)
+	}
+	if got := board.successCount("anon:Alice"); got != 0 {
+		t.Fatalf("anonymous success count = %d, want 0", got)
 	}
 }
 

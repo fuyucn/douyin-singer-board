@@ -171,7 +171,7 @@ func viewSong(song queue.Song, at time.Time, detail string, uncertain bool) song
 }
 
 func (board *boardState) successCount(userID string) int {
-	if userID == "" || userID == "manual" {
+	if userID == "" || userID == "manual" || isAnonymousUserID(userID) {
 		return 0
 	}
 	count := 0
@@ -215,7 +215,7 @@ func (board *boardState) snapshot() map[string]any {
 			key := writeKey(board.settings.Platform, board.account.User, target.ID, entry.Track.identity())
 			view.CanAdd = key == board.pendingAdd.key || board.settings.Unconfirmed[key] == ""
 		}
-		if !song.Manual && board.settings.Rules.Limit > 0 {
+		if !song.Manual && !isAnonymousUserID(song.UserID) && board.settings.Rules.Limit > 0 {
 			view.Quota = fmt.Sprintf("%d/%d", board.successCount(song.UserID), board.settings.Rules.Limit)
 		}
 		songs = append(songs, view)
