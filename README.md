@@ -18,5 +18,6 @@ go tool nsgo build -target windows_x64 -installers=false
 - [Application guide](nsgo-app/README.md): workbench, platform login, data and tests.
 - [Signed updates](nsgo-app/UPDATES.md): Mac and Windows installers, GH Proxy and the preview feed.
 - [Migration contract](nsgo-app/PARITY.md): UI and behavior references, versioning and remaining acceptance gates.
+- [Agent acceptance](docs/ACCEPTANCE.md): the required Functional AND Visual gates and their evidence standard.
 
 The retired implementations are no longer built from this repository. Existing installations, data and releases are not removed by the source migration. NSGo reads and writes settings in SQLite. When adopting an existing database, it backs up the database before adding its own settings table and leaves the legacy tables intact.

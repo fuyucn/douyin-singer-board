@@ -1,6 +1,6 @@
 # SUSUSongBoard
 
-This NSGo application is the only maintained implementation. It embeds the TSX workbench, with an icon toolbar, 288-point playlist and configuration sidebar, request/played/blacklist tabs, optional logs and a narrow layout below 720 points. Settings is a modal with General, Plugins and About tabs. `preview-ui/` is an NSGo design fixture, not a separate release target. See [PARITY.md](PARITY.md) for reference versions and acceptance gates.
+This NSGo application is the only maintained implementation. It embeds the TSX workbench, with an icon toolbar, 288-point playlist and configuration sidebar, request/played/blacklist tabs, optional logs and a narrow layout below 720 points. Settings is a modal with General, Plugins and About tabs. `preview-ui/` is an NSGo design fixture, not a separate release target. See [PARITY.md](PARITY.md) for reference versions and the [agent acceptance standard](../docs/ACCEPTANCE.md) for required functional and visual gates.
 
 ## Music platforms
 
@@ -38,13 +38,13 @@ From this directory:
     go test ./... -skip '^TestLiveDouyinConnection$'
     go test -race ./... -skip '^TestLiveDouyinConnection$'
     go tool nsgo check
-    go tool nsgo test -target macos -run '^TestWorkbenchNativeScreenshot$'
+    go run ./scripts/native-acceptance
     go tool nsgo build -target macos_arm64
     go tool nsgo build -target windows_x64 -installers=false
 
 Offline tests exercise real TSX/Go actions, both adapters, crypto known answers, request restrictions, fake credential failures, playlist confirmation, automatic scheduling, SQLite migration and restore, write failures, exclusive locking, and preservation of legacy table contents. They do not sign into or modify real music accounts. The separate live Douyin test uses a public room. Setting SONGBOARD_PUBLIC_SEARCH=1 explicitly enables the TestPublicPlatformSearch test for anonymous read-only queries; it does not authorize playlist changes.
 
-The check command generates declarations under .nsgo for tsconfig.json. Native screenshots are saved under .nsgo/test/screenshots/macos. A successful build or running process is not evidence that the interface rendered.
+The check command generates declarations under .nsgo for tsconfig.json. Run native acceptance on macOS and Windows separately. Each run creates a fresh .nsgo/acceptance/<platform>-<run>/ directory with logs, JUnit, candidate commit/worktree metadata, and both-theme desktop/narrow screenshots. Missing tests, skips, failures, missing screenshots, or incorrect viewport sizes fail the command. Screenshot generation does not approve visual parity; the result keeps visual review NOT RUN and overall NOT ACCEPTED until both acceptance gates are reviewed. The acceptance-evidence workflow runs these checks on both native desktop runners without publishing a release.
 
 ## Release boundaries
 

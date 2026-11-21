@@ -17,7 +17,7 @@ export function IconAction(props: { label: string; icon: string; testID?: string
   const button = <View role="button" accessibilityLabel={props.label} testID={props.testID} disabled={disabled()} onPress={() => props.onPress()}
       class="shrink-0 items-center justify-center rounded-[6px]"
       classList={{ "opacity-40": props.disabled, "size-8": !!props.appearance, "size-7": !!props.compact, "size-[30px]": !props.appearance && !props.compact,
-        "bg-success hover:opacity-90": props.appearance === "start", "bg-destructive hover:opacity-90": props.appearance === "stop", "hover:bg-secondary": !props.appearance }}>
+        "bg-foreground hover:bg-muted-foreground": props.appearance === "start", "bg-destructive hover:opacity-90": props.appearance === "stop", "hover:bg-secondary": !props.appearance }}>
       <Icon name={props.icon} size={props.compact ? 14 : 15} color={props.appearance === "start" ? token("background") : props.appearance === "stop" ? "#ffffff" : props.danger ? token("destructive") : token("muted-foreground")} />
     </View>;
   return <Tooltip testID={props.testID && props.testID + "-hint"} placement={props.appearance ? "bottom" : "top"}

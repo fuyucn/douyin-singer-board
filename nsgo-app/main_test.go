@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,6 +16,17 @@ import (
 )
 
 func TestMain(main *testing.M) { nsgotest.Main(main) }
+
+func desktopTestEnvironment(dark bool) core.Environment {
+	platform := core.OSMacOS
+	switch runtime.GOOS {
+	case "windows":
+		platform = core.OSWindows
+	case "linux":
+		platform = core.OSLinux
+	}
+	return core.Environment{Dark: dark, OS: platform, Idiom: core.IdiomDesktop}
+}
 
 func fixtureDatabase(t *testing.T) string {
 	t.Helper()
@@ -135,21 +147,29 @@ func TestWorkbenchNarrowLayoutAndPlatformSettings(t *testing.T) {
 }
 
 func TestWorkbenchNativeScreenshot(t *testing.T) {
-	if nsgotest.Target() != "macos" {
-		t.Skip("native Mac rendering test")
+	if target := nsgotest.Target(); target != "macos" && target != "windows" {
+		t.Skip("native desktop rendering test")
 	}
+	for _, theme := range []string{"dark", "light"} {
+		t.Run(theme, func(t *testing.T) { captureWorkbenchScreenshots(t, theme) })
+	}
+}
+
+func captureWorkbenchScreenshots(t *testing.T, theme string) {
+	t.Helper()
 	fixtureDatabase(t)
 	mock := &mockPlatforms{credentials: map[string]string{}, qrState: 1}
 	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Repeat: 1800, Limit: 3}, Platform: adapter.NetEase})
 	app := nsgotest.Start(t, func(scope *core.Scope) core.Node { return boardRoot(scope, mock.services()) },
-		nsgotest.Size(1000, 900))
-	app.Screenshot("nsgo-workbench")
+		nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme == "dark")))
+	capture := func(name string) { app.Screenshot(theme + "-" + name) }
+	capture("nsgo-workbench")
 	app.Type("id:manual-song", "Preview request")
 	app.Press("id:manual-add")
 	app.WaitUntil(time.Second, func() bool { return app.Find("id:queue-count").Text == "队列 1" })
 	app.WaitFor("text:已添加：Preview request", time.Second)
 	app.Advance(250 * time.Millisecond)
-	app.Screenshot("nsgo-workbench-queue")
+	capture("nsgo-workbench-queue")
 	app.Advance(4 * time.Second)
 	app.Press("id:settings")
 	app.Press("id:settings-plugin")
@@ -157,34 +177,38 @@ func TestWorkbenchNativeScreenshot(t *testing.T) {
 	app.WaitUntil(time.Second, func() bool { return !app.Find("id:login-qr").Props.Disabled })
 	app.Press("id:login-qr")
 	app.WaitFor("id:login-qr-image", time.Second)
-	app.Screenshot("nsgo-platforms")
+	capture("nsgo-platforms")
 	app.Press("id:cancel-qr")
 	app.Type("id:netease-cookie", "MUSIC_U=TEST_ONLY")
 	app.Press("id:cookie-login")
 	app.WaitUntil(time.Second, func() bool { return app.Exists("id:logout") })
 	app.WaitFor("role:alert 网易云已登录", time.Second)
 	app.Advance(250 * time.Millisecond)
-	app.Screenshot("susu-settings-toast")
+	capture("susu-settings-toast")
 	app.Press("id:close-settings")
 	app.Advance(250 * time.Millisecond)
 	app.WaitForGone("id:settings-dialog", 2*time.Second)
 	bindFirstPlaylist(t, app)
 	app.Advance(4 * time.Second)
-	app.Screenshot("susu-workbench-playlists")
-	app.Focus("role:button 加入歌单")
-	app.Advance(250 * time.Millisecond)
+	capture("susu-workbench-playlists")
+	app.Press("id:clear-platform-playlist")
+	app.WaitFor("id:clear-playlist-dialog", time.Second)
+	capture("susu-clear-confirmation")
+	app.Press("id:cancel-clear-platform")
+	app.WaitForGone("id:clear-playlist-dialog", time.Second)
+	app.Hover("role:button 加入歌单")
+	app.Advance(650 * time.Millisecond)
 	app.WaitFor("text:加入歌单：Test song", time.Second)
-	app.Screenshot("susu-song-tooltip")
+	capture("susu-song-tooltip")
 	app.RightClick("text:Preview request")
 	app.WaitFor("id:song-menu-dialog", time.Second)
-	app.Screenshot("susu-song-actions")
+	capture("susu-song-actions")
 	app.Press("id:close-song-menu")
 	app.Advance(250 * time.Millisecond)
 	app.WaitForGone("id:song-menu-dialog", 2*time.Second)
-	app.Press("id:theme-toggle")
 	app.Hover("id:app-header")
 	app.Advance(250 * time.Millisecond)
-	app.Screenshot("susu-workbench-light")
+	capture("susu-workbench-ready")
 	app.Press("id:tab-blacklist")
 	app.WaitFor("text:黑名单为空", time.Second)
 	app.Press("id:blacklist-type-singer")
@@ -195,7 +219,7 @@ func TestWorkbenchNativeScreenshot(t *testing.T) {
 	app.Type("id:blacklist-name", "示例歌曲")
 	app.Submit("id:blacklist-name")
 	app.Advance(4 * time.Second)
-	app.Screenshot("susu-blacklist")
+	capture("susu-blacklist")
 	app.Press("id:settings")
 	app.Press("id:settings-show-logs")
 	app.Press("id:close-settings")
@@ -212,16 +236,25 @@ func TestWorkbenchNativeScreenshot(t *testing.T) {
 	app.Press("id:log-toggle")
 	app.WaitFor("id:messages", time.Second)
 	app.WaitFor("text:已加入平台歌单：Test song", time.Second)
-	app.Screenshot("susu-log-panel")
+	capture("susu-log-panel")
 	app.Press("id:clear-logs")
 	app.WaitForGone("id:log-panel", time.Second)
+	app.Press("id:tab-played")
+	app.WaitFor("id:played-queue", time.Second)
+	capture("susu-played")
 	app.Press("id:settings")
 	app.Press("id:reset-session")
-	app.Screenshot("susu-reset-confirmation")
+	capture("susu-reset-confirmation")
 	app.Press("id:cancel-reset-session")
 	app.Press("id:close-settings")
 	app.Advance(250 * time.Millisecond)
 	app.WaitForGone("id:settings-dialog", time.Second)
+	app.Resize(390, 700)
+	app.Hover("id:app-header")
+	capture("susu-narrow-workbench")
+	app.Press("role:button 配置")
+	app.WaitFor("id:room", time.Second)
+	capture("susu-narrow-configuration")
 	if output := os.Getenv("SONGBOARD_SCREENSHOT"); output != "" {
 		if err := os.WriteFile(output, app.CapturePNG(), 0600); err != nil {
 			t.Fatal(err)

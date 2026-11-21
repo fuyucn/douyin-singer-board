@@ -254,6 +254,26 @@ func TestWorkbenchNotificationsDoNotMoveTheTableOrReplay(t *testing.T) {
 	}
 }
 
+func TestStartControlUsesReferencePalette(t *testing.T) {
+	for _, theme := range []struct {
+		name       string
+		dark       bool
+		foreground core.Color
+	}{
+		{"light", false, core.RGB(0x191d24)},
+		{"dark", true, core.RGB(0xedf0f1)},
+	} {
+		t.Run(theme.name, func(t *testing.T) {
+			fixtureDatabase(t)
+			app := nsgotest.Start(t, Root, nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme.dark)))
+			app.Hover("id:app-header")
+			if actual := app.Find("id:connect").Style.Background; actual != theme.foreground {
+				t.Fatalf("start control background = %v, want reference foreground %v", actual, theme.foreground)
+			}
+		})
+	}
+}
+
 func TestTableIconTooltip(t *testing.T) {
 	app, _ := startPlatformBoard(t, adapter.NetEase, true)
 	app.Type("id:manual-song", "Test request")
@@ -268,4 +288,19 @@ func TestTableIconTooltip(t *testing.T) {
 	app.Focus("role:button 歌曲操作")
 	app.Key("Enter")
 	app.WaitFor("id:song-menu-dialog", time.Second)
+}
+
+func TestWorkbenchPointerTooltip(t *testing.T) {
+	app, _ := startPlatformBoard(t, adapter.NetEase, true)
+	app.SetEnvironment(desktopTestEnvironment(false))
+	app.Resize(1000, 680)
+	app.Type("id:manual-song", "Hover request")
+	app.Press("id:manual-add")
+	app.WaitFor("text:Test song · Test artist", time.Second)
+	app.Hover("role:button 复制歌名")
+	app.Advance(650 * time.Millisecond)
+	if nsgotest.Target() != "" {
+		app.Screenshot("native-pointer-tooltip")
+	}
+	app.WaitFor("text:复制歌名", time.Second)
 }

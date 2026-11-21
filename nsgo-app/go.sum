@@ -48,8 +48,8 @@ github.com/modelcontextprotocol/go-sdk v1.8.0 h1:KIvahhYqwtbeniWVPs3TcXEA7b8jEtw
 github.com/modelcontextprotocol/go-sdk v1.8.0/go.mod h1:dL7u98E/zjJTGzEq+j30jQ8K2k1mb6LeAH4inEcSGts=
 github.com/ncruces/go-strftime v0.1.9 h1:bY0MQC28UADQmHmaF5dgpLmImcShSi2kHU9XLdhx/f4=
 github.com/ncruces/go-strftime v0.1.9/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
-github.com/nsgo-dev/nsgo v0.1.0 h1:QTzWsOd0uOwBrOiKXKYMsIDAeSSY4wraHcsoXMyNSgM=
-github.com/nsgo-dev/nsgo v0.1.0/go.mod h1:zVeObRFp8Ei49tpmMgH1FNeIWos1fY7ta0T6w+PxrGM=
+github.com/nsgo-dev/nsgo v0.2.0 h1:S67RXsN5OUn3chu0z8pJ6LMcSyXOVcjMjOUsyrtdedE=
+github.com/nsgo-dev/nsgo v0.2.0/go.mod h1:zVeObRFp8Ei49tpmMgH1FNeIWos1fY7ta0T6w+PxrGM=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
