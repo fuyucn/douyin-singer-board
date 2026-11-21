@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -54,6 +55,41 @@ func startTestApp(t *testing.T, render func(*core.Scope) core.Node, options ...n
 		})
 	})
 	return app
+}
+
+func startBoardWithReference(t *testing.T, services platformServices, options ...nsgotest.Option) (*nsgotest.App, *boardState) {
+	t.Helper()
+	var board *boardState
+	app := startTestApp(t, func(scope *core.Scope) core.Node {
+		board = newBoard(scope, services)
+		board.updatesEnabled = appUpdatesEnabled()
+		scope.ProvideHost(board.host)
+		board.host.Handle("board.snapshot", func(call *core.HostCall) { call.Resolve(board.snapshot()) })
+		for name, handle := range board.actions() {
+			board.host.Handle(name, handle)
+		}
+		if board.settings.Platform != "" && !board.settingsInvalid {
+			scope.Post(board.restoreSession)
+		}
+		return renderBoard(scope)
+	}, options...)
+	return app, board
+}
+
+func nativeOrigin(view *nsgotest.View) core.Point {
+	origin := core.Point{}
+	for view != nil {
+		origin.X += view.Frame.Origin.X
+		origin.Y += view.Frame.Origin.Y
+		view = view.Parent
+	}
+	return origin
+}
+
+func clearPlaylistCalls(mock *mockPlatforms) int {
+	mock.mu.Lock()
+	defer mock.mu.Unlock()
+	return strings.Count(strings.Join(mock.methods, ","), ":clearPlaylist")
 }
 
 func fixtureDatabase(t *testing.T) string {
@@ -216,7 +252,7 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 	fixtureDatabase(t)
 	mock := &mockPlatforms{credentials: map[string]string{}, qrState: 1}
 	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Repeat: 1800, Limit: 3}, Platform: adapter.NetEase})
-	app := startTestApp(t, func(scope *core.Scope) core.Node { return boardRoot(scope, mock.services()) },
+	app, board := startBoardWithReference(t, mock.services(),
 		nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme == "dark")))
 	viewport := core.Size{Width: 1000, Height: 680}
 	app.Resize(viewport.Width, viewport.Height)
@@ -254,24 +290,64 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 	bindFirstPlaylist(t, app)
 	app.Advance(4 * time.Second)
 	capture("susu-workbench-playlists")
+	app.Press("id:auto-sync")
+	app.WaitFor("role:button 停止同步", time.Second)
+	app.Advance(250 * time.Millisecond)
+	capture("susu-auto-sync-active")
+	app.Press("id:auto-sync")
+	app.WaitFor("role:button 自动同步", time.Second)
+	beforeClear := clearPlaylistCalls(mock)
 	app.Press("id:clear-platform-playlist")
 	app.WaitFor("id:clear-playlist-dialog", time.Second)
 	capture("susu-clear-confirmation")
-	app.Press("id:cancel-clear-platform")
+	pressCenteredClearDialogButton(t, app, "id:cancel-clear-platform")
 	app.WaitForGone("id:clear-playlist-dialog", time.Second)
+	if calls := clearPlaylistCalls(mock); calls != beforeClear {
+		t.Fatalf("cancel sent %d clear operations, want %d", calls, beforeClear)
+	}
+	app.Press("id:clear-platform-playlist")
+	app.WaitFor("id:clear-playlist-dialog", time.Second)
+	pressCenteredClearDialogButton(t, app, "id:confirm-clear-platform")
+	app.WaitFor("text:已绑定歌单：Target", time.Second)
+	if calls := clearPlaylistCalls(mock); calls != beforeClear+1 {
+		t.Fatalf("confirm sent %d clear operations, want %d", calls, beforeClear+1)
+	}
 	app.Hover("role:button 加入歌单")
 	app.Advance(650 * time.Millisecond)
 	app.WaitFor("text:加入歌单：Test song", time.Second)
 	capture("susu-song-tooltip")
+	rowView := app.Find("text:Preview request")
+	row := rowView.Frame
+	rowOrigin := nativeOrigin(rowView)
 	app.RightClick("text:Preview request")
-	app.WaitFor("id:song-menu-dialog", time.Second)
+	app.WaitFor("role:menu", time.Second)
+	menu := app.Find("role:menu")
+	if menu.Frame.Size.Width > 280 || menu.Frame.Size.Height > 300 {
+		t.Fatalf("song context menu is %v, want a compact reference-sized menu", menu.Frame.Size)
+	}
+	menuOrigin := nativeOrigin(menu)
+	if delta := menuOrigin.X - (rowOrigin.X + row.Size.Width/2); delta < -80 || delta > 80 {
+		t.Fatalf("song context menu opened %d points from the pointer (row=%v menu=%v)", int(delta), rowOrigin, menuOrigin)
+	}
 	capture("susu-song-actions")
-	app.Press("id:close-song-menu")
+	app.Press("id:song-menu-search")
+	app.WaitFor("id:song-search-dialog", time.Second)
+	app.WaitForGone("role:menu", 2*time.Second)
+	app.Press("id:close-song-search")
 	app.Advance(250 * time.Millisecond)
-	app.WaitForGone("id:song-menu-dialog", 2*time.Second)
+	app.WaitForGone("id:song-search-dialog", 2*time.Second)
 	app.Hover("id:app-header")
 	app.Advance(250 * time.Millisecond)
 	capture("susu-workbench-ready")
+	app.Post(func() {
+		board.connection = "已连接"
+		board.listenerCancel = func() {}
+		board.publish()
+	})
+	app.WaitFor("id:stop", time.Second)
+	capture("susu-workbench-running")
+	app.Post(func() { board.cancelListener(); board.publish() })
+	app.WaitFor("id:connect", time.Second)
 	app.Press("id:tab-blacklist")
 	app.WaitFor("text:黑名单为空", time.Second)
 	app.Press("id:blacklist-type-singer")

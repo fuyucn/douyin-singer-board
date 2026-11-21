@@ -25,8 +25,9 @@ var requiredTests = []string{
 
 var screenshotStates = []string{
 	"nsgo-workbench", "nsgo-workbench-queue", "nsgo-platforms",
-	"susu-settings-toast", "susu-workbench-playlists", "susu-clear-confirmation",
-	"susu-song-tooltip", "susu-song-actions", "susu-workbench-ready",
+	"susu-settings-toast", "susu-workbench-playlists", "susu-auto-sync-active",
+	"susu-clear-confirmation", "susu-song-tooltip", "susu-song-actions",
+	"susu-workbench-ready", "susu-workbench-running",
 	"susu-blacklist", "susu-log-panel", "susu-played", "susu-reset-confirmation",
 	"susu-narrow-workbench", "susu-narrow-configuration",
 }

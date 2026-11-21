@@ -48,11 +48,35 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
+          swift -e '
+          import AppKit
+          import CoreGraphics
+          let display = CGMainDisplayID()
+          if let modes = CGDisplayCopyAllDisplayModes(display, nil) as? [CGDisplayMode] {
+            print("Available GUI display modes:")
+            for mode in modes where mode.isUsableForDesktopGUI() {
+              print("  \(mode.width)x\(mode.height)")
+            }
+            let wanted = modes.filter { $0.isUsableForDesktopGUI() && $0.width >= 1280 && $0.height >= 800 }
+            if let mode = wanted.max(by: { ($0.width, $0.height) < ($1.width, $1.height) }) {
+              let status = CGDisplaySetDisplayMode(display, mode, nil)
+              print("Selected display mode: \(mode.width)x\(mode.height), status: \(status.rawValue)")
+            } else {
+              print("No 1280x800-or-larger display mode available")
+            }
+          }
+          '
           defaults write com.apple.dock autohide -bool true
+          defaults write NSGlobalDomain _HIHideMenuBar -bool true
+          defaults read com.apple.dock autohide
+          defaults read NSGlobalDomain _HIHideMenuBar
           if pgrep -x Dock > /dev/null; then
             killall Dock
           fi
-          sleep 2
+          if pgrep -x SystemUIServer > /dev/null; then
+            killall SystemUIServer
+          fi
+          sleep 3
           swift -e 'import AppKit; guard let screen = NSScreen.main else { fatalError("No desktop display") }; print("Desktop frame: \(screen.frame); visible: \(screen.visibleFrame)"); guard screen.visibleFrame.width >= 1000 && screen.visibleFrame.height >= 728 else { fatalError("Desktop too small for declared native test viewports") }'
       - name: Run native tests and collect fresh screenshots
         run: go run ./scripts/native-acceptance

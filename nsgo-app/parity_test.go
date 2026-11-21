@@ -285,9 +285,8 @@ func TestTableIconTooltip(t *testing.T) {
 	app.Hover("role:button 复制歌名")
 	app.Advance(650 * time.Millisecond)
 	app.WaitFor("text:复制歌名", time.Second)
-	app.Focus("role:button 歌曲操作")
-	app.Key("Enter")
-	app.WaitFor("id:song-menu-dialog", time.Second)
+	app.RightClick("text:Test request")
+	app.WaitFor("role:menuitem 复制弹幕", time.Second)
 }
 
 func TestWorkbenchPointerTooltip(t *testing.T) {

@@ -34,6 +34,15 @@
 - The follow-up explicitly resizes and checks application content bounds before capture. Only the ephemeral macOS CI job changes Dock visibility and checks available desktop space. PNG dimensions and required states remain unchanged.
 - Local follow-up offline tests passed twice, the race-enabled suite and NSGo type checks passed, and native checks passed 5/5 with zero skips, retaining 31 captures. Logs are under .nsgo/acceptance/github-44856232057/ and .nsgo/acceptance/macos-3843044310/ relative to nsgo-app. This records local evidence before the follow-up CI run; both OSes must be revalidated remotely and human visual approval is still separate.
 
+## Latest Repair
+
+- The song action surface is now the NSGo native context menu: a compact menu at the pointer, one command per row, and automatic dismissal after selection. Alternative matching was kept as a secondary menu item that opens a dedicated search dialog.
+- The native screenshot flow now presses both clear-confirmation buttons at their painted native coordinates and checks that cancel sends zero clear calls while confirm sends exactly one.
+- The screenshot matrix adds the running header/stop control and active auto-sync glow states. The running state is driven by an isolated fixture controller; it does not open a live Douyin connection.
+- The macOS CI viewport step now logs available display modes, selects a larger ephemeral-runner mode when one exists, hides the Dock and menu bar, and keeps the strict visible-frame and application-content checks.
+
+This repair has local macOS native evidence only. The remote macOS runner must still prove that the viewport preparation succeeds; that failure is not closed by a local pass.
+
 ## Local Evidence
 
 These paths are local development artifacts under ignored .nsgo, not published GitHub artifacts. They must accompany an acceptance review or be collected by CI; a source commit alone does not contain them.
@@ -47,13 +56,15 @@ These paths are local development artifacts under ignored .nsgo, not published G
 | Native macOS checks | PASS: 4 passed, 0 failed, 0 skipped | .nsgo/acceptance/macos-872331385/native.xml |
 | Native candidate provenance | Recorded | .nsgo/acceptance/macos-872331385/result.json |
 | macOS screenshots | 30 theme/state captures plus a pointer-tooltip capture | .nsgo/acceptance/macos-872331385/screenshots/ |
+| Follow-up native macOS checks | PASS: 5 passed, 0 failed, 0 skipped | .nsgo/acceptance/macos-1462163654/native.xml |
+| Follow-up macOS screenshot matrix | 35 captures, including running header and active sync | .nsgo/acceptance/macos-1462163654/screenshots/ |
 | Windows amd64 test-binary cross-compilation | PASS: seven packages compiled; not executed on Windows | .nsgo/acceptance/20261120/windows-compile.log and windows-build/ |
 
 The start palette, light/dark workbench, clear confirmation, pointer tooltip, and narrow configuration were inspected locally. This limited inspection is not a complete pinned-baseline comparison and is not human Visual approval.
 
 ## Remaining Required Evidence
 
-1. Run the native acceptance command on Windows itself and inspect its interactions and screenshots. Compilation is not native Windows acceptance.
+1. Re-run the acceptance workflow on the final candidate so the macOS viewport preparation and Windows native evidence both come from the same commit. A prior Windows pass does not cover later source changes.
 2. Capture the pinned reference and candidate at matching OS, scale, viewport, theme, and state; complete the visual review matrix and record the human reviewer findings.
 3. Complete separately authorized, user-operated live login and test-playlist checks on both music platforms, and verify a signed update install on the intended update channel without touching real playlists or another channel.
 4. Tie the complete evidence set to the final candidate commit and obtain PASS for both gates before marking the migration accepted.

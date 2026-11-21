@@ -2,7 +2,7 @@ import { cleanup, Clipboard, colorScheme, host, Image, List, mount, Scroll, setC
 import { Input, Tooltip } from "nsgo/base";
 import { Dialog, Icon, Toasts, type ToastsRef } from "nsgo/ui";
 import logo from "./assets/logo.png";
-import { Platforms, PlaylistControls, SongMenu } from "./Platforms";
+import { Platforms, PlaylistControls, SongMenu, SongSearchDialog } from "./Platforms";
 import { Action, IconAction } from "./Controls";
 import { BlacklistPanel, LogPanel, SessionFooter, type BlacklistEntry } from "./WorkbenchPanels";
 
@@ -77,7 +77,7 @@ function App() {
   const tab = signal("songs");
   const settings = signal(false);
   const settingsTab = signal("general");
-  const songMenu = signal("");
+  const songSearch = signal("");
   const themeMode = signal("system");
   const openSettings = (section: string) => { settingsTab.set(section); settings.set(true); };
   const resetConfirm = signal(false);
@@ -193,11 +193,8 @@ function App() {
                   <View class="w-10 items-end pr-3"><Text class="text-xs text-faint">{index()+1}</Text></View>
                   <If when={!narrow() && playingHistory()}><Text class="w-20 px-2 text-xs text-faint">{song().time}</Text></If>
                   <If when={!narrow()}><View class="flex-row items-center gap-1 px-2" style={{ width: playingHistory() ? 110 : 120 }}><Text class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{song().user || "?"}</Text><If when={song().quota}><Text class="rounded bg-secondary px-1 text-[10px] text-faint">{song().quota}</Text></If></View></If>
-                  <View role="button" accessibilityLabel="歌曲操作" accessibilityHint="打开歌曲操作" testID={"menu-"+song().id} class="min-w-0 flex-1 px-2"
-                    onPress={() => songMenu.set(song().id)} onContextMenu={() => songMenu.set(song().id)}>
-                    <Text class="truncate text-[13px] font-medium text-foreground">{song().name}</Text>
-                    <If when={song().detail}><Text class="truncate text-[11px] text-faint">{song().detail}</Text></If>
-                  </View>
+                  <SongMenu state={state()} act={act} name={playlistName()} bound={boundPlaylist()} songID={song().id} copy={copy}
+                    openSearch={(id) => songSearch.set(id)} />
                   <If when={!narrow() && !playingHistory()}><Text class="w-[72px] px-2 text-xs text-faint">{song().time}</Text></If>
                   <View class="shrink-0 flex-row items-center justify-end gap-1 px-2" style={{ width: playingHistory() ? 48 : 110 }}>
                     <If when={!playingHistory() && state().verified}><IconAction compact label="加入歌单" hint={addHint(song())}
@@ -251,7 +248,7 @@ function App() {
           </If>
         </View></If>
       </Dialog>
-      <If when={!!songMenu()}><SongMenu state={state()} songID={songMenu()} act={act} name={playlistName()} bound={boundPlaylist()} copy={copy} close={() => songMenu.set("")} /></If>
+      <If when={!!songSearch()}><SongSearchDialog state={state()} songID={songSearch()} act={act} name={playlistName()} bound={boundPlaylist()} copy={copy} close={() => songSearch.set("")} /></If>
       <Toasts ref={toasts.set} testID="notification-toasts" placement="bottomEnd" closeAccessibilityLabel="关闭通知" />
     </View>
   );
