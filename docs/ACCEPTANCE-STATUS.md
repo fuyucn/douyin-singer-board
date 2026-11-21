@@ -12,9 +12,15 @@
 
 | Gate | Status | Reason |
 |---|---|---|
-| Functional | NOT RUN | Local checks passed, but the follow-up Windows native run, authorized real-account checks, and end-to-end update installation remain pending. The first CI native run failed as recorded below. |
+| Functional | NOT RUN | Final-candidate CI passed native checks on both macOS and Windows, but authorized real-account checks and end-to-end update installation remain pending. Earlier CI failures are recorded below for context. |
 | Visual | NOT RUN | Fresh macOS captures exist and sample screens were inspected, but pinned reference captures and complete human comparison are pending. Windows reference/candidate captures are also missing. |
 | Overall | NOT ACCEPTED | Both mandatory gates have not passed. |
+
+## Final CI Evidence
+
+- Application candidate: `3d682b5deb13d47b8cf1f8ecb18b412cd83fca3b` on `feat/align-main`.
+- Acceptance run: `44868857818`, completed with conclusion `success`; both macOS and Windows jobs succeeded, including macOS viewport preparation and native screenshot checks.
+- This CI result closes the environment and native-check failures for that candidate. It does not approve visual parity, real platform accounts, or signed update installation.
 
 ## Repairs and Reproduction
 
