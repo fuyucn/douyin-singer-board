@@ -256,11 +256,28 @@ func (board *boardState) notify(message string) {
 	board.notice = message
 }
 
-func (board *boardState) log(message string) {
-	board.logs = append(board.logs, time.Now().Format("15:04:05")+"  "+strings.Join(strings.Fields(message), " "))
+func (board *boardState) logLevel(level, message string) {
+	entry := fmt.Sprintf("%s  %-5s  %s", time.Now().Format("15:04:05"), level, strings.Join(strings.Fields(message), " "))
+	board.logs = append(board.logs, entry)
 	if len(board.logs) > 120 {
 		board.logs = board.logs[len(board.logs)-120:]
 	}
+}
+
+func (board *boardState) log(message string) {
+	board.logLevel("INFO", message)
+}
+
+func (board *boardState) logDebug(message string) {
+	board.logLevel("DEBUG", message)
+}
+
+func (board *boardState) logWarn(message string) {
+	board.logLevel("WARN", message)
+}
+
+func (board *boardState) logError(message string) {
+	board.logLevel("ERROR", message)
 }
 
 func (board *boardState) cancelListener() {
@@ -316,7 +333,7 @@ func (board *boardState) connect(room string) {
 			if failed {
 				board.connection = "连接失败"
 				board.notify("直播间监听中断，请查看日志或重新连接")
-				board.log(err.Error())
+				board.logError(err.Error())
 			}
 		})
 	}()

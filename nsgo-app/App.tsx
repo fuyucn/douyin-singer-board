@@ -91,6 +91,20 @@ function App() {
   const narrow = () => windowSize().width < 720;
   const visibleSongs = () => tab() === "played" ? state().played.filter((song) => (song.name+song.user).toLowerCase().includes(search().toLowerCase())) : state().songs;
   const copy = async (text: string) => { try { await Clipboard.writeText(text); notify("已复制"); } catch { notify("复制失败", "error"); } };
+  const copyDiagnostics = async () => {
+    const s = state();
+    const lines = [
+      `SUSUSongBoard 诊断 v${s.version}`,
+      `直播间: ${s.rules.room || "—"}  连接: ${s.connection}  运行: ${s.running ? "是" : "否"}`,
+      `平台: ${s.platform || "未启用"}  ${s.verified ? "已登录" : "未登录"}${s.account ? " / " + s.account : ""}`,
+      `歌单: ${s.target.name || "—"} (ID ${s.target.id || 0})  自动同步: ${s.auto ? "开" : "关"}`,
+      `规则: 粉丝=${s.rules.fans} 冷却=${s.rules.cooldown}s 重复=${s.rules.repeat}s 上限=${s.rules.limit} 模板=${s.rules.template}`,
+      `队列/已点/日志: ${s.songs.length}/${s.played.length}/${s.logs.length}`,
+      "--- 日志 ---",
+      ...s.logs
+    ];
+    await copy(lines.join("\n"));
+  };
   const addManual = () => { if (manual().trim()) { void act("board.manual", manual()); manual.set(""); } };
   const platformName = () => state().platform === "kugou-web" ? "酷狗" : state().platform === "netease-web" ? "网易云" : "平台";
   const addHint = (song: Song) => {
@@ -216,7 +230,7 @@ function App() {
                 onRemove={(entry) => void act("board.blacklist", { kind: entry.kind, name: entry.name, remove: true })} />
             </If>
           <If when={state().showLogs && (state().logs || []).length > 0}>
-            <LogPanel lines={state().logs || []} onCopy={() => void copy(state().logs.join("\n"))} onClear={() => void act("board.clearLogs")} />
+            <LogPanel lines={state().logs || []} onCopy={() => void copyDiagnostics()} onClear={() => void act("board.clearLogs")} />
           </If>
         </View>
       </View>

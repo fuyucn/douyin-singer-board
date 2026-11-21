@@ -213,7 +213,7 @@ func TestRequestRejectionReasonsAppearInLogs(t *testing.T) {
 	} {
 		app.WaitFor("text:"+line, time.Second)
 	}
-	if app.Find("id:log-count").Text != "7" || app.Find("id:queue-count").Text != "队列 1" {
+	if app.Find("id:log-count").Text != "13" || app.Find("id:queue-count").Text != "队列 1" {
 		t.Fatal("request logging duplicated entries or changed admission behavior")
 	}
 }
@@ -337,6 +337,26 @@ func TestQuotaUsesConfirmedAddsNotQueue(t *testing.T) {
 	}
 	if len(app.Query("text:0/3")) != 0 {
 		t.Fatal("queued rows still showed a zero success count after a confirmed add")
+	}
+}
+
+func TestLogCopyIncludesDiagnostics(t *testing.T) {
+	fixtureDatabase(t)
+	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 3}, ShowLogs: true})
+	var board *boardState
+	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
+		board = newBoard(scope, platformServices{})
+		scope.ProvideHost(board.host)
+		board.host.Handle("board.snapshot", func(call *core.HostCall) { call.Resolve(board.snapshot()) })
+		return renderBoard(scope)
+	}, nsgotest.Size(1000, 780))
+	app.Post(func() { board.log("诊断测试"); board.publish() })
+	app.WaitFor("id:log-copy", time.Second)
+	app.Press("id:log-copy")
+	for _, want := range []string{"SUSUSongBoard 诊断 v" + appVersion, "上限=3", "--- 日志 ---", "诊断测试"} {
+		if !strings.Contains(app.Clipboard, want) {
+			t.Fatalf("copied diagnostics missing %q:\n%s", want, app.Clipboard)
+		}
 	}
 }
 

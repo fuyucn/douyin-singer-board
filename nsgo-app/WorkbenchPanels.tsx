@@ -53,20 +53,36 @@ export function BlacklistPanel(props: { entries: BlacklistEntry[]; narrow: boole
 export function LogPanel(props: { lines: string[]; onCopy: () => void; onClear: () => void }) {
   const open = signal(false);
   const toggle = () => open.set(!open());
+  const levelOf = (line: string) => {
+    const rest = line.slice(8).trimStart();
+    const split = rest.indexOf("  ");
+    return split < 0 ? "INFO" : rest.slice(0, split);
+  };
+  const messageOf = (line: string) => {
+    const rest = line.slice(8).trimStart();
+    const split = rest.indexOf("  ");
+    return split < 0 ? rest : rest.slice(split).trimStart();
+  };
   return <View testID="log-panel" class="shrink-0 border-t border-line bg-card">
     <View class="flex-row items-center gap-1 bg-secondary px-3 py-1">
       <View role="button" accessibilityLabel={open() ? "收起日志" : "展开日志"} onPress={toggle} class="min-w-0 flex-1 flex-row items-center gap-2 py-1">
         <Text class="text-xs font-medium text-muted-foreground">日志</Text>
         <View class="rounded bg-muted px-1.5"><Text testID="log-count" class="font-mono text-[10px] text-faint">{props.lines.length}</Text></View>
       </View>
-      <Action subtle label="复制" icon="copy" testID="log-copy" onPress={props.onCopy} />
+      <Action subtle label="复制诊断" icon="copy" testID="log-copy" onPress={props.onCopy} />
       <Action subtle label="清空" icon="trash" testID="clear-logs" danger onPress={props.onClear} />
       <IconAction compact label={open() ? "收起日志" : "展开日志"} icon={open() ? "up" : "down"} testID="log-toggle" onPress={toggle} />
     </View>
     <If when={open()}><Scroll testID="messages" class="max-h-[220px] bg-background">
       <Each of={props.lines}>{(line) => <View class="flex-row items-baseline border-b border-line px-3 py-1 hover:bg-secondary">
-        <Text class="w-[58px] shrink-0 text-right font-mono text-[10px] text-faint">{line().slice(0, 8)}</Text>
-        <Text class="min-w-0 flex-1 pl-2 text-[11px] text-muted-foreground">{line().slice(8).trimStart()}</Text>
+        <Text class="w-[52px] shrink-0 text-right font-mono text-[10px] text-faint">{line().slice(0, 8)}</Text>
+        <Text class="w-[42px] shrink-0 pl-2 font-mono text-[10px]" classList={{
+          "text-faint": levelOf(line()) === "DEBUG",
+          "text-muted-foreground": levelOf(line()) === "INFO",
+          "font-semibold text-foreground": levelOf(line()) === "WARN",
+          "font-semibold text-destructive": levelOf(line()) === "ERROR"
+        }}>{levelOf(line())}</Text>
+        <Text class="min-w-0 flex-1 pl-2 text-[11px] text-muted-foreground">{messageOf(line())}</Text>
       </View>}</Each>
     </Scroll></If>
   </View>;

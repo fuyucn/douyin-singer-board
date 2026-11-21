@@ -555,11 +555,15 @@ func (board *boardState) scheduleSync() {
 		songs := board.matcher.Queue()
 		for _, song := range songs {
 			entry := board.matches[strings.TrimSpace(song.Name)]
-			if entry.Status == "found" && !board.uncertain[song.ID] && !board.searchFailed[song.ID] && board.songAllowed(song, entry.Track) {
+			if entry.Status != "found" || board.uncertain[song.ID] || board.searchFailed[song.ID] {
+				continue
+			}
+			if board.songAllowed(song, entry.Track) {
 				board.syncSong(song, entry.Track, true)
 				board.publish()
 				return
 			}
+			board.logDebug(fmt.Sprintf("自动加歌跳过 song=%q uid=%s anonymous=%t count=%d limit=%d", song.Name, maskIdentity(song.UserID), isAnonymousUserID(song.UserID), board.successCount(song.UserID), board.settings.Rules.Limit))
 		}
 		board.scheduleSync()
 	})
@@ -620,8 +624,10 @@ func (board *boardState) syncSong(song queue.Song, candidate track, automatic bo
 	}
 	if !board.recordWrite(key, song.Name) {
 		board.stopSync()
+		board.logError("加入写入确认保存失败 song=" + song.Name)
 		return
 	}
+	board.logDebug(fmt.Sprintf("请求加入歌单 song=%q track=%q list=%d trackID=%q", song.Name, candidate.Name, target.ID, candidate.identity()))
 	board.pendingAdd = pendingPlaylistAdd{songID: song.ID, key: key}
 	platformCall(board, "addTrack", args, func(result struct{ Status int }, err error) {
 		board.pendingAdd = pendingPlaylistAdd{}
@@ -629,12 +635,14 @@ func (board *boardState) syncSong(song queue.Song, candidate track, automatic bo
 			board.uncertain[song.ID] = true
 			board.stopSync()
 			board.notify("加入结果未知，已停止自动同步；请在平台确认后处理")
+			board.logWarn("加入结果未知 song=" + song.Name + " reason=" + err.Error())
 			return
 		}
 		if result.Status != 1 {
 			board.searchFailed[song.ID] = true
 			board.stopSync()
 			board.notify("平台未接受歌曲，已停止自动同步；请检查登录及歌单")
+			board.logWarn(fmt.Sprintf("平台未接受歌曲 song=%q status=%d", song.Name, result.Status))
 			return
 		}
 		item := playedSong{song, candidate, board.settings.Platform, time.Now()}
@@ -645,6 +653,7 @@ func (board *boardState) syncSong(song queue.Song, candidate track, automatic bo
 		if !board.recordWrite(key, "") {
 			board.stopSync()
 			board.notify("歌曲已加入，但确认记录无法保存；请在平台核对后解除写入锁")
+			board.logError("加入成功但清除写入确认失败 song=" + song.Name)
 			return
 		}
 		message := "已加入平台歌单：" + candidate.Name
