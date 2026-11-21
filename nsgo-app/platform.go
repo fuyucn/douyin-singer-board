@@ -566,17 +566,14 @@ func (board *boardState) scheduleSync() {
 }
 
 func (board *boardState) songAllowed(song queue.Song, candidate track) bool {
-	limit, count := board.settings.Rules.Limit, 0
+	limit, count := board.settings.Rules.Limit, board.successCount(song.UserID)
 	if board.blocked(song, candidate) {
 		return false
 	}
 	for _, accepted := range board.accepted {
 		elapsed := time.Since(accepted.At).Seconds()
-		if !song.Manual && accepted.Song.UserID == song.UserID {
-			count++
-			if elapsed < float64(board.settings.Rules.Cooldown) {
-				return false
-			}
+		if !song.Manual && accepted.Song.UserID == song.UserID && elapsed < float64(board.settings.Rules.Cooldown) {
+			return false
 		}
 		if elapsed < float64(board.settings.Rules.Repeat) && (strings.EqualFold(accepted.Song.Name, song.Name) ||
 			(candidate.identity() != "" && accepted.Platform == board.settings.Platform && accepted.Track.identity() == candidate.identity())) {

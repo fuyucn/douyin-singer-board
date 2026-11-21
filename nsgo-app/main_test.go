@@ -13,6 +13,7 @@ import (
 	"github.com/nsgo-dev/nsgo/core"
 	"github.com/nsgo-dev/nsgo/nsgotest"
 	"github.com/sususongboard/nsgo-app/platform/adapter"
+	"github.com/sususongboard/nsgo-app/queue"
 	_ "modernc.org/sqlite"
 )
 
@@ -216,6 +217,31 @@ func TestListenerWindowStartsWithoutNetwork(t *testing.T) {
 	app.WaitFor("text:房间号必须是至少 6 位数字", time.Second)
 }
 
+func TestSongMenuStaysOpenAcrossSnapshotUpdates(t *testing.T) {
+	fixtureDatabase(t)
+	mock := &mockPlatforms{credentials: map[string]string{}}
+	app, board := startBoardWithReference(t, mock.services(), nsgotest.Size(1000, 680))
+	app.Post(func() {
+		result := board.matcher.Match(queue.ChatMessage{ID: "menu-song", UserID: "viewer", Nickname: "Viewer", Content: "Menu song"})
+		if result.Added != nil {
+			board.admitSong(*result.Added)
+		}
+		board.publish()
+	})
+	app.WaitFor("text:Menu song", time.Second)
+	app.RightClick("text:Menu song")
+	app.WaitFor("role:menu", time.Second)
+	before := nativeOrigin(app.Find("role:menu"))
+	app.Post(func() { board.publish(); board.publish() })
+	app.Advance(250 * time.Millisecond)
+	if !app.Exists("role:menu") {
+		t.Fatal("song context menu closed after a snapshot update")
+	}
+	if after := nativeOrigin(app.Find("role:menu")); after != before {
+		t.Fatalf("song context menu moved after a snapshot update: %v -> %v", before, after)
+	}
+}
+
 func TestWorkbenchNarrowLayoutAndPlatformSettings(t *testing.T) {
 	fixtureDatabase(t)
 	app := startTestApp(t, Root, nsgotest.Size(390, 700))
@@ -338,6 +364,16 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 		t.Fatalf("song context menu opened %d points from the pointer (row=%v menu=%v)", int(delta), rowOrigin, menuOrigin)
 	}
 	capture("susu-song-actions")
+	menuBefore := nativeOrigin(menu)
+	app.Post(func() { board.publish(); board.publish() })
+	app.Advance(250 * time.Millisecond)
+	if !app.Exists("role:menu") {
+		t.Fatal("song context menu closed after a snapshot update")
+	}
+	if menuAfter := nativeOrigin(app.Find("role:menu")); menuAfter != menuBefore {
+		t.Fatalf("song context menu moved after snapshot updates: %v -> %v", menuBefore, menuAfter)
+	}
+	capture("susu-song-actions-stable")
 	app.Press("id:song-menu-search")
 	app.WaitFor("id:song-search-dialog", time.Second)
 	app.WaitForGone("role:menu", 2*time.Second)

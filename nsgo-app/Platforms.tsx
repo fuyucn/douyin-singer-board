@@ -1,6 +1,6 @@
 import { createMotion, Image, Scroll, signal, Text, token, View, windowSize } from "nsgo";
 import { Dialog as ConfirmationDialog, Input } from "nsgo/base";
-import { ContextMenu, Dialog, Icon, MenuItem, MenuSeparator } from "nsgo/ui";
+import { Dialog, Icon } from "nsgo/ui";
 import type { State } from "./App";
 import { Action, IconAction } from "./Controls";
 
@@ -105,22 +105,41 @@ export function PlaylistControls(props: PlaylistProps & { setName: (name: string
   </View>;
 }
 
-export function SongMenu(props: PlaylistProps & { songID: string; copy: (value: string) => Promise<void>; openSearch: (id: string) => void }) {
+export function SongMenu(props: PlaylistProps & { songID: string; onContextMenu: (point: { x: number; y: number }) => void }) {
+  const song = () => [...props.state.songs, ...props.state.played].find((entry) => entry.id === props.songID);
+  return <View testID={"menu-"+props.songID} accessibilityLabel="歌曲操作" class="min-w-0 flex-1 px-2"
+    onContextMenu={(event) => props.onContextMenu({ x: event.pagePosition.x, y: event.pagePosition.y })}>
+    <Text class="truncate text-[13px] font-medium text-foreground">{song()?.name}</Text>
+    <If when={!!song()?.detail}><Text class="truncate text-[11px] text-faint">{song()?.detail}</Text></If>
+  </View>;
+}
+
+export function SongMenuOverlay(props: PlaylistProps & { songID: string; point: { x: number; y: number }; copy: (value: string) => Promise<void>; close: () => void; openSearch: (id: string) => void }) {
   const song = () => [...props.state.songs, ...props.state.played].find((entry) => entry.id === props.songID);
   const queued = () => props.state.songs.some((entry) => entry.id === props.songID);
-  return <ContextMenu testID={"song-menu-"+props.songID} style={{ flex: 1 }} trigger={
-    <View testID={"menu-"+props.songID} accessibilityLabel="歌曲操作" class="min-w-0 flex-1 px-2">
-      <Text class="truncate text-[13px] font-medium text-foreground">{song()?.name}</Text>
-      <If when={!!song()?.detail}><Text class="truncate text-[11px] text-faint">{song()?.detail}</Text></If>
-    </View>}>
-    <MenuItem text="复制弹幕" testID="copy-raw-message" onSelect={() => void props.copy(song()?.raw || song()?.name || "")} />
-    <MenuItem text="复制歌名" testID="copy-song-name" disabled={!song()?.matched} onSelect={() => void props.copy(song()?.matched || song()?.name || "")} />
-    <MenuItem text="删除" testID="delete-song-menu" variant="danger" onSelect={() => void props.act(queued() ? "board.remove" : "board.removePlayed", props.songID)} />
-    <MenuItem text="黑名单这首歌" testID="blacklist-matched-song" onSelect={() => void props.act("board.blacklist", { kind: "song", name: song()?.matched || song()?.name, artist: song()?.artist })} />
-    <If when={!!song()?.artist}><MenuItem text="黑名单该歌手" testID="blacklist-matched-artist" onSelect={() => void props.act("board.blacklist", { kind: "singer", name: song()?.artist })} /></If>
-    <If when={queued() && !!props.state.platform}><MenuSeparator /></If>
-    <If when={queued() && !!props.state.platform}><MenuItem text="搜索其他版本…" testID="song-menu-search" onSelect={() => props.openSearch(props.songID)} /></If>
-  </ContextMenu>;
+  const showArtist = !!song()?.artist;
+  const showSearch = queued() && !!props.state.platform;
+  const item = (label: string, testID: string, onPress: () => void, disabled = false) => <View role="menuitem" accessibilityLabel={label} testID={testID} disabled={disabled}
+    class="h-8 justify-center rounded px-3 hover:bg-secondary" classList={{ "opacity-40": disabled }} onPress={onPress}>
+    <Text class="truncate text-xs text-foreground">{label}</Text>
+  </View>;
+  const menuWidth = 220;
+  const menuHeight = (4 + (showArtist ? 1 : 0) + (showSearch ? 2 : 0)) * 32 + (showSearch ? 9 : 0) + 8;
+  const left = Math.max(8, Math.min(props.point.x + 2, windowSize().width - menuWidth - 8));
+  const top = Math.max(8, Math.min(props.point.y + 2, windowSize().height - menuHeight - 8));
+  return <View testID="song-menu-layer" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }}>
+    <View testID="song-menu-backdrop" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0 }} onPress={props.close} />
+    <View testID="song-menu" role="menu" accessibilityLabel="歌曲操作" class="gap-0.5 rounded-md border border-border bg-card p-1"
+      style={{ position: "absolute", left, top, width: menuWidth, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+      {item("复制弹幕", "copy-raw-message", () => { void props.copy(song()?.raw || song()?.name || ""); props.close(); })}
+      {item("复制歌名", "copy-song-name", () => { void props.copy(song()?.matched || song()?.name || ""); props.close(); }, !song()?.matched)}
+      {item("删除", "delete-song-menu", () => { void props.act(queued() ? "board.remove" : "board.removePlayed", props.songID); props.close(); })}
+      {item("黑名单这首歌", "blacklist-matched-song", () => { void props.act("board.blacklist", { kind: "song", name: song()?.matched || song()?.name, artist: song()?.artist }); props.close(); })}
+      <If when={showArtist}>{item("黑名单该歌手", "blacklist-matched-artist", () => { void props.act("board.blacklist", { kind: "singer", name: song()?.artist }); props.close(); })}</If>
+      <If when={showSearch}><View class="mx-2 my-1 h-px bg-line" /></If>
+      <If when={showSearch}>{item("搜索其他版本…", "song-menu-search", () => props.openSearch(props.songID))}</If>
+    </View>
+  </View>;
 }
 
 export function SongSearchDialog(props: PlaylistProps & { songID: string; copy: (value: string) => Promise<void>; close: () => void }) {

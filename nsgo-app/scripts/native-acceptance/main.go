@@ -20,13 +20,13 @@ var requiredTests = []string{
 	"TestWorkbenchNarrowLayoutAndPlatformSettings",
 	"TestStartControlUsesReferencePalette",
 	"TestWorkbenchPointerTooltip",
-	"TestWorkbenchFixtureReleasesResources",
+	"TestWorkbenchFixtureReleasesResources", "TestSongMenuStaysOpenAcrossSnapshotUpdates",
 }
 
 var screenshotStates = []string{
 	"nsgo-workbench", "nsgo-workbench-queue", "nsgo-platforms",
 	"susu-settings-toast", "susu-workbench-playlists", "susu-auto-sync-active",
-	"susu-clear-confirmation", "susu-song-tooltip", "susu-song-actions",
+	"susu-clear-confirmation", "susu-song-tooltip", "susu-song-actions", "susu-song-actions-stable",
 	"susu-workbench-ready", "susu-workbench-running",
 	"susu-blacklist", "susu-log-panel", "susu-played", "susu-reset-confirmation",
 	"susu-narrow-workbench", "susu-narrow-configuration",

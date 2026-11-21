@@ -185,7 +185,7 @@ func TestRequestRejectionReasonsAppearInLogs(t *testing.T) {
 		return renderBoard(scope)
 	}, nsgotest.Size(1000, 780))
 	app.Post(func() {
-		board.played = []playedSong{{Song: queue.Song{Name: "Played song", UserID: "quota"}, At: time.Now()}}
+		board.accepted = []playedSong{{Song: queue.Song{Name: "Played song", UserID: "quota"}, At: time.Now()}}
 		for _, message := range []queue.ChatMessage{
 			{UserID: "viewer", Nickname: "Viewer", Content: "普通弹幕", MedalLevel: 1},
 			{UserID: "viewer", Nickname: "Viewer", Content: "点歌 晴天", MedalLevel: 2},
@@ -215,6 +215,67 @@ func TestRequestRejectionReasonsAppearInLogs(t *testing.T) {
 	}
 	if app.Find("id:log-count").Text != "7" || app.Find("id:queue-count").Text != "队列 1" {
 		t.Fatal("request logging duplicated entries or changed admission behavior")
+	}
+}
+
+func TestSuccessCountExcludesManualAndEmptyUsers(t *testing.T) {
+	board := &boardState{accepted: []playedSong{
+		{Song: queue.Song{UserID: "viewer"}, At: time.Now()},
+		{Song: queue.Song{UserID: "viewer"}, At: time.Now()},
+		{Song: queue.Song{UserID: "manual"}, At: time.Now()},
+		{Song: queue.Song{UserID: ""}, At: time.Now()},
+	}}
+	if got := board.successCount("viewer"); got != 2 {
+		t.Fatalf("viewer success count = %d, want 2", got)
+	}
+	if got := board.successCount("manual"); got != 0 {
+		t.Fatalf("manual success count = %d, want 0", got)
+	}
+	if got := board.successCount(""); got != 0 {
+		t.Fatalf("empty user success count = %d, want 0", got)
+	}
+}
+
+func TestQuotaUsesConfirmedAddsNotQueue(t *testing.T) {
+	fixtureDatabase(t)
+	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 3}})
+	var board *boardState
+	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
+		board = newBoard(scope, platformServices{})
+		scope.ProvideHost(board.host)
+		board.host.Handle("board.snapshot", func(call *core.HostCall) { call.Resolve(board.snapshot()) })
+		return renderBoard(scope)
+	}, nsgotest.Size(1000, 780))
+	app.Post(func() {
+		for _, name := range []string{"Queued one", "Queued two"} {
+			result := board.matcher.Match(queue.ChatMessage{ID: name, UserID: "viewer", Nickname: "Viewer", Content: name})
+			if result.Added != nil {
+				board.admitSong(*result.Added)
+			}
+		}
+		board.publish()
+	})
+	app.WaitUntil(time.Second, func() bool { return len(app.Query("text:0/3")) == 2 })
+	if got := len(app.Query("text:0/3")); got != 2 {
+		t.Fatalf("queued-only rows showed %d quota badges, want 2", got)
+	}
+	app.Post(func() {
+		queued := board.matcher.Queue()
+		if len(queued) == 0 {
+			return
+		}
+		confirmed := queued[0]
+		board.matcher.RemoveByID(confirmed.ID)
+		board.played = []playedSong{{Song: confirmed, At: time.Now()}}
+		board.accepted = []playedSong{{Song: confirmed, At: time.Now()}}
+		board.publish()
+	})
+	app.WaitUntil(time.Second, func() bool { return len(app.Query("text:1/3")) == 1 })
+	if got := len(app.Query("text:1/3")); got != 1 {
+		t.Fatalf("rows showed %d confirmed-add badges, want 1", got)
+	}
+	if len(app.Query("text:0/3")) != 0 {
+		t.Fatal("queued rows still showed a zero success count after a confirmed add")
 	}
 }
 

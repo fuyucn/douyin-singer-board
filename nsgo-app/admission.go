@@ -29,13 +29,10 @@ func (board *boardState) admitSong(song queue.Song) bool {
 			break
 		}
 	}
-	count := 0
+	count := board.successCount(song.UserID)
 	for _, existing := range board.played {
 		if strings.TrimSpace(existing.Song.Name) == strings.TrimSpace(song.Name) {
 			duplicate = true
-		}
-		if existing.Song.UserID == song.UserID {
-			count++
 		}
 	}
 	if duplicate {

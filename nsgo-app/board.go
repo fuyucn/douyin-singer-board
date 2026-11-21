@@ -170,6 +170,19 @@ func viewSong(song queue.Song, at time.Time, detail string, uncertain bool) song
 	return songView{ID: song.ID, Name: song.Name, User: song.Nickname, Time: at.Local().Format("15:04:05"), Detail: detail, Uncertain: uncertain, Raw: song.RawMessage}
 }
 
+func (board *boardState) successCount(userID string) int {
+	if userID == "" || userID == "manual" {
+		return 0
+	}
+	count := 0
+	for _, accepted := range board.accepted {
+		if accepted.Song.UserID == userID {
+			count++
+		}
+	}
+	return count
+}
+
 func (board *boardState) snapshot() map[string]any {
 	songs, played := []songView{}, []songView{}
 	target := board.target()
@@ -203,13 +216,7 @@ func (board *boardState) snapshot() map[string]any {
 			view.CanAdd = key == board.pendingAdd.key || board.settings.Unconfirmed[key] == ""
 		}
 		if !song.Manual && board.settings.Rules.Limit > 0 {
-			count := 0
-			for _, accepted := range board.accepted {
-				if accepted.Song.UserID == song.UserID {
-					count++
-				}
-			}
-			view.Quota = fmt.Sprintf("%d/%d", count, board.settings.Rules.Limit)
+			view.Quota = fmt.Sprintf("%d/%d", board.successCount(song.UserID), board.settings.Rules.Limit)
 		}
 		songs = append(songs, view)
 	}

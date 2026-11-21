@@ -2,7 +2,7 @@ import { cleanup, Clipboard, colorScheme, host, Image, List, mount, Scroll, setC
 import { Input, Tooltip } from "nsgo/base";
 import { Dialog, Icon, Toasts, type ToastsRef } from "nsgo/ui";
 import logo from "./assets/logo.png";
-import { Platforms, PlaylistControls, SongMenu, SongSearchDialog } from "./Platforms";
+import { Platforms, PlaylistControls, SongMenuOverlay, SongSearchDialog } from "./Platforms";
 import { Action, IconAction } from "./Controls";
 import { BlacklistPanel, LogPanel, SessionFooter, type BlacklistEntry } from "./WorkbenchPanels";
 
@@ -77,6 +77,8 @@ function App() {
   const tab = signal("songs");
   const settings = signal(false);
   const settingsTab = signal("general");
+  const songMenu = signal("");
+  const menuPoint = signal({ x: 0, y: 0 });
   const songSearch = signal("");
   const themeMode = signal("system");
   const openSettings = (section: string) => { settingsTab.set(section); settings.set(true); };
@@ -158,7 +160,7 @@ function App() {
         <View class="min-h-0 min-w-0 flex-1 bg-card">
             <View testID="workbench-tabs" role="tablist" class="shrink-0 flex-row items-center gap-1 border-b border-line px-3 py-1">
               <Each of={[{ key: "songs", label: "点歌列表", count: state().songs.length }, { key: "played", label: "已点歌单", count: state().played.length }, { key: "blacklist", label: "黑名单", count: (state().blacklist || []).length }]} key={(item) => item.key}>
-                {(item) => <View role="tab" testID={"tab-"+item().key} selected={tab() === item().key} onPress={() => { tab.set(item().key); confirm.set(""); }}
+                {(item) => <View role="tab" testID={"tab-"+item().key} selected={tab() === item().key} onPress={() => { tab.set(item().key); confirm.set(""); songMenu.set(""); }}
                   class="h-9 flex-row items-center justify-center border-b-2 border-transparent px-3" classList={{ "border-foreground": tab() === item().key }}>
                   <Text class="text-sm font-medium" classList={{ "text-foreground": tab() === item().key, "text-muted-foreground": tab() !== item().key }}>{item().label} ({item().count})</Text>
                 </View>}
@@ -166,7 +168,7 @@ function App() {
               <If when={tab() !== "blacklist" && (playingHistory() ? state().played.length > 0 : state().songs.length > 0)}>
                 <View class="flex-1" />
                 <IconAction label={confirm() === tab() ? "确认清空" : "清空列表"} icon="trash" testID={tab() === "songs" ? "clear-queue" : "clear-played"} danger={confirm() === tab()}
-                  onPress={() => { if (confirm() === tab()) { void act(tab() === "songs" ? "board.clearQueue" : "board.clearPlayed"); confirm.set(""); } else confirm.set(tab()); }} />
+                  onPress={() => { if (confirm() === tab()) { void act(tab() === "songs" ? "board.clearQueue" : "board.clearPlayed"); confirm.set(""); songMenu.set(""); } else confirm.set(tab()); }} />
               </If>
             </View>
             <If when={tab() === "blacklist"} else={<>
@@ -192,9 +194,12 @@ function App() {
                 {(song, index) => <View testID={"song-"+song().id} class="h-12 flex-row items-center border-b border-line hover:bg-secondary">
                   <View class="w-10 items-end pr-3"><Text class="text-xs text-faint">{index()+1}</Text></View>
                   <If when={!narrow() && playingHistory()}><Text class="w-20 px-2 text-xs text-faint">{song().time}</Text></If>
-                  <If when={!narrow()}><View class="flex-row items-center gap-1 px-2" style={{ width: playingHistory() ? 110 : 120 }}><Text class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{song().user || "?"}</Text><If when={song().quota}><Text class="rounded bg-secondary px-1 text-[10px] text-faint">{song().quota}</Text></If></View></If>
-                  <SongMenu state={state()} act={act} name={playlistName()} bound={boundPlaylist()} songID={song().id} copy={copy}
-                    openSearch={(id) => songSearch.set(id)} />
+                  <If when={!narrow()}><View class="flex-row items-center gap-1 px-2" style={{ width: playingHistory() ? 110 : 120 }}><Text class="min-w-0 flex-1 truncate text-xs text-muted-foreground">{song().user || "?"}</Text><If when={song().quota}><Tooltip testID={"quota-"+song().id+"-help"} placement="top" popupClass="max-w-[280px] rounded-[6px] bg-foreground px-2 py-1" trigger={<View focusable accessibilityLabel="本场已成功加入歌单数量"><Text class="rounded bg-secondary px-1 text-[10px] text-faint">{song().quota}</Text></View>}><Text class="text-xs text-background">本场已成功加入歌单 {song().quota}</Text></Tooltip></If></View></If>
+                  <View testID={"menu-"+song().id} accessibilityLabel="歌曲操作" class="min-w-0 flex-1 px-2"
+                    onContextMenu={(event) => { menuPoint.set({ x: event.pagePosition.x, y: event.pagePosition.y }); songMenu.set(song().id); }}>
+                    <Text class="truncate text-[13px] font-medium text-foreground">{song().name}</Text>
+                    <If when={song().detail}><Text class="truncate text-[11px] text-faint">{song().detail}</Text></If>
+                  </View>
                   <If when={!narrow() && !playingHistory()}><Text class="w-[72px] px-2 text-xs text-faint">{song().time}</Text></If>
                   <View class="shrink-0 flex-row items-center justify-end gap-1 px-2" style={{ width: playingHistory() ? 48 : 110 }}>
                     <If when={!playingHistory() && state().verified}><IconAction compact label="加入歌单" hint={addHint(song())}
@@ -248,6 +253,8 @@ function App() {
           </If>
         </View></If>
       </Dialog>
+      <If when={!!songMenu()}><SongMenuOverlay state={state()} act={act} name={playlistName()} bound={boundPlaylist()} songID={songMenu()} point={menuPoint()} copy={copy}
+        close={() => songMenu.set("")} openSearch={(id) => { songMenu.set(""); songSearch.set(id); }} /></If>
       <If when={!!songSearch()}><SongSearchDialog state={state()} songID={songSearch()} act={act} name={playlistName()} bound={boundPlaylist()} copy={copy} close={() => songSearch.set("")} /></If>
       <Toasts ref={toasts.set} testID="notification-toasts" placement="bottomEnd" closeAccessibilityLabel="关闭通知" />
     </View>
