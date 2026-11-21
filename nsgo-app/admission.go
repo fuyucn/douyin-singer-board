@@ -7,7 +7,20 @@ import (
 	"github.com/sususongboard/nsgo-app/queue"
 )
 
+func chatUserID(message queue.ChatMessage) string {
+	userID := strings.TrimSpace(message.UserID)
+	if userID != "" && userID != "0" {
+		return userID
+	}
+	name := strings.TrimSpace(message.Nickname)
+	if name == "" {
+		return "anonymous"
+	}
+	return "anon:" + name
+}
+
 func (board *boardState) handleChat(message queue.ChatMessage) {
+	message.UserID = chatUserID(message)
 	result := board.matcher.Match(message)
 	if result.Ignored != "" {
 		board.logRequestRejection(message.Nickname, message.Content, result.Ignored)

@@ -236,6 +236,72 @@ func TestSuccessCountExcludesManualAndEmptyUsers(t *testing.T) {
 	}
 }
 
+func TestChatUserIDFallback(t *testing.T) {
+	cases := []struct {
+		message queue.ChatMessage
+		want    string
+	}{
+		{queue.ChatMessage{UserID: "12345", Nickname: "A"}, "12345"},
+		{queue.ChatMessage{UserID: " 0 ", Nickname: "A"}, "anon:A"},
+		{queue.ChatMessage{UserID: "", Nickname: " 张三 "}, "anon:张三"},
+		{queue.ChatMessage{UserID: "0"}, "anonymous"},
+	}
+	for _, test := range cases {
+		if got := chatUserID(test.message); got != test.want {
+			t.Fatalf("chatUserID(%+v) = %q, want %q", test.message, got, test.want)
+		}
+	}
+}
+
+func TestAnonymousViewersDoNotShareQuota(t *testing.T) {
+	fixtureDatabase(t)
+	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 3}})
+	var board *boardState
+	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
+		board = newBoard(scope, platformServices{})
+		scope.ProvideHost(board.host)
+		board.host.Handle("board.snapshot", func(call *core.HostCall) { call.Resolve(board.snapshot()) })
+		return renderBoard(scope)
+	}, nsgotest.Size(1000, 780))
+	requests := []struct{ id, nickname, name string }{
+		{"a1", "Alice", "Alice song"},
+		{"b1", "Bob", "Bob song"},
+		{"c1", "Carol", "Carol song"},
+	}
+	app.Post(func() {
+		for _, request := range requests {
+			board.handleChat(queue.ChatMessage{ID: request.id, UserID: "0", Nickname: request.nickname, Content: request.name})
+		}
+		board.publish()
+	})
+	app.WaitUntil(time.Second, func() bool { return len(app.Query("text:0/3")) == 3 })
+	app.Post(func() {
+		for _, song := range board.matcher.Queue() {
+			if song.UserID == "anon:Alice" {
+				board.accepted = []playedSong{{Song: song, At: time.Now()}}
+				break
+			}
+		}
+		board.publish()
+	})
+	app.WaitFor("text:1/3", time.Second)
+	if got := len(app.Query("text:0/3")); got != 2 {
+		t.Fatalf("%d anonymous viewers still showed 0/3, want 2", got)
+	}
+}
+
+func TestAnonymousCancelUsesNickname(t *testing.T) {
+	app, board := controllerHarness(t, platformServices{})
+	app.Post(func() {
+		board.handleChat(queue.ChatMessage{ID: "anon-1", UserID: "0", Nickname: "Alice", Content: "Song one"})
+		board.handleChat(queue.ChatMessage{ID: "anon-2", UserID: "0", Nickname: "Alice", Content: "取消点歌"})
+	})
+	app.Settle()
+	if queue := board.matcher.Queue(); len(queue) != 0 {
+		t.Fatalf("anonymous cancel left %d queued songs", len(queue))
+	}
+}
+
 func TestQuotaUsesConfirmedAddsNotQueue(t *testing.T) {
 	fixtureDatabase(t)
 	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Limit: 3}})
