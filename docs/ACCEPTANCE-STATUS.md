@@ -4,7 +4,7 @@
 
 - Branch: feat/align-main. Initial repair commit 95c1485f8ea753e42912a4807434bed8d8e4016e was based on 85e7ab6a44d2480aed354af90d2ef539477c76c8.
 - The follow-up candidate repairs native fixture ownership and prepares CI desktop workspace. CI result metadata identifies the exact tested revision.
-- Product version: 0.43.1. The product version was not bumped.
+- Product version: 0.43.2-preview.2 on this release branch. The reviewed application candidate is df1bb88; only the manifest and version references were bumped for the fixed preview package.
 - Runtime dependency: NSGo 0.2.0. No Tauri/NSH runtime was restored.
 - Reference authorities and the two mandatory gates remain defined in [ACCEPTANCE.md](ACCEPTANCE.md).
 
