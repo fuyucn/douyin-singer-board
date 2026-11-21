@@ -13,7 +13,7 @@
 | Gate | Status | Reason |
 |---|---|---|
 | Functional | NOT RUN | Final-candidate CI passed native checks on both macOS and Windows, but authorized real-account checks and end-to-end update installation remain pending. Earlier CI failures are recorded below for context. |
-| Visual | NOT RUN | Fresh macOS captures exist and sample screens were inspected, but pinned reference captures and complete human comparison are pending. Windows reference/candidate captures are also missing. |
+| Visual | NOT RUN | Final-candidate native captures exist on both macOS and Windows, but pinned reference captures and complete human comparison are pending. |
 | Overall | NOT ACCEPTED | Both mandatory gates have not passed. |
 
 ## Final CI Evidence
@@ -70,7 +70,7 @@ The start palette, light/dark workbench, clear confirmation, pointer tooltip, an
 
 ## Remaining Required Evidence
 
-1. Verify the acceptance workflow on the final candidate so the macOS viewport preparation and Windows native evidence both come from the same commit. A prior Windows pass does not cover later source changes.
+1. Preserve and review the final-candidate CI artifacts from run 44868857818 so the macOS viewport preparation and Windows native evidence remain tied to application candidate 3d682b5.
 2. Capture the pinned reference and candidate at matching OS, scale, viewport, theme, and state; complete the visual review matrix and record the human reviewer findings.
 3. Complete separately authorized, user-operated live login and test-playlist checks on both music platforms, and verify a signed update install on the intended update channel without touching real playlists or another channel.
 4. Tie the complete evidence set to the final candidate commit and obtain PASS for both gates before marking the migration accepted.
