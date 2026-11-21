@@ -242,8 +242,9 @@ func TestChatUserIDFallback(t *testing.T) {
 		want    string
 	}{
 		{queue.ChatMessage{UserID: "12345", Nickname: "A"}, "12345"},
-		{queue.ChatMessage{UserID: " 0 ", Nickname: "A"}, "anon:A"},
-		{queue.ChatMessage{UserID: "", Nickname: " 张三 "}, "anon:张三"},
+		{queue.ChatMessage{UserID: "12345", Nickname: "名字****"}, "anon:uid:12345"},
+		{queue.ChatMessage{UserID: " 0 ", Nickname: "A"}, "anon:name:A"},
+		{queue.ChatMessage{UserID: "", Nickname: " 张三 "}, "anon:name:张三"},
 		{queue.ChatMessage{UserID: "0"}, "anonymous"},
 	}
 	for _, test := range cases {
@@ -263,15 +264,15 @@ func TestAnonymousViewersIgnoreUserQuota(t *testing.T) {
 		board.host.Handle("board.snapshot", func(call *core.HostCall) { call.Resolve(board.snapshot()) })
 		return renderBoard(scope)
 	}, nsgotest.Size(1000, 780))
-	requests := []struct{ id, nickname, name string }{
-		{"a1", "Alice", "Alice song"},
-		{"b1", "Bob", "Bob song"},
-		{"c1", "Carol", "Carol song"},
-		{"a2", "Alice", "Alice second song"},
+	requests := []struct{ id, uid, nickname, name string }{
+		{"a1", "101", "名字****", "Alice song"},
+		{"b1", "102", "游客****", "Bob song"},
+		{"c1", "103", "匿名***", "Carol song"},
+		{"a2", "101", "名字****", "Alice second song"},
 	}
 	app.Post(func() {
 		for _, request := range requests {
-			board.handleChat(queue.ChatMessage{ID: request.id, UserID: "0", Nickname: request.nickname, Content: request.name})
+			board.handleChat(queue.ChatMessage{ID: request.id, UserID: request.uid, Nickname: request.nickname, Content: request.name})
 		}
 		board.publish()
 	})
@@ -279,7 +280,7 @@ func TestAnonymousViewersIgnoreUserQuota(t *testing.T) {
 	if got := len(app.Query("text:0/1")) + len(app.Query("text:1/1")); got != 0 {
 		t.Fatalf("anonymous rows showed %d quota badges, want none", got)
 	}
-	if got := board.successCount("anon:Alice"); got != 0 {
+	if got := board.successCount("anon:uid:101"); got != 0 {
 		t.Fatalf("anonymous success count = %d, want 0", got)
 	}
 }

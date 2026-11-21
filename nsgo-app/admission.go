@@ -7,16 +7,35 @@ import (
 	"github.com/sususongboard/nsgo-app/queue"
 )
 
+func isMaskedNickname(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" || strings.Contains(name, "*") {
+		return true
+	}
+	lower := strings.ToLower(name)
+	return strings.HasPrefix(lower, "匿名") || strings.HasPrefix(lower, "游客")
+}
+
 func chatUserID(message queue.ChatMessage) string {
 	userID := strings.TrimSpace(message.UserID)
-	if userID != "" && userID != "0" {
-		return userID
-	}
+	validUID := userID != "" && userID != "0"
 	name := strings.TrimSpace(message.Nickname)
-	if name == "" {
+	if isMaskedNickname(name) {
+		if validUID {
+			return "anon:uid:" + userID
+		}
+		if name != "" {
+			return "anon:name:" + name
+		}
 		return "anonymous"
 	}
-	return "anon:" + name
+	if validUID {
+		return userID
+	}
+	if name != "" {
+		return "anon:name:" + name
+	}
+	return "anonymous"
 }
 
 func isAnonymousUserID(userID string) bool {
