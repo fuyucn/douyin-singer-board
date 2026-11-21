@@ -212,7 +212,7 @@ func startPlatformBoard(t *testing.T, id string, loggedIn bool) (*nsgotest.App, 
 		mock.credentials[id] = string(encoded)
 	}
 	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Repeat: 1800, Limit: 3}, Platform: id})
-	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
+	app := startTestApp(t, func(scope *core.Scope) core.Node {
 		mock.close = scope.Dispose
 		return boardRoot(scope, mock.services())
 	},

@@ -265,7 +265,7 @@ func TestStartControlUsesReferencePalette(t *testing.T) {
 	} {
 		t.Run(theme.name, func(t *testing.T) {
 			fixtureDatabase(t)
-			app := nsgotest.Start(t, Root, nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme.dark)))
+			app := startTestApp(t, Root, nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme.dark)))
 			app.Hover("id:app-header")
 			if actual := app.Find("id:connect").Style.Background; actual != theme.foreground {
 				t.Fatalf("start control background = %v, want reference foreground %v", actual, theme.foreground)

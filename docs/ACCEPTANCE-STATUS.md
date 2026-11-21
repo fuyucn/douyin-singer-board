@@ -2,7 +2,8 @@
 
 ## Candidate
 
-- Branch: feat/align-main, based on 85e7ab6a44d2480aed354af90d2ef539477c76c8, with uncommitted repair/test/documentation changes.
+- Branch: feat/align-main. Initial repair commit 95c1485f8ea753e42912a4807434bed8d8e4016e was based on 85e7ab6a44d2480aed354af90d2ef539477c76c8.
+- The follow-up candidate repairs native fixture ownership and prepares CI desktop workspace. CI result metadata identifies the exact tested revision.
 - Product version: 0.43.1. The product version was not bumped.
 - Runtime dependency: NSGo 0.2.0. No Tauri/NSH runtime was restored.
 - Reference authorities and the two mandatory gates remain defined in [ACCEPTANCE.md](ACCEPTANCE.md).
@@ -11,7 +12,7 @@
 
 | Gate | Status | Reason |
 |---|---|---|
-| Functional | NOT RUN | Required offline and macOS native checks passed, but Windows native execution, authorized real-account checks, and end-to-end update installation remain unrun. |
+| Functional | NOT RUN | Local checks passed, but the follow-up Windows native run, authorized real-account checks, and end-to-end update installation remain pending. The first CI native run failed as recorded below. |
 | Visual | NOT RUN | Fresh macOS captures exist and sample screens were inspected, but pinned reference captures and complete human comparison are pending. Windows reference/candidate captures are also missing. |
 | Overall | NOT ACCEPTED | Both mandatory gates have not passed. |
 
@@ -22,7 +23,16 @@
 - Native pointer hover failed both for the workbench and a minimal tooltip primitive under NSGo 0.1.0. Both reproductions passed with NSGo 0.2.0 using an isolated temporary module manifest before updating the main dependency.
 - Screenshot coverage now runs on both supported native desktop targets, with explicit light/dark desktop environments, 1000x680 desktop and 390x700 narrow layouts, pointer tooltip, and clear/recreate cancellation.
 - The native acceptance command requires current-run JUnit results and screenshot files. Failed, skipped, empty, missing, or duplicated required test results cannot become PASS. Native checks do not automatically approve the Visual gate.
-- A separate macOS/Windows acceptance-evidence workflow is added. It has not been pushed or executed remotely in this repair session and does not publish releases.
+- A separate macOS/Windows acceptance-evidence workflow was published on the feature branch. It does not publish releases; the first remote native failures are recorded below.
+
+## First CI Run and Follow-up
+
+- Push-triggered run 44856232057 tested initial repair commit 95c1485. Offline functional tests, NSGo checks, and version-rule tests passed on both native runners.
+- macOS native interaction tests all passed, but the image verifier correctly rejected a constrained 1000x656 capture instead of 1000x680. Narrow captures were also clamped to 656 pixels high. No screenshot tolerance was relaxed.
+- Windows produced all interaction screenshots, but every native case failed temporary-directory cleanup because the actual application scope still held its SQLite file. These are failed tests, not passes inferred from screenshots.
+- The fixture ownership regression reproduced the unreleased lock on native macOS before the fix and passed after deterministic disposal on the application context. It verifies both locks can be reacquired and the database can be renamed. This proves resource cleanup, not per-test native-window destruction; the test host owns the native process/window lifetime.
+- The follow-up explicitly resizes and checks application content bounds before capture. Only the ephemeral macOS CI job changes Dock visibility and checks available desktop space. PNG dimensions and required states remain unchanged.
+- Local follow-up offline tests passed twice, the race-enabled suite and NSGo type checks passed, and native checks passed 5/5 with zero skips, retaining 31 captures. Logs are under .nsgo/acceptance/github-44856232057/ and .nsgo/acceptance/macos-3843044310/ relative to nsgo-app. This records local evidence before the follow-up CI run; both OSes must be revalidated remotely and human visual approval is still separate.
 
 ## Local Evidence
 

@@ -44,6 +44,16 @@ jobs:
         run: go tool nsgo check ./...
       - name: Check version rules
         run: node --test scripts/bump-patch.test.mjs
+      - name: Prepare macOS screenshot viewport
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          defaults write com.apple.dock autohide -bool true
+          if pgrep -x Dock > /dev/null; then
+            killall Dock
+          fi
+          sleep 2
+          swift -e 'import AppKit; guard let screen = NSScreen.main else { fatalError("No desktop display") }; print("Desktop frame: \(screen.frame); visible: \(screen.visibleFrame)"); guard screen.visibleFrame.width >= 1000 && screen.visibleFrame.height >= 728 else { fatalError("Desktop too small for declared native test viewports") }'
       - name: Run native tests and collect fresh screenshots
         run: go run ./scripts/native-acceptance
       - name: Upload evidence for separate visual review

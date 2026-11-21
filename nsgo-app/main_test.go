@@ -28,6 +28,34 @@ func desktopTestEnvironment(dark bool) core.Environment {
 	return core.Environment{Dark: dark, OS: platform, Idiom: core.IdiomDesktop}
 }
 
+func startTestApp(t *testing.T, render func(*core.Scope) core.Node, options ...nsgotest.Option) *nsgotest.App {
+	t.Helper()
+	var owner *core.Scope
+	disposed := make(chan struct{})
+	app := nsgotest.Start(t, func(scope *core.Scope) core.Node {
+		owner = scope
+		scope.Cleanup(func() { close(disposed) })
+		return render(scope)
+	}, options...)
+	t.Cleanup(func() {
+		select {
+		case <-disposed:
+			return
+		default:
+		}
+		app.Post(func() { owner.Dispose() })
+		app.WaitUntil(time.Second, func() bool {
+			select {
+			case <-disposed:
+				return true
+			default:
+				return false
+			}
+		})
+	})
+	return app
+}
+
 func fixtureDatabase(t *testing.T) string {
 	t.Helper()
 	directory := filepath.Join(t.TempDir(), "SongBoard \u6570\u636e #1")
@@ -84,9 +112,37 @@ func savedSQLiteSettings(t *testing.T) string {
 	return data
 }
 
+func TestWorkbenchFixtureReleasesResources(t *testing.T) {
+	path := fixtureDatabase(t)
+	locks := []string{path, filepath.Join(os.Getenv("SUSUSONGBOARD_SETTINGS_DIR"), preferencesFilename)}
+	t.Run("mounted", func(t *testing.T) {
+		app := startTestApp(t, Root, nsgotest.Size(1000, 680))
+		app.WaitFor("id:workbench", time.Second)
+		for _, name := range locks {
+			lock, err := acquireSettingsLock(name)
+			if err == nil {
+				lock.Close()
+				t.Fatalf("mounted application did not hold its lock: %s", name)
+			}
+		}
+	})
+	for _, name := range locks {
+		lock, err := acquireSettingsLock(name)
+		if err != nil {
+			t.Fatalf("fixture cleanup did not release %s: %v", name, err)
+		}
+		if err := lock.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(path, path+".closed"); err != nil {
+		t.Fatalf("fixture cleanup left the database open: %v", err)
+	}
+}
+
 func TestListenerWindowStartsWithoutNetwork(t *testing.T) {
 	fixtureDatabase(t)
-	app := nsgotest.Start(t, Root, nsgotest.Size(1000, 680))
+	app := startTestApp(t, Root, nsgotest.Size(1000, 680))
 	for _, query := range []string{"id:app-header", "id:room-sidebar", "id:room", "id:connect", "id:sing-prefix", "id:song-queue", "id:workbench-tabs", "id:status-footer"} {
 		if !app.Exists(query) {
 			t.Fatalf("workbench is missing %q: %s", query, app.Dump())
@@ -126,7 +182,7 @@ func TestListenerWindowStartsWithoutNetwork(t *testing.T) {
 
 func TestWorkbenchNarrowLayoutAndPlatformSettings(t *testing.T) {
 	fixtureDatabase(t)
-	app := nsgotest.Start(t, Root, nsgotest.Size(390, 700))
+	app := startTestApp(t, Root, nsgotest.Size(390, 700))
 	if app.Exists("id:room") {
 		t.Fatal("narrow configuration should start collapsed")
 	}
@@ -160,9 +216,16 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 	fixtureDatabase(t)
 	mock := &mockPlatforms{credentials: map[string]string{}, qrState: 1}
 	seedJSONPreferences(t, boardSettings{Rules: rules{Template: "[song]", Repeat: 1800, Limit: 3}, Platform: adapter.NetEase})
-	app := nsgotest.Start(t, func(scope *core.Scope) core.Node { return boardRoot(scope, mock.services()) },
+	app := startTestApp(t, func(scope *core.Scope) core.Node { return boardRoot(scope, mock.services()) },
 		nsgotest.Size(1000, 680), nsgotest.Environment(desktopTestEnvironment(theme == "dark")))
-	capture := func(name string) { app.Screenshot(theme + "-" + name) }
+	viewport := core.Size{Width: 1000, Height: 680}
+	app.Resize(viewport.Width, viewport.Height)
+	capture := func(name string) {
+		if actual := app.Find("id:workbench").Frame.Size; actual != viewport {
+			t.Fatalf("native client viewport = %v, want %v", actual, viewport)
+		}
+		app.Screenshot(theme + "-" + name)
+	}
 	capture("nsgo-workbench")
 	app.Type("id:manual-song", "Preview request")
 	app.Press("id:manual-add")
@@ -249,7 +312,8 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 	app.Press("id:close-settings")
 	app.Advance(250 * time.Millisecond)
 	app.WaitForGone("id:settings-dialog", time.Second)
-	app.Resize(390, 700)
+	viewport = core.Size{Width: 390, Height: 700}
+	app.Resize(viewport.Width, viewport.Height)
 	app.Hover("id:app-header")
 	capture("susu-narrow-workbench")
 	app.Press("role:button 配置")

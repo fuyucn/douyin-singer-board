@@ -20,6 +20,7 @@ var requiredTests = []string{
 	"TestWorkbenchNarrowLayoutAndPlatformSettings",
 	"TestStartControlUsesReferencePalette",
 	"TestWorkbenchPointerTooltip",
+	"TestWorkbenchFixtureReleasesResources",
 }
 
 var screenshotStates = []string{
