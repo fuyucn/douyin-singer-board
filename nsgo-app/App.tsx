@@ -1,6 +1,6 @@
 import { cleanup, Clipboard, colorScheme, host, Image, List, mount, Scroll, setColorScheme, signal, Text, token, View, windowSize } from "nsgo";
 import { Input, Tooltip } from "nsgo/base";
-import { Dialog, Icon, Toasts, type ToastsRef } from "nsgo/ui";
+import { Dialog, Icon, Switch, Toasts, type ToastsRef } from "nsgo/ui";
 import logo from "./assets/logo.png";
 import { Platforms, PlaylistControls, SongMenuOverlay, SongSearchDialog } from "./Platforms";
 import { Action, IconAction } from "./Controls";
@@ -247,7 +247,7 @@ function App() {
         <If when={settingsTab() === "general"}><Scroll class="min-h-0 flex-1 bg-card p-4"><View class="gap-4">
           <Text class="text-[13px] font-semibold text-foreground">外观</Text>
           <View class="flex-row gap-2"><Each of={[{ key: "system", label: "跟随系统" }, { key: "light", label: "亮色" }, { key: "dark", label: "暗色" }]} key={(mode) => mode.key}>{(mode) => <Action label={(themeMode() === mode().key ? "✓ " : "")+mode().label} onPress={() => { themeMode.set(mode().key); setColorScheme(mode().key as "light" | "dark" | "system"); }} />}</Each></View>
-          <View class="h-px bg-line" /><View class="flex-row items-center gap-3"><Text class="flex-1 text-sm text-foreground">显示日志面板</Text><Action label={state().showLogs ? "已显示" : "已隐藏"} testID="settings-show-logs" onPress={() => void act("board.showLogs", !state().showLogs)} /></View>
+          <View class="h-px bg-line" /><View class="flex-row items-center gap-3"><Text class="flex-1 text-sm text-foreground">显示日志面板</Text><Switch testID="settings-show-logs" accessibilityLabel="显示日志面板" checked={state().showLogs} onChange={({ checked }) => void act("board.showLogs", checked)} /></View>
           <Text class="text-xs text-muted-foreground">直播间 ID：{draftRules().room || "—"}</Text><Text class="text-xs text-muted-foreground">版本：v{state().version}</Text>
           <Action label="前往插件设置" testID="go-plugin" onPress={() => settingsTab.set("plugin")} />
           <View class="h-px bg-line" />

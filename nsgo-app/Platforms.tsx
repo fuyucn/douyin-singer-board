@@ -1,6 +1,6 @@
 import { createMotion, Image, Scroll, signal, Text, token, View, windowSize } from "nsgo";
 import { Dialog as ConfirmationDialog, Input } from "nsgo/base";
-import { Dialog, Icon } from "nsgo/ui";
+import { Dialog, Icon, Switch } from "nsgo/ui";
 import type { State } from "./App";
 import { Action, IconAction } from "./Controls";
 
@@ -21,35 +21,39 @@ function Unconfirmed(props: PanelProps) {
 export function Platforms(props: PanelProps) {
   const cookie = signal("");
   return <Scroll testID="platform-settings" class="min-h-0 flex-1 bg-card p-4"><View class="gap-4">
-    <If when={!props.state.qrImage}>
     <Text class="text-[13px] font-semibold text-foreground">音乐平台插件</Text>
     <Text class="text-xs text-muted-foreground">可选一个平台，也可以都不开；歌单、同步与歌曲匹配只随所选平台显示。</Text>
-    <Each of={[{ id: "kugou-web", testID: "plugin-kugou", name: "酷狗音乐" }, { id: "netease-web", testID: "plugin-netease", name: "网易云音乐" }]} key={(provider) => provider.id}>
-      {(provider) => <View class="flex-row items-center gap-3 rounded-[6px] border border-border p-3" classList={{ "bg-secondary": props.state.platform === provider().id }}>
-        <View class="min-w-0 flex-1 gap-1"><Text class="text-[13px] font-medium text-foreground">{provider().name}</Text><Text class="text-[11px] text-faint">{props.state.platform === provider().id ? "已启用" : "未启用"}</Text></View>
-        <Action label={props.state.platform === provider().id ? "停用" : "启用"} testID={provider().testID} locked={props.state.busy} onPress={() => { cookie.set(""); void props.act("platform.select", props.state.platform === provider().id ? "" : provider().id); }} />
-      </View>}
-    </Each>
-    <If when={!props.state.platform} else={<Action label="仅弹幕监听（停用平台）" testID="plugin-none" locked={props.state.busy} onPress={() => { cookie.set(""); void props.act("platform.select", ""); }} />}>
+    <View class="gap-3">
+      <Each of={[{ id: "kugou-web", testID: "plugin-kugou", name: "酷狗音乐" }, { id: "netease-web", testID: "plugin-netease", name: "网易云音乐" }]} key={(provider) => provider.id}>{(provider) => {
+        const active = () => props.state.platform === provider().id;
+        return <View testID={"plugin-card-"+provider().id} class="gap-3 rounded-[8px] border p-3" classList={{ "border-foreground bg-secondary": active(), "border-border bg-card": !active() }}>
+          <View class="flex-row items-center gap-3">
+            <View class="min-w-0 flex-1 gap-1"><Text class="text-[13px] font-medium text-foreground">{provider().name}</Text><Text class="text-[11px] text-faint">{active() ? "已启用" : "未启用"}</Text></View>
+            <Switch testID={provider().testID} accessibilityLabel={"启用"+provider().name} checked={active()} disabled={props.state.busy}
+              onChange={({ checked }) => { cookie.set(""); void props.act("platform.select", checked ? provider().id : ""); }} />
+          </View>
+          <If when={active()}>
+            <View class="h-px bg-line" />
+            <Text testID="platform-account" class="text-xs text-muted-foreground">{props.state.verified ? "已登录："+props.state.account : props.state.busy ? "正在验证账号…" : "未登录或尚未验证"}</Text>
+            <If when={!props.state.verified} else={<View class="flex-row gap-2"><Action label="刷新登录与歌单" testID="refresh-login" icon="refresh" locked={props.state.busy} onPress={() => void props.act("platform.refresh")} /><Action label="退出登录" testID="logout" locked={props.state.busy} onPress={() => void props.act("platform.logout")} /></View>}>
+              <Action label="生成登录二维码 / 刷新" testID="login-qr" icon="refresh" locked={props.state.busy} onPress={() => void props.act("platform.qr")} />
+              <If when={props.state.qrStatus}><Text testID="qr-status" class="text-xs text-muted-foreground">{props.state.qrStatus}</Text><Action label="取消扫码" testID="cancel-qr" onPress={() => void props.act("platform.cancelQR")} /></If>
+              <If when={props.state.qrImage}><View class="items-center gap-2"><Image testID="login-qr-image" src={props.state.qrImage} alt="登录二维码" class="size-[150px]" /><Text class="text-xs text-muted-foreground">请使用 {provider().name} App 扫码并在手机确认。</Text></View></If>
+              <If when={provider().id === "netease-web"}>
+                <Text class="text-xs text-muted-foreground">如果平台拒绝扫码，可使用自己的 MUSIC_U Cookie；不要发到聊天中。</Text>
+                <Input testID="netease-cookie" accessibilityLabel="网易云 Cookie" masked value={cookie()} onChange={({ value }) => cookie.set(value)} placeholder="包含 MUSIC_U 的 Cookie" class="h-8 rounded border border-border bg-background px-2 text-sm text-foreground" />
+                <Action label="验证 Cookie 登录" testID="cookie-login" disabled={!cookie().trim()} locked={props.state.busy} onPress={() => { const value = cookie(); cookie.set(""); void props.act("platform.cookie", value); }} />
+              </If>
+            </If>
+            <Text class="text-[11px] text-faint">授权保存在系统钥匙串；切换平台或退出账号会停止同步。</Text>
+          </If>
+        </View>;
+      }}</Each>
+    </View>
+    <If when={!props.state.platform}>
       <Text testID="plugin-none" class="text-xs text-muted-foreground">仅弹幕监听：连接直播间后收集点歌指令，不操作音乐平台。</Text>
     </If>
-    </If>
-    <If when={!!props.state.platform}>
-      <View class="h-px bg-line" /><Text class="text-[13px] font-semibold text-foreground">{platformName(props.state)}登录</Text>
-      <Text testID="platform-account" class="text-xs text-muted-foreground">{props.state.verified ? "已登录："+props.state.account : props.state.busy ? "正在验证账号…" : "未登录或尚未验证"}</Text>
-      <If when={!props.state.verified} else={<View class="flex-row gap-2"><Action label="刷新登录与歌单" testID="refresh-login" icon="refresh" locked={props.state.busy} onPress={() => void props.act("platform.refresh")} /><Action label="退出登录" testID="logout" locked={props.state.busy} onPress={() => void props.act("platform.logout")} /></View>}>
-        <Action label="生成登录二维码 / 刷新" testID="login-qr" icon="refresh" locked={props.state.busy} onPress={() => void props.act("platform.qr")} />
-        <If when={props.state.qrStatus}><Text testID="qr-status" class="text-xs text-muted-foreground">{props.state.qrStatus}</Text><Action label="取消扫码" testID="cancel-qr" onPress={() => void props.act("platform.cancelQR")} /></If>
-        <If when={props.state.qrImage}><View class="items-center gap-2"><Image testID="login-qr-image" src={props.state.qrImage} alt="登录二维码" class="size-[180px]" /><Text class="text-xs text-muted-foreground">请使用 {platformName(props.state)} App 扫码并在手机确认。</Text></View></If>
-        <If when={props.state.platform === "netease-web"}>
-          <Text class="text-xs text-muted-foreground">如果平台拒绝扫码，可使用自己的 MUSIC_U Cookie；不要发到聊天中。</Text>
-          <Input testID="netease-cookie" accessibilityLabel="网易云 Cookie" masked value={cookie()} onChange={({ value }) => cookie.set(value)} placeholder="包含 MUSIC_U 的 Cookie" class="h-8 rounded border border-border bg-background px-2 text-sm text-foreground" />
-          <Action label="验证 Cookie 登录" testID="cookie-login" disabled={!cookie().trim()} locked={props.state.busy} onPress={() => { const value = cookie(); cookie.set(""); void props.act("platform.cookie", value); }} />
-        </If>
-      </If>
-      <Text class="text-[11px] text-faint">授权保存在系统钥匙串；切换平台或退出账号会停止同步。</Text>
-      <Unconfirmed state={props.state} act={props.act} />
-    </If>
+    <If when={!!props.state.platform}><Unconfirmed state={props.state} act={props.act} /></If>
   </View></Scroll>;
 }
 
