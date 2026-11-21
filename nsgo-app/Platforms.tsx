@@ -108,7 +108,7 @@ export function PlaylistControls(props: PlaylistProps & { setName: (name: string
 export function SongMenu(props: PlaylistProps & { songID: string; copy: (value: string) => Promise<void>; openSearch: (id: string) => void }) {
   const song = () => [...props.state.songs, ...props.state.played].find((entry) => entry.id === props.songID);
   const queued = () => props.state.songs.some((entry) => entry.id === props.songID);
-  return <ContextMenu testID={"song-menu-"+props.songID} trigger={
+  return <ContextMenu testID={"song-menu-"+props.songID} style={{ flex: 1 }} trigger={
     <View testID={"menu-"+props.songID} accessibilityLabel="歌曲操作" class="min-w-0 flex-1 px-2">
       <Text class="truncate text-[13px] font-medium text-foreground">{song()?.name}</Text>
       <If when={!!song()?.detail}><Text class="truncate text-[11px] text-faint">{song()?.detail}</Text></If>

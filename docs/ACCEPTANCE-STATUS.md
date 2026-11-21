@@ -36,12 +36,12 @@
 
 ## Latest Repair
 
-- The song action surface is now the NSGo native context menu: a compact menu at the pointer, one command per row, and automatic dismissal after selection. Alternative matching was kept as a secondary menu item that opens a dedicated search dialog.
+- The song action surface is now the NSGo native context menu: a compact menu at the pointer, one command per row, and automatic dismissal after selection. The menu trigger keeps the flexible table column so the time and icon columns stay aligned; native tests assert that alignment. Alternative matching was kept as a secondary menu item that opens a dedicated search dialog.
 - The native screenshot flow now presses both clear-confirmation buttons at their painted native coordinates and checks that cancel sends zero clear calls while confirm sends exactly one.
 - The screenshot matrix adds the running header/stop control and active auto-sync glow states. The running state is driven by an isolated fixture controller; it does not open a live Douyin connection.
 - The macOS CI viewport step now logs available display modes, selects a larger ephemeral-runner mode when one exists, hides the Dock and menu bar, and keeps the strict visible-frame and application-content checks.
 
-This repair has local macOS native evidence only. The remote macOS runner must still prove that the viewport preparation succeeds; that failure is not closed by a local pass.
+The final candidate must carry a green acceptance workflow run on both native runners; the macOS viewport preparation failure is closed only by the remote runner result, not by a local pass. Local captures below remain development evidence and are not the authoritative final commit artifacts.
 
 ## Local Evidence
 
@@ -56,15 +56,15 @@ These paths are local development artifacts under ignored .nsgo, not published G
 | Native macOS checks | PASS: 4 passed, 0 failed, 0 skipped | .nsgo/acceptance/macos-872331385/native.xml |
 | Native candidate provenance | Recorded | .nsgo/acceptance/macos-872331385/result.json |
 | macOS screenshots | 30 theme/state captures plus a pointer-tooltip capture | .nsgo/acceptance/macos-872331385/screenshots/ |
-| Follow-up native macOS checks | PASS: 5 passed, 0 failed, 0 skipped | .nsgo/acceptance/macos-1462163654/native.xml |
-| Follow-up macOS screenshot matrix | 35 captures, including running header and active sync | .nsgo/acceptance/macos-1462163654/screenshots/ |
+| Pre-commit native macOS checks | PASS: 5 passed, 0 failed, 0 skipped; not bound to final commit | .nsgo/acceptance/macos-3357607973/native.xml |
+| Pre-commit macOS screenshot matrix | 35 captures, including running header and active sync | .nsgo/acceptance/macos-3357607973/screenshots/ |
 | Windows amd64 test-binary cross-compilation | PASS: seven packages compiled; not executed on Windows | .nsgo/acceptance/20261120/windows-compile.log and windows-build/ |
 
 The start palette, light/dark workbench, clear confirmation, pointer tooltip, and narrow configuration were inspected locally. This limited inspection is not a complete pinned-baseline comparison and is not human Visual approval.
 
 ## Remaining Required Evidence
 
-1. Re-run the acceptance workflow on the final candidate so the macOS viewport preparation and Windows native evidence both come from the same commit. A prior Windows pass does not cover later source changes.
+1. Verify the acceptance workflow on the final candidate so the macOS viewport preparation and Windows native evidence both come from the same commit. A prior Windows pass does not cover later source changes.
 2. Capture the pinned reference and candidate at matching OS, scale, viewport, theme, and state; complete the visual review matrix and record the human reviewer findings.
 3. Complete separately authorized, user-operated live login and test-playlist checks on both music platforms, and verify a signed update install on the intended update channel without touching real playlists or another channel.
 4. Tie the complete evidence set to the final candidate commit and obtain PASS for both gates before marking the migration accepted.

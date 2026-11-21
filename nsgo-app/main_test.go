@@ -319,6 +319,14 @@ func captureWorkbenchScreenshots(t *testing.T, theme string) {
 	rowView := app.Find("text:Preview request")
 	row := rowView.Frame
 	rowOrigin := nativeOrigin(rowView)
+	if rowView.Parent == nil || rowView.Parent.Frame.Size.Width < 300 {
+		t.Fatalf("song name column lost its flexible width: %+v", rowView.Parent)
+	}
+	if timeHeader, copyAction := app.Find("text:时间"), app.Find("role:button 复制歌名"); timeHeader != nil && copyAction != nil {
+		if delta := nativeOrigin(timeHeader).X - nativeOrigin(copyAction).X; delta < -120 || delta > 40 {
+			t.Fatalf("song actions are not aligned with the table header, delta=%d", int(delta))
+		}
+	}
 	app.RightClick("text:Preview request")
 	app.WaitFor("role:menu", time.Second)
 	menu := app.Find("role:menu")
