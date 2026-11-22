@@ -4,7 +4,7 @@
 
 - Branch: feat/align-main. Initial repair commit 95c1485f8ea753e42912a4807434bed8d8e4016e was based on 85e7ab6a44d2480aed354af90d2ef539477c76c8.
 - The follow-up candidate repairs native fixture ownership and prepares CI desktop workspace. CI result metadata identifies the exact tested revision.
-- Product version: 0.43.2. The reviewed NSGo migration was merged into main before this release bump.
+- Product version: 0.43.3. This release adds the first signed stable internal updater channel; 0.43.2 ordinary packages remain non-updating and need one manual install to enter the channel.
 - Runtime dependency: NSGo 0.2.0. No Tauri/NSH runtime was restored.
 - Reference authorities and the two mandatory gates remain defined in [ACCEPTANCE.md](ACCEPTANCE.md).
 
