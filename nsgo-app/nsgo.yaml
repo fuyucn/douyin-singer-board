@@ -1,6 +1,6 @@
 name: SUSUSongBoard
 id: com.sususongboard.nsgo
-version: 0.43.1
+version: 0.43.2
 theme: theme.yaml
 
 icon:
