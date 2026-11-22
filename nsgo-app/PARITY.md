@@ -20,7 +20,7 @@ NSGo is the sole maintained application. The previous implementations are histor
 
 The display name, executable, bundle and package names are SUSUSongBoard, without a runtime suffix. The internal ID remains com.sususongboard.nsgo to preserve separate data and avoid overwriting legacy installs.
 
-The canonical version is nsgo.yaml. The migration preview started at 0.43.0-preview.1; 0.43.0 was the first regular package and 0.43.1 is the next version. Run node scripts/bump-patch.mjs to increment only the patch or edition counter; for a preview, it increments preview.N without changing the base version. Major/minor changes are explicit decisions. UI metadata and packaging read the same manifest. Versioned package tags must match v<VERSION>. Signed stable, isolated update-test, and preview channels are separate; see UPDATES.md. They do not configure or replace the legacy auto-updater.
+The canonical version is nsgo.yaml. Tags follow the manifest exactly: stable `vX.Y.Z`, preview `vX.Y.Z-preview.N`, and special/susu `vX.Y.Z-susu.N`. The migration preview started at 0.43.0-preview.1; 0.43.0 and 0.43.1 were regular packages, and 0.43.2 is the stable NSGo release after merging the migration into main. Run node scripts/bump-patch.mjs to increment only the patch or edition counter; for preview and susu editions, it increments the edition counter without changing the base version. Major/minor changes are explicit decisions. UI metadata and packaging read the same manifest. Release assets use the bare version without the `v` prefix. Signed stable, isolated update-test, and preview channels are separate; see UPDATES.md. They do not configure or replace the legacy auto-updater.
 
 ## Acceptance boundaries
 
