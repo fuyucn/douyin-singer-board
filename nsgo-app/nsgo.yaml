@@ -1,0 +1,26 @@
+name: SUSUSongBoard
+id: com.sususongboard.nsgo
+version: 0.43.1
+theme: theme.yaml
+
+icon:
+  png: assets/icon.png
+
+dev:
+  target: native
+
+song_requests:
+  default_template: "点歌[space][song]"
+
+build:
+  output: dist
+  targets:
+    - macos_arm64
+    - windows_x64
+
+macos:
+  dmg_icon: assets/icon.png
+
+windows:
+  installer_icon: assets/icon.ico
+  uninstaller_icon: assets/icon.ico

@@ -1,0 +1,9 @@
+name: SUSUSongBoard Main Preview
+id: com.sususongboard.nsgo.preview
+version: 0.1.0
+
+icon:
+  png: logo.png
+
+dev:
+  target: native

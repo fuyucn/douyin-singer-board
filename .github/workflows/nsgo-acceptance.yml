@@ -1,0 +1,90 @@
+name: SongBoard acceptance evidence
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/align-main]
+    paths:
+      - nsgo-app/**
+      - .github/workflows/nsgo-acceptance.yml
+  pull_request:
+    paths:
+      - nsgo-app/**
+      - .github/workflows/nsgo-acceptance.yml
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Native evidence (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: nsgo-app
+    env:
+      SONGBOARD_PUBLIC_SEARCH: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: nsgo-app/go.mod
+          cache-dependency-path: nsgo-app/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run offline functional tests
+        run: go test ./... -count=2 -skip '^(TestLiveDouyinConnection|TestPublicPlatformSearch)$'
+      - name: Check NSGo project
+        run: go tool nsgo check ./...
+      - name: Check version rules
+        run: node --test scripts/bump-patch.test.mjs
+      - name: Prepare macOS screenshot viewport
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          swift -e '
+          import AppKit
+          import CoreGraphics
+          let display = CGMainDisplayID()
+          if let modes = CGDisplayCopyAllDisplayModes(display, nil) as? [CGDisplayMode] {
+            print("Available GUI display modes:")
+            for mode in modes where mode.isUsableForDesktopGUI() {
+              print("  \(mode.width)x\(mode.height)")
+            }
+            let wanted = modes.filter { $0.isUsableForDesktopGUI() && $0.width >= 1280 && $0.height >= 800 }
+            if let mode = wanted.max(by: { ($0.width, $0.height) < ($1.width, $1.height) }) {
+              let status = CGDisplaySetDisplayMode(display, mode, nil)
+              print("Selected display mode: \(mode.width)x\(mode.height), status: \(status.rawValue)")
+            } else {
+              print("No 1280x800-or-larger display mode available")
+            }
+          }
+          '
+          defaults write com.apple.dock autohide -bool true
+          defaults write NSGlobalDomain _HIHideMenuBar -bool true
+          defaults read com.apple.dock autohide
+          defaults read NSGlobalDomain _HIHideMenuBar
+          if pgrep -x Dock > /dev/null; then
+            killall Dock
+          fi
+          if pgrep -x SystemUIServer > /dev/null; then
+            killall SystemUIServer
+          fi
+          sleep 3
+          swift -e 'import AppKit; guard let screen = NSScreen.main else { fatalError("No desktop display") }; print("Desktop frame: \(screen.frame); visible: \(screen.visibleFrame)"); guard screen.visibleFrame.width >= 1000 && screen.visibleFrame.height >= 728 else { fatalError("Desktop too small for declared native test viewports") }'
+      - name: Run native tests and collect fresh screenshots
+        run: go run ./scripts/native-acceptance
+      - name: Upload evidence for separate visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-acceptance-${{ matrix.os }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          path: nsgo-app/.nsgo/acceptance/
